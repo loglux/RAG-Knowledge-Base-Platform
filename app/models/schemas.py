@@ -31,6 +31,12 @@ class KnowledgeBaseBase(BaseModel):
         default=ChunkingStrategy.FIXED_SIZE,
         description="Chunking strategy"
     )
+    upsert_batch_size: int = Field(
+        default=256,
+        ge=64,
+        le=1024,
+        description="Max vectors per upsert request"
+    )
 
     @field_validator("chunk_overlap")
     @classmethod
@@ -55,6 +61,7 @@ class KnowledgeBaseUpdate(BaseModel):
     chunk_size: Optional[int] = Field(None, ge=100, le=4000)
     chunk_overlap: Optional[int] = Field(None, ge=0, le=1000)
     chunking_strategy: Optional[ChunkingStrategy] = None
+    upsert_batch_size: Optional[int] = Field(None, ge=64, le=1024)
 
 
 class KnowledgeBaseResponse(KnowledgeBaseBase):

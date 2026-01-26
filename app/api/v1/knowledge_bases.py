@@ -58,6 +58,7 @@ async def create_knowledge_base(
         chunk_size=kb.chunk_size,
         chunk_overlap=kb.chunk_overlap,
         chunking_strategy=kb.chunking_strategy,
+        upsert_batch_size=kb.upsert_batch_size,
         user_id=user_id,
     )
 

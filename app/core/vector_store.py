@@ -205,6 +205,7 @@ class QdrantVectorStore:
         vectors: List[List[float]],
         payloads: List[Dict[str, Any]],
         ids: Optional[List[str]] = None,
+        batch_size: Optional[int] = None,
     ) -> List[str]:
         """
         Insert vectors with metadata into a collection.
@@ -248,11 +249,36 @@ class QdrantVectorStore:
                 for point_id, vector, payload in zip(ids, vectors, payloads)
             ]
 
-            # Upsert points
-            await self.client.upsert(
-                collection_name=collection_name,
-                points=points,
-            )
+            # Log vector size diagnostics
+            try:
+                sample_dim = len(vectors[0]) if vectors else 0
+                collection_info = await self.client.get_collection(collection_name)
+                collection_dim = None
+                try:
+                    collection_dim = collection_info.config.params.vectors.size
+                except Exception:
+                    collection_dim = None
+                logger.info(
+                    "Upserting %s vectors into '%s' (sample_dim=%s, collection_dim=%s)",
+                    len(points),
+                    collection_name,
+                    sample_dim,
+                    collection_dim,
+                )
+            except Exception as e:
+                logger.warning("Failed to read collection vector size: %s", e)
+
+            # Upsert points (batched)
+            effective_batch_size = batch_size or len(points)
+            if effective_batch_size <= 0:
+                effective_batch_size = len(points)
+
+            for start in range(0, len(points), effective_batch_size):
+                batch = points[start:start + effective_batch_size]
+                await self.client.upsert(
+                    collection_name=collection_name,
+                    points=batch,
+                )
 
             logger.info(
                 f"Inserted {len(points)} vectors into collection '{collection_name}'"
@@ -262,7 +288,13 @@ class QdrantVectorStore:
         except CollectionNotFoundError:
             raise
         except Exception as e:
-            logger.error(f"Failed to insert vectors: {e}")
+            logger.error(
+                "Failed to insert vectors: %s (type=%s, args=%s)",
+                e,
+                type(e).__name__,
+                getattr(e, "args", None),
+            )
+            logger.exception("Vector insert exception")
             raise VectorStoreException(f"Failed to insert vectors: {e}") from e
 
     async def search(

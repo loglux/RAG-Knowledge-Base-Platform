@@ -160,6 +160,7 @@ class DocumentProcessor:
                 collection_name=kb.collection_name,
                 vectors=vectors,
                 payloads=payloads,
+                batch_size=kb.upsert_batch_size,
             )
 
             # 11. Update document status to completed

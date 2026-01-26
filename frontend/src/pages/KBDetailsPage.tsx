@@ -18,6 +18,7 @@ export function KBDetailsPage() {
   const [settingsData, setSettingsData] = useState({
     chunk_size: 1000,
     chunk_overlap: 200,
+    upsert_batch_size: 256,
   })
   const [settingsErrors, setSettingsErrors] = useState<Record<string, string>>({})
   const [settingsSaving, setSettingsSaving] = useState(false)
@@ -47,6 +48,7 @@ export function KBDetailsPage() {
         setSettingsData({
           chunk_size: data.chunk_size,
           chunk_overlap: data.chunk_overlap,
+          upsert_batch_size: data.upsert_batch_size,
         })
       } catch (err) {
         setKbError(err instanceof Error ? err.message : 'Failed to load knowledge base')
@@ -75,6 +77,10 @@ export function KBDetailsPage() {
       newErrors.chunk_overlap = 'Chunk overlap must be less than chunk size'
     }
 
+    if (settingsData.upsert_batch_size < 64 || settingsData.upsert_batch_size > 1024) {
+      newErrors.upsert_batch_size = 'Batch size must be between 64 and 1024'
+    }
+
     setSettingsErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -88,6 +94,7 @@ export function KBDetailsPage() {
       const updated = await apiClient.updateKnowledgeBase(kb.id, {
         chunk_size: settingsData.chunk_size,
         chunk_overlap: settingsData.chunk_overlap,
+        upsert_batch_size: settingsData.upsert_batch_size,
       })
       setKb(updated)
       setIsEditingSettings(false)
@@ -106,6 +113,7 @@ export function KBDetailsPage() {
     setSettingsData({
       chunk_size: kb.chunk_size,
       chunk_overlap: kb.chunk_overlap,
+      upsert_batch_size: kb.upsert_batch_size,
     })
     setSettingsErrors({})
     setIsEditingSettings(false)
@@ -321,6 +329,28 @@ export function KBDetailsPage() {
                 {settingsErrors.chunk_overlap && <p className="mt-1 text-sm text-red-500">{settingsErrors.chunk_overlap}</p>}
               </div>
 
+              <div>
+                <label htmlFor="kb-upsert-batch-size" className="block text-gray-400 mb-2">
+                  Upsert Batch Size: <span className="text-white font-medium">{settingsData.upsert_batch_size}</span>
+                </label>
+                <input
+                  id="kb-upsert-batch-size"
+                  type="range"
+                  min="64"
+                  max="1024"
+                  step="64"
+                  value={settingsData.upsert_batch_size}
+                  onChange={(e) => setSettingsData({ ...settingsData, upsert_batch_size: parseInt(e.target.value) })}
+                  className="w-full"
+                  disabled={settingsSaving}
+                />
+                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <span>64</span>
+                  <span>1024</span>
+                </div>
+                {settingsErrors.upsert_batch_size && <p className="mt-1 text-sm text-red-500">{settingsErrors.upsert_batch_size}</p>}
+              </div>
+
               <div className="text-xs text-gray-500">
                 Changes apply to new or reprocessed documents only.
               </div>
@@ -358,6 +388,10 @@ export function KBDetailsPage() {
                 <span className="text-gray-500 ml-1">
                   ({kb.chunk_size > 0 ? Math.round((kb.chunk_overlap / kb.chunk_size) * 100) : 0}%)
                 </span>
+              </div>
+              <div>
+                <span className="text-gray-400">Upsert Batch Size:</span>
+                <span className="text-white ml-2 font-medium">{kb.upsert_batch_size}</span>
               </div>
               <div>
                 <span className="text-gray-400">Chunking Strategy:</span>

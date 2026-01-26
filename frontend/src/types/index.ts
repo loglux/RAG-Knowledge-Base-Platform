@@ -5,6 +5,7 @@ export interface KnowledgeBase {
   description: string | null
   chunk_size: number
   chunk_overlap: number
+  upsert_batch_size: number
   chunking_strategy: 'fixed_size' | 'semantic'
   collection_name: string
   document_count: number
@@ -24,6 +25,7 @@ export interface CreateKBRequest {
   embedding_model?: string
   chunk_size?: number
   chunk_overlap?: number
+  upsert_batch_size?: number
   chunking_strategy?: 'fixed_size' | 'semantic'
 }
 

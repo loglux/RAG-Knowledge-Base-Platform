@@ -16,6 +16,7 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
     embedding_model: 'text-embedding-3-large',
     chunk_size: 1000,
     chunk_overlap: 200,
+    upsert_batch_size: 256,
     chunking_strategy: 'fixed_size',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -65,6 +66,10 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
       newErrors.chunk_overlap = 'Chunk overlap must be less than chunk size'
     }
 
+    if (formData.upsert_batch_size < 64 || formData.upsert_batch_size > 1024) {
+      newErrors.upsert_batch_size = 'Batch size must be between 64 and 1024'
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -80,14 +85,15 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
     try {
       await onSubmit(formData)
       // Reset form on success
-      setFormData({
-        name: '',
-        description: '',
-        embedding_model: 'text-embedding-3-large',
-        chunk_size: 1000,
-        chunk_overlap: 200,
-        chunking_strategy: 'fixed_size',
-      })
+        setFormData({
+          name: '',
+          description: '',
+          embedding_model: 'text-embedding-3-large',
+          chunk_size: 1000,
+          chunk_overlap: 200,
+          upsert_batch_size: 256,
+          chunking_strategy: 'fixed_size',
+        })
       setErrors({})
       onClose()
     } catch (error) {
@@ -105,6 +111,7 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
         embedding_model: 'text-embedding-3-large',
         chunk_size: 1000,
         chunk_overlap: 200,
+        upsert_batch_size: 256,
         chunking_strategy: 'fixed_size',
       })
       setErrors({})
@@ -257,6 +264,29 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
               <span>500</span>
             </div>
             {errors.chunk_overlap && <p className="mt-1 text-sm text-red-500">{errors.chunk_overlap}</p>}
+          </div>
+
+          {/* Upsert Batch Size */}
+          <div className="mt-4">
+            <label htmlFor="upsert-batch-size" className="block text-sm text-gray-400 mb-2">
+              Upsert Batch Size: <span className="text-white font-medium">{formData.upsert_batch_size}</span>
+            </label>
+            <input
+              id="upsert-batch-size"
+              type="range"
+              min="64"
+              max="1024"
+              step="64"
+              value={formData.upsert_batch_size}
+              onChange={(e) => setFormData({ ...formData, upsert_batch_size: parseInt(e.target.value) })}
+              className="w-full"
+              disabled={isSubmitting}
+            />
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>64</span>
+              <span>1024</span>
+            </div>
+            {errors.upsert_batch_size && <p className="mt-1 text-sm text-red-500">{errors.upsert_batch_size}</p>}
           </div>
         </div>
 

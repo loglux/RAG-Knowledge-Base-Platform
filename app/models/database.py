@@ -60,6 +60,12 @@ class KnowledgeBase(Base):
         default=ChunkingStrategy.FIXED_SIZE,
         nullable=False
     )
+    upsert_batch_size: Mapped[int] = mapped_column(
+        Integer,
+        default=256,
+        nullable=False,
+        comment="Max number of vectors to upsert per request"
+    )
 
     # Statistics
     document_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
