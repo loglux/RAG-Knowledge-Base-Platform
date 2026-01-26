@@ -1,5 +1,15 @@
 @import "katex/dist/katex.min.css";
 
+/* Sources summary caret */
+details[open] .sources-caret {
+  transform: rotate(90deg);
+}
+
+.sources-caret {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

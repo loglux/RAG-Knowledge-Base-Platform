@@ -222,16 +222,17 @@ export function ChatPage() {
               <div key={index}>
                 <MessageBubble message={message} />
                 {message.sources && message.sources.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    <p className="text-xs text-gray-500 font-medium">
-                      SOURCES ({message.sources.length})
-                    </p>
-                    <div className="grid grid-cols-1 gap-2">
+                  <details className="mt-4 space-y-2">
+                    <summary className="text-xs text-gray-500 font-medium cursor-pointer select-none sources-summary">
+                      <span>SOURCES ({message.sources.length})</span>
+                      <span className="sources-caret ml-2">▸</span>
+                    </summary>
+                    <div className="grid grid-cols-1 gap-2 mt-2">
                       {message.sources.map((source, idx) => (
                         <SourceCard key={idx} source={source} />
                       ))}
                     </div>
-                  </div>
+                  </details>
                 )}
               </div>
             ))}
