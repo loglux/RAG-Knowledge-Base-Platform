@@ -119,27 +119,38 @@ class OpenAILLMService(BaseLLMService):
                 for msg in messages
             ]
 
-            # Call OpenAI API
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=openai_messages,
-                temperature=temperature,
-                max_tokens=max_tokens or settings.OPENAI_MAX_TOKENS,
-            )
+            # Use Responses API for all OpenAI models.
+            model_name = (self.model or "").lower()
+            # Thinking models (gpt-5/o-series) do not support temperature.
+            allow_temperature = not (model_name.startswith("gpt-5") or model_name.startswith("o"))
 
-            content = response.choices[0].message.content
+            response_kwargs = {
+                "model": self.model,
+                "input": openai_messages,
+                "max_output_tokens": max_tokens or settings.OPENAI_MAX_TOKENS,
+            }
+            if allow_temperature:
+                response_kwargs["temperature"] = temperature
+
+            response = await self.client.responses.create(**response_kwargs)
+
+            content = response.output_text or ""
+            usage = getattr(response, "usage", None)
+            input_tokens = getattr(usage, "input_tokens", None)
+            output_tokens = getattr(usage, "output_tokens", None)
+            total_tokens = getattr(usage, "total_tokens", None)
 
             logger.debug(
                 f"Generated {len(content)} chars "
-                f"(input: {response.usage.prompt_tokens}, output: {response.usage.completion_tokens})"
+                f"(input: {input_tokens}, output: {output_tokens})"
             )
 
             return LLMResponse(
                 content=content.strip(),
                 model=self.model,
-                input_tokens=response.usage.prompt_tokens,
-                output_tokens=response.usage.completion_tokens,
-                total_tokens=response.usage.total_tokens,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                total_tokens=total_tokens,
             )
 
         except RateLimitError as e:

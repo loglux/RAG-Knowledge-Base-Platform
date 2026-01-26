@@ -57,8 +57,8 @@ class RAGService:
     Orchestrates retrieval from vector store and generation with LLM.
     """
 
-    # System prompt for RAG
-    SYSTEM_PROMPT = """You are a helpful AI assistant that answers questions based on the provided context from a knowledge base.
+    # System prompt for RAG (kept for rollback)
+    SYSTEM_PROMPT_LEGACY = """You are a helpful AI assistant that answers questions based on the provided context from a knowledge base.
 
 Your task:
 1. First, understand the FULL CONVERSATION HISTORY to grasp what the user is asking about
@@ -77,6 +77,14 @@ Important:
 - If the requested item spans multiple context chunks, return all relevant verbatim excerpts,
   even if they come from multiple chunks, until the item is complete.
 - Do not invent missing parts or add commentary.
+"""
+    # System prompt for RAG (incremental update)
+    SYSTEM_PROMPT = """Identity:
+You are a retrieval assistant for a knowledge base. You answer ONLY from the provided context.
+
+""" + SYSTEM_PROMPT_LEGACY + """
+
+Context follows below.
 """
 
     def __init__(
@@ -338,13 +346,11 @@ Important:
                     "If any subpart is missing from the context, say which parts are missing."
                 )
 
-            user_prompt = f"""Context from knowledge base:
-
+            user_prompt = f"""<context>
 {context}
+</context>
 
----
-
-Question: {question}{show_question_instructions}
+<question>{question}{show_question_instructions}</question>
 
 Answer based on the context above:"""
 
