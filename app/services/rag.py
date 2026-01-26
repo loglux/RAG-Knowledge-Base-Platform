@@ -339,6 +339,11 @@ Context follows below.
             # Build user prompt with RAG context for current question
             show_question_instructions = ""
             if show_question_request:
+                logger.warning(
+                    "[DEBUG] show_question context length=%s preview=%r",
+                    len(context),
+                    context[:2000],
+                )
                 show_question_instructions = (
                     "\nInstruction: The user is asking to see the question text. "
                     "Return the full, verbatim question from the context, including all subparts "

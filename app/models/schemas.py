@@ -258,7 +258,7 @@ class ChatRequest(BaseModel):
     top_k: int = Field(
         default=5,
         ge=1,
-        le=20,
+        le=100,
         description="Number of chunks to retrieve"
     )
     temperature: float = Field(

@@ -78,7 +78,7 @@ export function ChatSettings({
             <input
               type="range"
               min="1"
-              max="20"
+              max="100"
               step="1"
               value={topK}
               onChange={(e) => onTopKChange(Number(e.target.value))}
