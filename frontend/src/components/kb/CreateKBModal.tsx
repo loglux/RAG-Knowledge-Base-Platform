@@ -237,6 +237,9 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
           <div>
             <label htmlFor="chunk-overlap" className="block text-sm text-gray-400 mb-2">
               Chunk Overlap: <span className="text-white font-medium">{formData.chunk_overlap}</span> characters
+              <span className="text-gray-500">
+                {' '}({formData.chunk_size > 0 ? Math.round((formData.chunk_overlap / formData.chunk_size) * 100) : 0}%)
+              </span>
             </label>
             <input
               id="chunk-overlap"

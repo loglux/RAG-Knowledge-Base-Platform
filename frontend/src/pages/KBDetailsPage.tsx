@@ -299,6 +299,9 @@ export function KBDetailsPage() {
               <div>
                 <label htmlFor="kb-chunk-overlap" className="block text-gray-400 mb-2">
                   Chunk Overlap: <span className="text-white font-medium">{settingsData.chunk_overlap}</span> characters
+                  <span className="text-gray-500">
+                    {' '}({settingsData.chunk_size > 0 ? Math.round((settingsData.chunk_overlap / settingsData.chunk_size) * 100) : 0}%)
+                  </span>
                 </label>
                 <input
                   id="kb-chunk-overlap"
@@ -352,6 +355,9 @@ export function KBDetailsPage() {
               <div>
                 <span className="text-gray-400">Chunk Overlap:</span>
                 <span className="text-white ml-2 font-medium">{kb.chunk_overlap} characters</span>
+                <span className="text-gray-500 ml-1">
+                  ({kb.chunk_size > 0 ? Math.round((kb.chunk_overlap / kb.chunk_size) * 100) : 0}%)
+                </span>
               </div>
               <div>
                 <span className="text-gray-400">Chunking Strategy:</span>
