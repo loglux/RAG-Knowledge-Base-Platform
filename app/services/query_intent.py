@@ -43,24 +43,11 @@ Determine if the user is asking for a specific structural element (like a questi
 
 Return JSON with:
 - intent_type: "structured_search" if asking for specific question/section/chapter, otherwise "semantic_search"
-- document_name: name of document mentioned (e.g., "TMA01", "Unit 3") or null
+- document_name: exact document identifier mentioned in the query (must match one of the provided document names) or null
 - section_type: "question", "section", "chapter", or null
 - section_number: number if mentioned (e.g., 2 for "Question 2") or null
 - section_id: section identifier like "1.2" for hierarchical sections, or null
 - confidence: 0.0-1.0 how confident you are this is structured search
-
-Examples:
-Query: "show me question 2 from TMA01"
-→ {{"intent_type": "structured_search", "document_name": "TMA01", "section_type": "question", "section_number": 2, "confidence": 0.95}}
-
-Query: "what is in section 3.1"
-→ {{"intent_type": "structured_search", "section_type": "section", "section_id": "3.1", "confidence": 0.9}}
-
-Query: "how to calculate percentages"
-→ {{"intent_type": "semantic_search", "confidence": 1.0}}
-
-Query: "question 5"
-→ {{"intent_type": "structured_search", "section_type": "question", "section_number": 5, "confidence": 0.85}}
 
 Return ONLY valid JSON, no other text."""
 
@@ -81,13 +68,6 @@ Return ONLY valid JSON, no other text."""
         Returns:
             QueryIntent with extracted information
         """
-        # Quick pattern-based fallback (fast path)
-        if use_cache:
-            quick_intent = self._quick_pattern_match(query)
-            if quick_intent and quick_intent.confidence > 0.7:
-                logger.info(f"Quick match for query: {query}")
-                return quick_intent
-
         # LLM-based extraction (more accurate, slower)
         try:
             doc_list = "\n".join([f"- {doc}" for doc in (kb_documents or [])])
@@ -133,42 +113,6 @@ Return ONLY valid JSON, no other text."""
                 confidence=1.0,
                 original_query=query
             )
-
-    def _quick_pattern_match(self, query: str) -> Optional[QueryIntent]:
-        """Fast pattern-based intent extraction (fallback)."""
-        query_lower = query.lower()
-
-        # Pattern: "question N"
-        if match := re.search(r'\bquestion\s+(\d+)', query_lower):
-            return QueryIntent(
-                intent_type="structured_search",
-                section_type="question",
-                section_number=int(match.group(1)),
-                confidence=0.8,
-                original_query=query
-            )
-
-        # Pattern: "section N" or "section N.M"
-        if match := re.search(r'\bsection\s+(\d+(?:\.\d+)?)', query_lower):
-            return QueryIntent(
-                intent_type="structured_search",
-                section_type="section",
-                section_id=match.group(1),
-                confidence=0.75,
-                original_query=query
-            )
-
-        # Pattern: "chapter N"
-        if match := re.search(r'\bchapter\s+(\d+)', query_lower):
-            return QueryIntent(
-                intent_type="structured_search",
-                section_type="chapter",
-                section_number=int(match.group(1)),
-                confidence=0.75,
-                original_query=query
-            )
-
-        return None
 
     def _parse_llm_response(self, response: str) -> Dict[str, Any]:
         """Parse LLM JSON response."""
