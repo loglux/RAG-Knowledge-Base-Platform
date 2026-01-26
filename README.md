@@ -4,6 +4,9 @@
 ![Qdrant](https://img.shields.io/badge/Qdrant-FF6B6B?logo=qdrant&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
 ![OpenAI](https://img.shields.io/badge/OpenAI-111111?logo=openai&logoColor=white)
+![Anthropic](https://img.shields.io/badge/Anthropic-191919?logo=anthropic&logoColor=white)
+![Voyage](https://img.shields.io/badge/Voyage-1B1F23?logo=voyage&logoColor=white)
+![Ollama](https://img.shields.io/badge/Ollama-000000?logo=ollama&logoColor=white)
 ![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=111111)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
 
