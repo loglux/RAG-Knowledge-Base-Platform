@@ -1,0 +1,112 @@
+import React from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
+import type { ChatMessage } from '../../types/index'
+
+interface MessageBubbleProps {
+  message: ChatMessage
+}
+
+export function MessageBubble({ message }: MessageBubbleProps) {
+  const isUser = message.role === 'user'
+  const timestamp = new Date(message.timestamp).toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div
+        className={`max-w-3xl rounded-lg px-4 py-3 ${
+          isUser
+            ? 'bg-primary-600 text-white'
+            : 'bg-gray-800 text-gray-100 border border-gray-700'
+        }`}
+      >
+        <div className="flex items-baseline space-x-2 mb-1">
+          <span className="text-xs font-medium opacity-75">
+            {isUser ? 'You' : 'Assistant'}
+          </span>
+          <span className="text-xs opacity-50">{timestamp}</span>
+        </div>
+        <div className="text-sm leading-relaxed prose prose-invert prose-sm max-w-none">
+          {isUser ? (
+            <div className="whitespace-pre-wrap">{message.content}</div>
+          ) : (
+            <ReactMarkdown
+              remarkPlugins={[
+                remarkGfm,
+                [remarkMath, { singleDollarTextMath: true }]
+              ]}
+              rehypePlugins={[
+                [rehypeKatex, { strict: false, throwOnError: false }]
+              ]}
+              components={{
+                code: ({ node, inline, className, children, ...props }) => {
+                  const match = /language-(\w+)/.exec(className || '')
+                  const childText = String(children).trim()
+
+                  // Check if this is a single-line path/command (likely should be inline)
+                  const isSingleLinePath = !inline && childText.split('\n').length === 1 &&
+                    (childText.endsWith('/') || childText.length < 50)
+
+                  if (isSingleLinePath) {
+                    // Render short paths as inline code instead of blocks
+                    return (
+                      <code className="bg-gray-900 px-2 py-1 rounded text-xs font-mono border border-gray-700 inline-block" {...props}>
+                        {children}
+                      </code>
+                    )
+                  }
+
+                  return !inline ? (
+                    <pre className="bg-gray-900 rounded p-3 overflow-x-auto my-2 text-xs font-mono border border-gray-700">
+                      <code className={className} {...props}>
+                        {children}
+                      </code>
+                    </pre>
+                  ) : (
+                    <code className="bg-gray-900 px-1.5 py-0.5 rounded text-xs font-mono border border-gray-700" {...props}>
+                      {children}
+                    </code>
+                  )
+                },
+                ul: ({ children }) => (
+                  <ul className="list-disc list-outside ml-5 space-y-1 my-2">{children}</ul>
+                ),
+                ol: ({ children }) => (
+                  <ol className="list-decimal list-outside ml-5 space-y-1 my-2">{children}</ol>
+                ),
+                li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                p: ({ children }) => <p className="my-2 leading-relaxed">{children}</p>,
+                strong: ({ children }) => <strong className="font-bold text-white">{children}</strong>,
+                h1: ({ children }) => <h1 className="text-xl font-bold my-3">{children}</h1>,
+                h2: ({ children }) => <h2 className="text-lg font-bold my-2">{children}</h2>,
+                h3: ({ children }) => <h3 className="text-base font-bold my-2">{children}</h3>,
+                blockquote: ({ children }) => (
+                  <blockquote className="border-l-4 border-primary-500 pl-4 my-2 italic text-gray-400">
+                    {children}
+                  </blockquote>
+                ),
+                a: ({ href, children }) => (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary-400 hover:text-primary-300 underline"
+                  >
+                    {children}
+                  </a>
+                ),
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

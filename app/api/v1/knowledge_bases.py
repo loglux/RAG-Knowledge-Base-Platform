@@ -1,0 +1,255 @@
+"""Knowledge Base CRUD endpoints."""
+from typing import Optional
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.session import get_db
+from app.models.database import KnowledgeBase as KnowledgeBaseModel
+from app.models.schemas import (
+    KnowledgeBaseCreate,
+    KnowledgeBaseUpdate,
+    KnowledgeBaseResponse,
+    KnowledgeBaseList,
+)
+from app.dependencies import get_current_user_id
+from app.core.embeddings_base import EMBEDDING_MODELS
+
+router = APIRouter()
+
+
+@router.post("/", response_model=KnowledgeBaseResponse, status_code=status.HTTP_201_CREATED)
+async def create_knowledge_base(
+    kb: KnowledgeBaseCreate,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """
+    Create a new knowledge base.
+
+    Creates a new knowledge base with specified configuration.
+    A unique collection name will be generated for Qdrant.
+    """
+    # Validate embedding model
+    if kb.embedding_model not in EMBEDDING_MODELS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown embedding model: {kb.embedding_model}. "
+                   f"Available models: {', '.join(EMBEDDING_MODELS.keys())}"
+        )
+
+    # Get embedding model configuration
+    model_config = EMBEDDING_MODELS[kb.embedding_model]
+
+    # Generate unique collection name
+    import uuid
+    collection_name = f"kb_{uuid.uuid4().hex[:16]}"
+
+    # Create KB
+    kb_model = KnowledgeBaseModel(
+        name=kb.name,
+        description=kb.description,
+        collection_name=collection_name,
+        embedding_model=kb.embedding_model,
+        embedding_provider=model_config.provider.value,
+        embedding_dimension=model_config.dimension,
+        chunk_size=kb.chunk_size,
+        chunk_overlap=kb.chunk_overlap,
+        chunking_strategy=kb.chunking_strategy,
+        user_id=user_id,
+    )
+
+    db.add(kb_model)
+    await db.commit()
+    await db.refresh(kb_model)
+
+    # TODO: Create Qdrant collection (Phase 3)
+
+    return kb_model
+
+
+@router.get("/", response_model=KnowledgeBaseList)
+async def list_knowledge_bases(
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(10, ge=1, le=100, description="Items per page"),
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """
+    List all knowledge bases.
+
+    Returns paginated list of knowledge bases.
+    In MVP: returns all KBs (no user filtering).
+    Future: filter by user_id when auth is implemented.
+    """
+    # Build query
+    query = select(KnowledgeBaseModel).where(KnowledgeBaseModel.is_deleted == False)
+
+    # Future: Add user filter when auth is implemented
+    # if user_id:
+    #     query = query.where(KnowledgeBaseModel.user_id == user_id)
+
+    # Count total
+    count_query = select(func.count()).select_from(query.subquery())
+    total = await db.scalar(count_query)
+
+    # Apply pagination
+    query = query.offset((page - 1) * page_size).limit(page_size)
+
+    # Execute
+    result = await db.execute(query)
+    items = result.scalars().all()
+
+    return KnowledgeBaseList(
+        items=items,
+        total=total or 0,
+        page=page,
+        page_size=page_size,
+        pages=(total + page_size - 1) // page_size if total else 0,
+    )
+
+
+@router.get("/{kb_id}", response_model=KnowledgeBaseResponse)
+async def get_knowledge_base(
+    kb_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """
+    Get knowledge base by ID.
+
+    Returns detailed information about a specific knowledge base.
+    """
+    query = select(KnowledgeBaseModel).where(
+        KnowledgeBaseModel.id == kb_id,
+        KnowledgeBaseModel.is_deleted == False,
+    )
+
+    result = await db.execute(query)
+    kb = result.scalar_one_or_none()
+
+    if not kb:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Knowledge base {kb_id} not found"
+        )
+
+    # Future: Check user ownership when auth is implemented
+
+    return kb
+
+
+@router.put("/{kb_id}", response_model=KnowledgeBaseResponse)
+async def update_knowledge_base(
+    kb_id: UUID,
+    kb_update: KnowledgeBaseUpdate,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """
+    Update knowledge base.
+
+    Updates knowledge base configuration.
+    Note: Changing chunking config won't re-process existing documents.
+    """
+    # Get existing KB
+    query = select(KnowledgeBaseModel).where(
+        KnowledgeBaseModel.id == kb_id,
+        KnowledgeBaseModel.is_deleted == False,
+    )
+    result = await db.execute(query)
+    kb = result.scalar_one_or_none()
+
+    if not kb:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Knowledge base {kb_id} not found"
+        )
+
+    # Future: Check user ownership
+
+    # Update fields
+    update_data = kb_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(kb, field, value)
+
+    await db.commit()
+    await db.refresh(kb)
+
+    return kb
+
+
+@router.delete("/{kb_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_knowledge_base(
+    kb_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """
+    Delete knowledge base (soft delete).
+
+    Marks knowledge base and all associated documents as deleted.
+    Deletes Qdrant collection and all vectors.
+    """
+    from app.models.database import Document as DocumentModel
+    from app.core.vector_store import get_vector_store
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    # Get existing KB
+    query = select(KnowledgeBaseModel).where(
+        KnowledgeBaseModel.id == kb_id,
+        KnowledgeBaseModel.is_deleted == False,
+    )
+    result = await db.execute(query)
+    kb = result.scalar_one_or_none()
+
+    if not kb:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Knowledge base {kb_id} not found"
+        )
+
+    # Future: Check user ownership
+
+    logger.info(f"Deleting KB '{kb.name}' (id={kb_id}, collection={kb.collection_name})")
+
+    # 1. Soft delete all documents in this KB
+    doc_query = select(DocumentModel).where(
+        DocumentModel.knowledge_base_id == kb_id,
+        DocumentModel.is_deleted == False,
+    )
+    doc_result = await db.execute(doc_query)
+    documents = doc_result.scalars().all()
+
+    doc_count = len(documents)
+    for doc in documents:
+        doc.is_deleted = True
+
+    logger.info(f"Marked {doc_count} documents as deleted")
+
+    # 2. Soft delete KB
+    kb.is_deleted = True
+    await db.commit()
+
+    logger.info(f"Marked KB as deleted")
+
+    # 3. Delete Qdrant collection
+    try:
+        vector_store = get_vector_store()
+        collection_exists = await vector_store.collection_exists(kb.collection_name)
+
+        if collection_exists:
+            await vector_store.delete_collection(kb.collection_name)
+            logger.info(f"Deleted Qdrant collection '{kb.collection_name}'")
+        else:
+            logger.warning(f"Qdrant collection '{kb.collection_name}' not found (already deleted?)")
+
+    except Exception as e:
+        logger.error(f"Failed to delete Qdrant collection '{kb.collection_name}': {e}")
+        # Don't fail the request if Qdrant deletion fails - KB is already marked deleted
+
+    return None

@@ -1,0 +1,51 @@
+Generic single-database configuration with async support.
+
+## Usage
+
+### Create a new migration (auto-generate from models)
+```bash
+alembic revision --autogenerate -m "Description of changes"
+```
+
+### Apply all pending migrations
+```bash
+alembic upgrade head
+```
+
+### Rollback last migration
+```bash
+alembic downgrade -1
+```
+
+### Show current version
+```bash
+alembic current
+```
+
+### Show migration history
+```bash
+alembic history --verbose
+```
+
+### Create empty migration (manual)
+```bash
+alembic revision -m "Description"
+```
+
+### Upgrade to specific revision
+```bash
+alembic upgrade <revision_id>
+```
+
+### Downgrade to specific revision
+```bash
+alembic downgrade <revision_id>
+```
+
+## Important Notes
+
+- This configuration uses async SQLAlchemy with asyncpg
+- Database URL is loaded from app/config.py settings
+- Migrations are stored in app/db/migrations/versions/
+- Always review auto-generated migrations before applying
+- Test migrations on development database first

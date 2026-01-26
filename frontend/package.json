@@ -1,0 +1,50 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test:ui": "docker run --rm --network host -v $(pwd):/work -w /work mcr.microsoft.com/playwright:v1.58.0-jammy npx playwright test",
+    "test:ui:line": "docker run --rm --network host -v $(pwd):/work -w /work mcr.microsoft.com/playwright:v1.58.0-jammy npx playwright test --reporter=line",
+    "test:ui:html": "docker run --rm --network host -v $(pwd):/work -w /work mcr.microsoft.com/playwright:v1.58.0-jammy npx playwright test --reporter=html",
+    "test:ui:headed": "docker run --rm --network host -v $(pwd):/work -w /work mcr.microsoft.com/playwright:v1.58.0-jammy npx playwright test --headed",
+    "lint": "eslint \"src/**/*.{ts,tsx}\""
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.0",
+    "autoprefixer": "^10.4.23",
+    "playwright": "^1.58.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^3.4.19",
+    "typescript": "~5.9.3",
+    "vite": "^7.2.4",
+    "eslint": "^9.20.0",
+    "@typescript-eslint/parser": "^8.25.0",
+    "@typescript-eslint/eslint-plugin": "^8.25.0",
+    "eslint-plugin-react": "^7.37.4",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-unused-imports": "^4.1.4",
+    "globals": "^15.15.0"
+  },
+  "dependencies": {
+    "@headlessui/react": "^2.2.9",
+    "@heroicons/react": "^2.2.0",
+    "@tailwindcss/typography": "^0.5.19",
+    "@types/react": "^19.2.9",
+    "@types/react-dom": "^19.2.3",
+    "@types/react-router-dom": "^5.3.3",
+    "@vitejs/plugin-react": "^5.1.2",
+    "axios": "^1.13.2",
+    "katex": "^0.16.28",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-markdown": "^10.1.0",
+    "react-router-dom": "^7.13.0",
+    "rehype-katex": "^7.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0"
+  }
+}

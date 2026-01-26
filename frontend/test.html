@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Frontend</title>
+</head>
+<body>
+    <h1>Testing Frontend Connection</h1>
+    <div id="results"></div>
+    <script>
+        const results = document.getElementById('results');
+
+        // Test 1: Load main page
+        fetch('http://192.168.10.32:5174/')
+            .then(r => r.text())
+            .then(html => {
+                results.innerHTML += '<p>✅ HTML loads: ' + html.length + ' bytes</p>';
+                results.innerHTML += '<p>Has root div: ' + (html.includes('id="root"') ? '✅' : '❌') + '</p>';
+            })
+            .catch(e => results.innerHTML += '<p>❌ HTML Error: ' + e.message + '</p>');
+
+        // Test 2: Load JavaScript
+        setTimeout(() => {
+            const script = document.createElement('script');
+            script.type = 'module';
+            script.textContent = `
+                import React from 'http://192.168.10.32:5174/node_modules/.vite/deps/react.js?v=e16cffc9';
+                document.getElementById('results').innerHTML += '<p>✅ React loads: ' + React.version + '</p>';
+            `;
+            document.head.appendChild(script);
+        }, 1000);
+
+        // Test 3: Load App
+        setTimeout(() => {
+            fetch('http://192.168.10.32:5174/src/App.tsx')
+                .then(r => r.text())
+                .then(code => {
+                    const hasError = code.toLowerCase().includes('syntaxerror') || code.toLowerCase().includes('cannot find');
+                    document.getElementById('results').innerHTML += '<p>App.tsx: ' + (hasError ? '❌ Has errors' : '✅ Compiles') + '</p>';
+                })
+                .catch(e => document.getElementById('results').innerHTML += '<p>❌ App Error: ' + e.message + '</p>');
+        }, 2000);
+    </script>
+</body>
+</html>
