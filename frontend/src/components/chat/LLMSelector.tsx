@@ -15,11 +15,9 @@ interface LLMModel {
 interface LLMSelectorProps {
   value: string
   onChange: (model: string, provider: string) => void
-  showOllama: boolean
-  onShowOllamaChange: (value: boolean) => void
 }
 
-export function LLMSelector({ value, onChange, showOllama, onShowOllamaChange }: LLMSelectorProps) {
+export function LLMSelector({ value, onChange }: LLMSelectorProps) {
   const [models, setModels] = useState<LLMModel[]>([])
   const [loading, setLoading] = useState(true)
   const [groupBy, setGroupBy] = useState<'provider' | 'all'>('provider')
@@ -49,10 +47,7 @@ export function LLMSelector({ value, onChange, showOllama, onShowOllamaChange }:
     }
   }
 
-  // Filter out Ollama models if not enabled
-  const filteredModels = showOllama ? models : models.filter(m => m.provider !== 'ollama')
-
-  const groupedModels = filteredModels.reduce((acc, model) => {
+  const groupedModels = models.reduce((acc, model) => {
     if (!acc[model.provider]) {
       acc[model.provider] = []
     }
@@ -70,15 +65,6 @@ export function LLMSelector({ value, onChange, showOllama, onShowOllamaChange }:
         <div className="flex items-center justify-between mb-2">
           <label htmlFor="llm-model" className="block text-sm font-medium text-gray-300">
             LLM Model
-          </label>
-          <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showOllama}
-              onChange={(e) => onShowOllamaChange(e.target.checked)}
-              className="rounded border-gray-600 bg-gray-700 text-primary-500 focus:ring-primary-500"
-            />
-            Show Ollama (slow)
           </label>
         </div>
         <select
@@ -106,7 +92,7 @@ export function LLMSelector({ value, onChange, showOllama, onShowOllamaChange }:
               </optgroup>
             ))
           ) : (
-            filteredModels.map(model => (
+            models.map(model => (
               <option key={model.model} value={model.model}>
                 [{model.provider.toUpperCase()}] {model.model}
               </option>

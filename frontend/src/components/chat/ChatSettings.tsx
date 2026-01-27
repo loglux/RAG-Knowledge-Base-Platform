@@ -8,14 +8,12 @@ interface ChatSettingsProps {
   scoreThreshold: number
   llmModel: string
   llmProvider: string
-  showOllama: boolean
   useStructure: boolean
   onTopKChange: (value: number) => void
   onTemperatureChange: (value: number) => void
   onMaxContextCharsChange: (value: number) => void
   onScoreThresholdChange: (value: number) => void
   onLLMChange: (model: string, provider: string) => void
-  onShowOllamaChange: (value: boolean) => void
   onUseStructureChange: (value: boolean) => void
   onClose: () => void
 }
@@ -27,14 +25,12 @@ export function ChatSettings({
   scoreThreshold,
   llmModel,
   llmProvider,
-  showOllama,
   useStructure,
   onTopKChange,
   onTemperatureChange,
   onMaxContextCharsChange,
   onScoreThresholdChange,
   onLLMChange,
-  onShowOllamaChange,
   onUseStructureChange,
   onClose,
 }: ChatSettingsProps) {
@@ -82,8 +78,6 @@ export function ChatSettings({
             <LLMSelector
               value={llmModel}
               onChange={onLLMChange}
-              showOllama={showOllama}
-              onShowOllamaChange={onShowOllamaChange}
             />
           </div>
 

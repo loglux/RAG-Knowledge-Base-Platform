@@ -18,51 +18,32 @@ export function ChatPage() {
 
   const [showSettings, setShowSettings] = useState(false)
   const [topK, setTopK] = useState(() => {
-    const saved = localStorage.getItem('chat_topK')
-    return saved ? Number(saved) : 5
+    return 5
   })
   const [temperature, setTemperature] = useState(() => {
-    const saved = localStorage.getItem('chat_temperature')
-    return saved ? Number(saved) : 0.7
+    return 0.7
   })
   const [maxContextChars, setMaxContextChars] = useState(() => {
-    const saved = localStorage.getItem('chat_maxContextChars')
-    return saved ? Number(saved) : 0
+    return 0
   })
   const [scoreThreshold, setScoreThreshold] = useState(() => {
-    const saved = localStorage.getItem('chat_scoreThreshold')
-    return saved ? Number(saved) : 0
+    return 0
   })
   const [llmModel, setLlmModel] = useState(() => {
-    return localStorage.getItem('chat_llmModel') || 'gpt-4o'
+    return 'gpt-4o'
   })
   const [llmProvider, setLlmProvider] = useState(() => {
-    return localStorage.getItem('chat_llmProvider') || 'openai'
+    return 'openai'
   })
   const [useStructure, setUseStructure] = useState(() => {
-    const saved = localStorage.getItem('chat_useStructure')
-    return saved === 'true'
-  })
-  const [showOllama, setShowOllama] = useState(() => {
-    const saved = localStorage.getItem('chat_showOllama')
-    return saved === 'true'
+    return false
   })
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const { messages, isLoading, error, sendMessage, clearMessages, conversationId } = useChat(id!)
 
-  // Persist settings to localStorage as a fallback cache
-  useEffect(() => {
-    localStorage.setItem('chat_topK', String(topK))
-    localStorage.setItem('chat_temperature', String(temperature))
-    localStorage.setItem('chat_maxContextChars', String(maxContextChars))
-    localStorage.setItem('chat_scoreThreshold', String(scoreThreshold))
-    localStorage.setItem('chat_llmModel', llmModel)
-    localStorage.setItem('chat_llmProvider', llmProvider)
-    localStorage.setItem('chat_useStructure', String(useStructure))
-    localStorage.setItem('chat_showOllama', String(showOllama))
-  }, [topK, temperature, maxContextChars, scoreThreshold, llmModel, llmProvider, useStructure, showOllama])
+  // No localStorage fallback: settings are loaded from server per conversation
 
   // Load conversation settings from server
   useEffect(() => {
@@ -80,7 +61,6 @@ export function ChatPage() {
         if (settings.llm_model) setLlmModel(settings.llm_model)
         if (settings.llm_provider) setLlmProvider(settings.llm_provider)
         if (settings.use_structure !== undefined) setUseStructure(settings.use_structure)
-        if (settings.show_ollama !== undefined) setShowOllama(settings.show_ollama)
       } catch (err) {
         console.error('Failed to load conversation settings:', err)
       }
@@ -100,13 +80,12 @@ export function ChatPage() {
       llm_model: llmModel,
       llm_provider: llmProvider,
       use_structure: useStructure,
-      show_ollama: showOllama,
     }
 
     apiClient.updateConversationSettings(conversationId, payload).catch((err) => {
       console.error('Failed to update conversation settings:', err)
     })
-  }, [conversationId, topK, temperature, maxContextChars, scoreThreshold, llmModel, llmProvider, useStructure, showOllama])
+  }, [conversationId, topK, temperature, maxContextChars, scoreThreshold, llmModel, llmProvider, useStructure])
 
   useEffect(() => {
     const fetchKB = async () => {
@@ -221,14 +200,12 @@ export function ChatPage() {
           scoreThreshold={scoreThreshold}
           llmModel={llmModel}
           llmProvider={llmProvider}
-          showOllama={showOllama}
           useStructure={useStructure}
           onTopKChange={setTopK}
           onTemperatureChange={setTemperature}
           onMaxContextCharsChange={setMaxContextChars}
           onScoreThresholdChange={setScoreThreshold}
           onLLMChange={handleLLMChange}
-          onShowOllamaChange={setShowOllama}
           onUseStructureChange={setUseStructure}
           onClose={() => setShowSettings(false)}
         />
