@@ -81,6 +81,10 @@ class Settings(BaseSettings):
         default="llama3.1",
         description="Ollama chat model"
     )
+    OLLAMA_TIMEOUT_SECONDS: int = Field(
+        default=120,
+        description="Timeout in seconds for Ollama chat requests"
+    )
 
     # LLM Provider Selection
     LLM_PROVIDER: str = Field(

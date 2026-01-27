@@ -243,7 +243,7 @@ async def chat_query(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Chat query failed: {e}")
+        logger.exception("Chat query failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Query failed: {str(e)}"

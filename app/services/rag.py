@@ -233,8 +233,8 @@ Context follows below.
                 model=llm_service.model,
             )
 
-        except Exception as e:
-            logger.error(f"RAG query failed: {e}")
+        except Exception:
+            logger.exception("RAG query failed")
             raise
 
     async def query_document(
@@ -385,8 +385,8 @@ Answer based on the context above:"""
 
             return answer
 
-        except Exception as e:
-            logger.error(f"Answer generation failed: {e}")
+        except Exception:
+            logger.exception("Answer generation failed")
             raise
 
     async def _extract_structure_filters(

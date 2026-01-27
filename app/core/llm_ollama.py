@@ -58,7 +58,12 @@ class OllamaLLMService(BaseLLMService):
         if not self.base_url:
             raise ValueError("OLLAMA_BASE_URL is required for Ollama LLM service")
 
-        self.client = httpx.AsyncClient(timeout=120.0)  # Longer timeout for generation
+        timeout = httpx.Timeout(
+            timeout=settings.OLLAMA_TIMEOUT_SECONDS,
+            connect=10.0,
+            read=settings.OLLAMA_TIMEOUT_SECONDS,
+        )
+        self.client = httpx.AsyncClient(timeout=timeout)  # Longer timeout for generation
 
         logger.info(f"Initialized OllamaLLMService with model: {self.model} at {self.base_url}")
 
@@ -105,7 +110,13 @@ class OllamaLLMService(BaseLLMService):
             if max_tokens:
                 request_data["options"]["num_predict"] = max_tokens
 
-            logger.debug(f"Calling Ollama with {len(messages)} messages")
+            total_chars = sum(len(msg.content or "") for msg in messages)
+            logger.debug(
+                "Calling Ollama model=%s with %d messages (%d chars)",
+                self.model,
+                len(messages),
+                total_chars,
+            )
 
             response = await self.client.post(
                 f"{self.base_url}/api/chat",
@@ -135,8 +146,24 @@ class OllamaLLMService(BaseLLMService):
                 total_tokens=(input_tokens or 0) + (output_tokens or 0) if input_tokens and output_tokens else None,
             )
 
+        except httpx.HTTPStatusError as e:
+            body = None
+            try:
+                body = e.response.text
+            except Exception:
+                body = None
+            logger.error(
+                "Ollama API status error model=%s status=%s: %s",
+                self.model,
+                e.response.status_code if e.response else "unknown",
+                (body[:1000] if body else "no response body"),
+            )
+            raise
+        except (httpx.ReadTimeout, httpx.ConnectTimeout) as e:
+            logger.error("Ollama API timeout model=%s: %s", self.model, e)
+            raise
         except httpx.HTTPError as e:
-            logger.error(f"Ollama API error: {e}")
+            logger.error("Ollama API error model=%s: %s", self.model, e)
             raise
         except Exception as e:
             logger.error(f"Unexpected error generating text: {e}")
