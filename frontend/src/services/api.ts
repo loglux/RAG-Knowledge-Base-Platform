@@ -9,6 +9,10 @@ import type {
   PaginatedResponse,
   ChatRequest,
   ChatResponse,
+  ConversationSummary,
+  ChatMessageResponse,
+  ConversationDetail,
+  ConversationSettings,
   EmbeddingModel,
 } from '../types/index'
 
@@ -124,6 +128,43 @@ class APIClient {
   // Chat
   async chat(data: ChatRequest): Promise<ChatResponse> {
     const response = await this.client.post<ChatResponse>('/chat/', data)
+    return response.data
+  }
+
+  async listConversations(knowledgeBaseId: string): Promise<ConversationSummary[]> {
+    const response = await this.client.get<ConversationSummary[]>('/chat/conversations', {
+      params: { knowledge_base_id: knowledgeBaseId },
+    })
+    return response.data
+  }
+
+  async getConversationMessages(conversationId: string): Promise<ChatMessageResponse[]> {
+    const response = await this.client.get<ChatMessageResponse[]>(
+      `/chat/conversations/${conversationId}/messages`
+    )
+    return response.data
+  }
+
+  async getConversation(conversationId: string): Promise<ConversationDetail> {
+    const response = await this.client.get<ConversationDetail>(
+      `/chat/conversations/${conversationId}`
+    )
+    return response.data
+  }
+
+  async updateConversationSettings(
+    conversationId: string,
+    settings: ConversationSettings
+  ): Promise<ConversationDetail> {
+    const response = await this.client.patch<ConversationDetail>(
+      `/chat/conversations/${conversationId}/settings`,
+      settings
+    )
+    return response.data
+  }
+
+  async deleteConversation(conversationId: string): Promise<{ status: string; id: string }> {
+    const response = await this.client.delete(`/chat/conversations/${conversationId}`)
     return response.data
   }
 

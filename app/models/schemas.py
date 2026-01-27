@@ -238,6 +238,46 @@ class ConversationMessage(BaseModel):
     content: str = Field(..., description="Message content")
 
 
+class ChatMessageResponse(BaseModel):
+    """Chat message response (stored conversation history)."""
+    id: UUID
+    role: str = Field(..., description="Message role: user or assistant")
+    content: str = Field(..., description="Message content")
+    sources: Optional[List[SourceChunk]] = Field(default=None, description="Source chunks for assistant messages")
+    timestamp: datetime
+    message_index: int
+
+
+class ConversationSummary(BaseModel):
+    """Conversation list item."""
+    id: UUID
+    knowledge_base_id: UUID
+    title: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ConversationSettings(BaseModel):
+    """Chat settings stored per conversation."""
+    top_k: Optional[int] = Field(default=None, ge=1, le=100)
+    temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
+    max_context_chars: Optional[int] = Field(default=None, ge=0)
+    score_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    llm_model: Optional[str] = None
+    llm_provider: Optional[str] = None
+    use_structure: Optional[bool] = None
+
+
+class ConversationDetail(BaseModel):
+    """Conversation detail with settings."""
+    id: UUID
+    knowledge_base_id: UUID
+    title: Optional[str] = None
+    settings: Optional[ConversationSettings] = None
+    created_at: datetime
+    updated_at: datetime
+
+
 class ChatRequest(BaseModel):
     """Schema for chat/query request."""
 
@@ -250,6 +290,10 @@ class ChatRequest(BaseModel):
     knowledge_base_id: UUID = Field(
         ...,
         description="Knowledge base to query"
+    )
+    conversation_id: Optional[UUID] = Field(
+        default=None,
+        description="Conversation ID for persistent chat (optional)"
     )
     conversation_history: Optional[List["ConversationMessage"]] = Field(
         default=None,
@@ -306,6 +350,7 @@ class ChatResponse(BaseModel):
     confidence_score: float = Field(..., description="Average relevance score")
     model: str = Field(..., description="Model used for generation")
     knowledge_base_id: UUID = Field(..., description="Knowledge base queried")
+    conversation_id: Optional[UUID] = Field(default=None, description="Conversation ID for persistent chat")
 
 
 # ============================================================================

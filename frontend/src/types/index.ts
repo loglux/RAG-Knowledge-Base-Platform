@@ -102,6 +102,7 @@ export interface ConversationMessage {
 export interface ChatRequest {
   question: string
   knowledge_base_id: string
+  conversation_id?: string
   conversation_history?: ConversationMessage[]
   top_k?: number
   temperature?: number
@@ -119,4 +120,41 @@ export interface ChatResponse {
   confidence_score: number
   model: string
   knowledge_base_id: string
+  conversation_id?: string
+}
+
+export interface ConversationSummary {
+  id: string
+  knowledge_base_id: string
+  title: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ConversationSettings {
+  top_k?: number
+  temperature?: number
+  max_context_chars?: number
+  score_threshold?: number
+  llm_model?: string
+  llm_provider?: string
+  use_structure?: boolean
+}
+
+export interface ConversationDetail {
+  id: string
+  knowledge_base_id: string
+  title: string | null
+  settings?: ConversationSettings | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ChatMessageResponse {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  sources?: SourceChunk[]
+  timestamp: string
+  message_index: number
 }

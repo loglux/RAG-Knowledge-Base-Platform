@@ -1,15 +1,29 @@
 """Chat/Query endpoints for RAG."""
+import json
 import logging
+from datetime import datetime
 from uuid import UUID
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.models.database import KnowledgeBase as KnowledgeBaseModel
-from app.models.schemas import ChatRequest, ChatResponse, SourceChunk
+from app.models.database import (
+    KnowledgeBase as KnowledgeBaseModel,
+    Conversation as ConversationModel,
+    ChatMessage as ChatMessageModel,
+)
+from app.models.schemas import (
+    ChatRequest,
+    ChatResponse,
+    SourceChunk,
+    ConversationSummary,
+    ChatMessageResponse,
+    ConversationDetail,
+    ConversationSettings,
+)
 from app.services.rag import get_rag_service, RAGService
 from app.dependencies import get_current_user_id
 
@@ -66,7 +80,27 @@ async def chat_query(
                 detail="Knowledge base is empty. Please add documents first."
             )
 
-        # 3. Perform RAG query
+        # 3. Load conversation (optional)
+        conversation = None
+        if request.conversation_id:
+            convo_query = select(ConversationModel).where(
+                ConversationModel.id == request.conversation_id,
+                ConversationModel.is_deleted == False,
+            )
+            convo_result = await db.execute(convo_query)
+            conversation = convo_result.scalar_one_or_none()
+            if not conversation:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Conversation {request.conversation_id} not found"
+                )
+            if conversation.knowledge_base_id != request.knowledge_base_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Conversation does not belong to this knowledge base"
+                )
+
+        # 4. Perform RAG query
         logger.debug(f"Querying collection: {kb.collection_name}")
 
         # Convert conversation history to dict format
@@ -76,6 +110,20 @@ async def chat_query(
                 {"role": msg.role, "content": msg.content}
                 for msg in request.conversation_history
             ]
+        elif conversation:
+            history_query = (
+                select(ChatMessageModel)
+                .where(ChatMessageModel.conversation_id == conversation.id)
+                .order_by(desc(ChatMessageModel.message_index))
+                .limit(10)
+            )
+            history_result = await db.execute(history_query)
+            history_messages = list(reversed(history_result.scalars().all()))
+            if history_messages:
+                history_dicts = [
+                    {"role": msg.role, "content": msg.content}
+                    for msg in history_messages
+                ]
 
         rag_response = await rag_service.query(
             question=request.question,
@@ -94,7 +142,75 @@ async def chat_query(
             kb_id=request.knowledge_base_id,
         )
 
-        # 4. Convert to API response format
+        # 5. Ensure conversation exists (create if needed)
+        if conversation is None:
+            title = request.question.strip()[:120] if request.question else "New conversation"
+            settings_payload = {
+                "top_k": request.top_k,
+                "temperature": request.temperature,
+                "max_context_chars": request.max_context_chars,
+                "score_threshold": request.score_threshold,
+                "llm_model": request.llm_model,
+                "llm_provider": request.llm_provider,
+                "use_structure": request.use_structure,
+            }
+            conversation = ConversationModel(
+                knowledge_base_id=request.knowledge_base_id,
+                title=title,
+                user_id=user_id,
+                settings_json=json.dumps(settings_payload),
+            )
+            db.add(conversation)
+            await db.flush()
+        else:
+            settings_payload = {
+                "top_k": request.top_k,
+                "temperature": request.temperature,
+                "max_context_chars": request.max_context_chars,
+                "score_threshold": request.score_threshold,
+                "llm_model": request.llm_model,
+                "llm_provider": request.llm_provider,
+                "use_structure": request.use_structure,
+            }
+            conversation.settings_json = json.dumps(settings_payload)
+
+        # 6. Persist messages
+        max_index_query = select(func.max(ChatMessageModel.message_index)).where(
+            ChatMessageModel.conversation_id == conversation.id
+        )
+        max_index_result = await db.execute(max_index_query)
+        max_index = max_index_result.scalar_one_or_none() or 0
+        user_index = max_index + 1
+        assistant_index = max_index + 2
+
+        db.add(ChatMessageModel(
+            conversation_id=conversation.id,
+            role="user",
+            content=request.question,
+            message_index=user_index,
+        ))
+
+        sources_payload = [
+            {
+                "text": chunk.text,
+                "score": chunk.score,
+                "document_id": chunk.document_id,
+                "filename": chunk.filename,
+                "chunk_index": chunk.chunk_index,
+            }
+            for chunk in rag_response.sources
+        ]
+
+        db.add(ChatMessageModel(
+            conversation_id=conversation.id,
+            role="assistant",
+            content=rag_response.answer,
+            sources_json=json.dumps(sources_payload),
+            message_index=assistant_index,
+        ))
+        conversation.updated_at = datetime.utcnow()
+
+        # 7. Convert to API response format
         sources = [
             SourceChunk(
                 text=chunk.text,
@@ -113,6 +229,7 @@ async def chat_query(
             confidence_score=rag_response.confidence_score,
             model=rag_response.model,
             knowledge_base_id=request.knowledge_base_id,
+            conversation_id=conversation.id,
         )
 
         logger.info(
@@ -176,3 +293,173 @@ async def get_knowledge_base_stats(
         "created_at": kb.created_at.isoformat() if kb.created_at else None,
         "ready_for_queries": kb.document_count > 0,
     }
+
+
+@router.get("/conversations", response_model=list[ConversationSummary])
+async def list_conversations(
+    knowledge_base_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """List conversations for a knowledge base."""
+    convo_query = (
+        select(ConversationModel)
+        .where(
+            ConversationModel.knowledge_base_id == knowledge_base_id,
+            ConversationModel.is_deleted == False,
+        )
+        .order_by(desc(ConversationModel.updated_at))
+    )
+    convo_result = await db.execute(convo_query)
+    conversations = convo_result.scalars().all()
+
+    return [
+        ConversationSummary(
+            id=convo.id,
+            knowledge_base_id=convo.knowledge_base_id,
+            title=convo.title,
+            created_at=convo.created_at,
+            updated_at=convo.updated_at,
+        )
+        for convo in conversations
+    ]
+
+
+@router.get("/conversations/{conversation_id}", response_model=ConversationDetail)
+async def get_conversation(
+    conversation_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """Get conversation details including settings."""
+    convo_query = select(ConversationModel).where(
+        ConversationModel.id == conversation_id,
+        ConversationModel.is_deleted == False,
+    )
+    convo_result = await db.execute(convo_query)
+    conversation = convo_result.scalar_one_or_none()
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Conversation {conversation_id} not found"
+        )
+
+    settings = None
+    if conversation.settings_json:
+        try:
+            settings = ConversationSettings(**json.loads(conversation.settings_json))
+        except Exception:
+            settings = None
+
+    return ConversationDetail(
+        id=conversation.id,
+        knowledge_base_id=conversation.knowledge_base_id,
+        title=conversation.title,
+        settings=settings,
+        created_at=conversation.created_at,
+        updated_at=conversation.updated_at,
+    )
+
+
+@router.patch("/conversations/{conversation_id}/settings", response_model=ConversationDetail)
+async def update_conversation_settings(
+    conversation_id: UUID,
+    payload: ConversationSettings,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """Update conversation settings."""
+    convo_query = select(ConversationModel).where(
+        ConversationModel.id == conversation_id,
+        ConversationModel.is_deleted == False,
+    )
+    convo_result = await db.execute(convo_query)
+    conversation = convo_result.scalar_one_or_none()
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Conversation {conversation_id} not found"
+        )
+
+    conversation.settings_json = payload.model_dump_json(exclude_none=True)
+    conversation.updated_at = datetime.utcnow()
+
+    return ConversationDetail(
+        id=conversation.id,
+        knowledge_base_id=conversation.knowledge_base_id,
+        title=conversation.title,
+        settings=payload,
+        created_at=conversation.created_at,
+        updated_at=conversation.updated_at,
+    )
+
+
+@router.get("/conversations/{conversation_id}/messages", response_model=list[ChatMessageResponse])
+async def get_conversation_messages(
+    conversation_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """Get messages for a conversation."""
+    convo_query = select(ConversationModel).where(
+        ConversationModel.id == conversation_id,
+        ConversationModel.is_deleted == False,
+    )
+    convo_result = await db.execute(convo_query)
+    conversation = convo_result.scalar_one_or_none()
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Conversation {conversation_id} not found"
+        )
+
+    msg_query = (
+        select(ChatMessageModel)
+        .where(ChatMessageModel.conversation_id == conversation_id)
+        .order_by(ChatMessageModel.message_index)
+    )
+    msg_result = await db.execute(msg_query)
+    messages = msg_result.scalars().all()
+
+    response_messages: list[ChatMessageResponse] = []
+    for msg in messages:
+        sources = None
+        if msg.sources_json:
+            try:
+                raw_sources = json.loads(msg.sources_json)
+                sources = [SourceChunk(**source) for source in raw_sources]
+            except Exception:
+                sources = None
+        response_messages.append(ChatMessageResponse(
+            id=msg.id,
+            role=msg.role,
+            content=msg.content,
+            sources=sources,
+            timestamp=msg.created_at,
+            message_index=msg.message_index,
+        ))
+
+    return response_messages
+
+
+@router.delete("/conversations/{conversation_id}")
+async def delete_conversation(
+    conversation_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """Soft-delete a conversation."""
+    convo_query = select(ConversationModel).where(
+        ConversationModel.id == conversation_id,
+        ConversationModel.is_deleted == False,
+    )
+    convo_result = await db.execute(convo_query)
+    conversation = convo_result.scalar_one_or_none()
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Conversation {conversation_id} not found"
+        )
+
+    conversation.is_deleted = True
+    return {"status": "deleted", "id": str(conversation_id)}

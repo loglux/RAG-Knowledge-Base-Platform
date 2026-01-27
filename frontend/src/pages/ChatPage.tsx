@@ -6,7 +6,7 @@ import { MessageBubble } from '../components/chat/MessageBubble'
 import { SourceCard } from '../components/chat/SourceCard'
 import { ChatInput } from '../components/chat/ChatInput'
 import { ChatSettings } from '../components/chat/ChatSettings'
-import type { KnowledgeBase } from '../types/index'
+import type { KnowledgeBase, ConversationSettings } from '../types/index'
 
 export function ChatPage() {
   const { id } = useParams<{ id: string }>()
@@ -46,36 +46,60 @@ export function ChatPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const { messages, isLoading, error, sendMessage, clearMessages } = useChat(id!)
+  const { messages, isLoading, error, sendMessage, clearMessages, conversationId } = useChat(id!)
 
-  // Save settings to localStorage when they change
+  // Persist settings to localStorage as a fallback cache
   useEffect(() => {
     localStorage.setItem('chat_topK', String(topK))
-  }, [topK])
-
-  useEffect(() => {
     localStorage.setItem('chat_temperature', String(temperature))
-  }, [temperature])
-
-  useEffect(() => {
     localStorage.setItem('chat_maxContextChars', String(maxContextChars))
-  }, [maxContextChars])
-
-  useEffect(() => {
     localStorage.setItem('chat_scoreThreshold', String(scoreThreshold))
-  }, [scoreThreshold])
-
-  useEffect(() => {
     localStorage.setItem('chat_llmModel', llmModel)
-  }, [llmModel])
-
-  useEffect(() => {
     localStorage.setItem('chat_llmProvider', llmProvider)
-  }, [llmProvider])
-
-  useEffect(() => {
     localStorage.setItem('chat_useStructure', String(useStructure))
-  }, [useStructure])
+  }, [topK, temperature, maxContextChars, scoreThreshold, llmModel, llmProvider, useStructure])
+
+  // Load conversation settings from server
+  useEffect(() => {
+    const loadConversationSettings = async () => {
+      if (!conversationId) return
+      try {
+        const detail = await apiClient.getConversation(conversationId)
+        const settings = detail.settings
+        if (!settings) return
+
+        if (settings.top_k !== undefined) setTopK(settings.top_k)
+        if (settings.temperature !== undefined) setTemperature(settings.temperature)
+        if (settings.max_context_chars !== undefined) setMaxContextChars(settings.max_context_chars)
+        if (settings.score_threshold !== undefined) setScoreThreshold(settings.score_threshold)
+        if (settings.llm_model) setLlmModel(settings.llm_model)
+        if (settings.llm_provider) setLlmProvider(settings.llm_provider)
+        if (settings.use_structure !== undefined) setUseStructure(settings.use_structure)
+      } catch (err) {
+        console.error('Failed to load conversation settings:', err)
+      }
+    }
+
+    loadConversationSettings()
+  }, [conversationId])
+
+  // Persist conversation settings to server when they change
+  useEffect(() => {
+    if (!conversationId) return
+    const payload: ConversationSettings = {
+      top_k: topK,
+      temperature,
+      max_context_chars: maxContextChars,
+      score_threshold: scoreThreshold,
+      llm_model: llmModel,
+      llm_provider: llmProvider,
+      use_structure: useStructure,
+    }
+
+    apiClient.updateConversationSettings(conversationId, payload).catch((err) => {
+      console.error('Failed to update conversation settings:', err)
+    })
+  }, [conversationId, topK, temperature, maxContextChars, scoreThreshold, llmModel, llmProvider, useStructure])
 
   useEffect(() => {
     const fetchKB = async () => {

@@ -2,31 +2,83 @@ import { useState, useCallback, useEffect } from 'react'
 import { apiClient } from '../services/api'
 import type { ChatMessage, ChatRequest } from '../types/index'
 
-const STORAGE_KEY_PREFIX = 'chat_history_'
+const CONVERSATION_KEY_PREFIX = 'chat_conversation_'
 
 export function useChat(kbId: string) {
-  const storageKey = `${STORAGE_KEY_PREFIX}${kbId}`
+  const conversationKey = `${CONVERSATION_KEY_PREFIX}${kbId}`
 
-  // Load initial messages from localStorage
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [conversationId, setConversationId] = useState<string | null>(() => {
     try {
-      const stored = localStorage.getItem(storageKey)
-      return stored ? JSON.parse(stored) : []
+      return localStorage.getItem(conversationKey)
     } catch {
-      return []
+      return null
     }
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Save messages to localStorage whenever they change
   useEffect(() => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(messages))
-    } catch (e) {
-      console.error('Failed to save chat history:', e)
+    let isMounted = true
+
+    const loadConversation = async () => {
+      try {
+        if (conversationId) {
+          const history = await apiClient.getConversationMessages(conversationId)
+          if (!isMounted) return
+          setMessages(history.map(msg => ({
+            role: msg.role,
+            content: msg.content,
+            sources: msg.sources,
+            timestamp: msg.timestamp,
+          })))
+          return
+        }
+
+        const conversations = await apiClient.listConversations(kbId)
+        if (!isMounted) return
+        if (conversations.length === 0) {
+          setMessages([])
+          return
+        }
+
+        const latest = conversations[0]
+        setConversationId(latest.id)
+        try {
+          localStorage.setItem(conversationKey, latest.id)
+        } catch (e) {
+          console.error('Failed to persist conversation id:', e)
+        }
+
+        const history = await apiClient.getConversationMessages(latest.id)
+        if (!isMounted) return
+        setMessages(history.map(msg => ({
+          role: msg.role,
+          content: msg.content,
+          sources: msg.sources,
+          timestamp: msg.timestamp,
+        })))
+      } catch (e) {
+        console.error('Failed to load conversation history:', e)
+        if (conversationId) {
+          setConversationId(null)
+          try {
+            localStorage.removeItem(conversationKey)
+          } catch (removeError) {
+            console.error('Failed to clear conversation id:', removeError)
+          }
+        }
+      }
     }
-  }, [messages, storageKey])
+
+    if (kbId) {
+      loadConversation()
+    }
+
+    return () => {
+      isMounted = false
+    }
+  }, [kbId, conversationId, conversationKey])
 
   const sendMessage = useCallback(
     async (
@@ -52,16 +104,10 @@ export function useChat(kbId: string) {
       setError(null)
 
       try {
-        // Prepare conversation history (last 10 messages, excluding current question)
-        const history = messages.slice(-10).map(msg => ({
-          role: msg.role,
-          content: msg.content
-        }))
-
         const request: ChatRequest = {
           question,
           knowledge_base_id: kbId,
-          conversation_history: history.length > 0 ? history : undefined,
+          conversation_id: conversationId || undefined,
           top_k: topK,
           temperature,
           max_context_chars: maxContextChars,
@@ -72,6 +118,15 @@ export function useChat(kbId: string) {
         }
 
         const response = await apiClient.chat(request)
+
+        if (response.conversation_id && response.conversation_id !== conversationId) {
+          setConversationId(response.conversation_id)
+          try {
+            localStorage.setItem(conversationKey, response.conversation_id)
+          } catch (e) {
+            console.error('Failed to persist conversation id:', e)
+          }
+        }
 
         const assistantMessage: ChatMessage = {
           role: 'assistant',
@@ -96,18 +151,24 @@ export function useChat(kbId: string) {
         setIsLoading(false)
       }
     },
-    [kbId]
+    [kbId, conversationId, conversationKey]
   )
 
   const clearMessages = useCallback(() => {
     setMessages([])
     setError(null)
     try {
-      localStorage.removeItem(storageKey)
+      if (conversationId) {
+        apiClient.deleteConversation(conversationId).catch((e) => {
+          console.error('Failed to delete conversation:', e)
+        })
+      }
+      localStorage.removeItem(conversationKey)
+      setConversationId(null)
     } catch (e) {
       console.error('Failed to clear chat history:', e)
     }
-  }, [storageKey])
+  }, [conversationId, conversationKey])
 
   return {
     messages,
@@ -115,5 +176,6 @@ export function useChat(kbId: string) {
     error,
     sendMessage,
     clearMessages,
+    conversationId,
   }
 }
