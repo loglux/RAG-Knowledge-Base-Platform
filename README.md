@@ -110,6 +110,17 @@ Key settings:
 - `OPENAI_API_KEY` (or alternate provider keys)
 - `QDRANT_URL` and `DATABASE_URL`
 - `OLLAMA_BASE_URL` (optional for local models)
+- `MAX_CONTEXT_CHARS` (0 = unlimited)
+
+## Chat settings (UI)
+
+The chat UI exposes retrieval controls to tune answer quality:
+
+- **Top K**: number of chunks retrieved from the vector store. Typical range 10–50. Higher values add recall but can bring more noise.
+- **Max context chars**: limit for assembled context (0 = unlimited). Lower values reduce cost/latency; higher values preserve more context.
+- **Score threshold**: minimum similarity score (0–1) to filter low‑relevance chunks. 0 disables filtering; 0.2–0.4 is a good starting range.
+- **Temperature**: response randomness. Use 0–0.3 for factual extraction, higher for exploratory/creative explanations.
+- **Use Document Structure**: enables TOC‑aware, section‑targeted retrieval (e.g., “show question 2”).
 
 ## Repo layout (minimal)
 
