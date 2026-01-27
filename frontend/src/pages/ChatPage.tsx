@@ -38,6 +38,7 @@ export function ChatPage() {
   const [useStructure, setUseStructure] = useState(() => {
     return false
   })
+  const [settingsLoaded, setSettingsLoaded] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -61,6 +62,7 @@ export function ChatPage() {
         if (settings.llm_model) setLlmModel(settings.llm_model)
         if (settings.llm_provider) setLlmProvider(settings.llm_provider)
         if (settings.use_structure !== undefined) setUseStructure(settings.use_structure)
+        setSettingsLoaded(true)
       } catch (err) {
         console.error('Failed to load conversation settings:', err)
       }
@@ -71,7 +73,7 @@ export function ChatPage() {
 
   // Persist conversation settings to server when they change
   useEffect(() => {
-    if (!conversationId) return
+    if (!conversationId || !settingsLoaded) return
     const payload: ConversationSettings = {
       top_k: topK,
       temperature,
@@ -85,7 +87,7 @@ export function ChatPage() {
     apiClient.updateConversationSettings(conversationId, payload).catch((err) => {
       console.error('Failed to update conversation settings:', err)
     })
-  }, [conversationId, topK, temperature, maxContextChars, scoreThreshold, llmModel, llmProvider, useStructure])
+  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, llmModel, llmProvider, useStructure])
 
   useEffect(() => {
     const fetchKB = async () => {
