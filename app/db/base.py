@@ -4,7 +4,7 @@
 from app.models.database import Base
 
 # Import all models so Alembic can detect them
-from app.models.database import KnowledgeBase, Document, DocumentStructure, Conversation, ChatMessage
+from app.models.database import KnowledgeBase, Document, DocumentStructure, Conversation, ChatMessage, AppSettings
 
 __all__ = [
     "Base",
@@ -13,4 +13,5 @@ __all__ = [
     "DocumentStructure",
     "Conversation",
     "ChatMessage",
+    "AppSettings",
 ]

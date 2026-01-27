@@ -30,8 +30,16 @@ export function DashboardPage() {
               <div className="text-2xl">🧠</div>
               <h1 className="text-2xl font-bold text-white">Knowledge Base Platform</h1>
             </div>
-            <div className="text-sm text-gray-400">
-              {loading ? 'Loading...' : `${knowledgeBases.length} knowledge bases`}
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => navigate('/settings')}
+                className="text-gray-400 hover:text-white transition-colors text-sm"
+              >
+                Settings
+              </button>
+              <div className="text-sm text-gray-400">
+                {loading ? 'Loading...' : `${knowledgeBases.length} knowledge bases`}
+              </div>
             </div>
           </div>
         </div>

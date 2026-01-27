@@ -267,7 +267,27 @@ class ConversationSettings(BaseModel):
     llm_model: Optional[str] = None
     llm_provider: Optional[str] = None
     use_structure: Optional[bool] = None
-    show_ollama: Optional[bool] = None
+
+
+class AppSettingsBase(BaseModel):
+    """Global app defaults for chat settings."""
+    llm_model: Optional[str] = Field(default=None)
+    llm_provider: Optional[str] = Field(default=None)
+    temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
+    top_k: Optional[int] = Field(default=None, ge=1, le=100)
+    max_context_chars: Optional[int] = Field(default=None, ge=0)
+    score_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    use_structure: Optional[bool] = Field(default=None)
+
+
+class AppSettingsResponse(AppSettingsBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class AppSettingsUpdate(AppSettingsBase):
+    pass
 
 
 class ConversationDetail(BaseModel):

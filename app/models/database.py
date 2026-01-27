@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
+import sqlalchemy as sa
 from sqlalchemy import String, Text, DateTime, Integer, Boolean, Enum as SQLEnum, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -356,3 +357,33 @@ class ChatMessage(Base):
 
     def __repr__(self) -> str:
         return f"<ChatMessage(id={self.id}, role={self.role}, conversation_id={self.conversation_id})>"
+
+
+class AppSettings(Base):
+    """Global application settings."""
+
+    __tablename__ = "app_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    llm_model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    llm_provider: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    temperature: Mapped[Optional[float]] = mapped_column(sa.Float, nullable=True)
+    top_k: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    max_context_chars: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    score_threshold: Mapped[Optional[float]] = mapped_column(sa.Float, nullable=True)
+    use_structure: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return f"<AppSettings(id={self.id})>"

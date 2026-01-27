@@ -14,6 +14,8 @@ import type {
   ConversationDetail,
   ConversationSettings,
   EmbeddingModel,
+  AppSettings,
+  AppSettingsUpdate,
 } from '../types/index'
 
 class APIClient {
@@ -182,6 +184,17 @@ class APIClient {
   // LLM Models
   async getLLMModels(): Promise<{ models: any[]; providers: any; total: number }> {
     const response = await this.client.get('/llm/models')
+    return response.data
+  }
+
+  // App Settings
+  async getAppSettings(): Promise<AppSettings> {
+    const response = await this.client.get<AppSettings>('/settings')
+    return response.data
+  }
+
+  async updateAppSettings(payload: AppSettingsUpdate): Promise<AppSettings> {
+    const response = await this.client.put<AppSettings>('/settings', payload)
     return response.data
   }
 }

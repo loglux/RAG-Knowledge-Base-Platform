@@ -159,3 +159,26 @@ export interface ChatMessageResponse {
   timestamp: string
   message_index: number
 }
+
+export interface AppSettings {
+  id: number
+  llm_model: string | null
+  llm_provider: string | null
+  temperature: number | null
+  top_k: number | null
+  max_context_chars: number | null
+  score_threshold: number | null
+  use_structure: boolean | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AppSettingsUpdate {
+  llm_model?: string | null
+  llm_provider?: string | null
+  temperature?: number | null
+  top_k?: number | null
+  max_context_chars?: number | null
+  score_threshold?: number | null
+  use_structure?: boolean | null
+}

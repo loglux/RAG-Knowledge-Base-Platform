@@ -53,7 +53,10 @@ export function ChatPage() {
       try {
         const detail = await apiClient.getConversation(conversationId)
         const settings = detail.settings
-        if (!settings) return
+        if (!settings) {
+          setSettingsLoaded(true)
+          return
+        }
 
         if (settings.top_k !== undefined) setTopK(settings.top_k)
         if (settings.temperature !== undefined) setTemperature(settings.temperature)
@@ -65,10 +68,33 @@ export function ChatPage() {
         setSettingsLoaded(true)
       } catch (err) {
         console.error('Failed to load conversation settings:', err)
+        setSettingsLoaded(true)
       }
     }
 
     loadConversationSettings()
+  }, [conversationId])
+
+  useEffect(() => {
+    const loadGlobalSettings = async () => {
+      if (conversationId) return
+      try {
+        const data = await apiClient.getAppSettings()
+        if (data.top_k !== null) setTopK(data.top_k)
+        if (data.temperature !== null) setTemperature(data.temperature)
+        if (data.max_context_chars !== null) setMaxContextChars(data.max_context_chars)
+        if (data.score_threshold !== null) setScoreThreshold(data.score_threshold)
+        if (data.llm_model) setLlmModel(data.llm_model)
+        if (data.llm_provider) setLlmProvider(data.llm_provider)
+        if (data.use_structure !== null) setUseStructure(data.use_structure)
+        setSettingsLoaded(true)
+      } catch (err) {
+        console.error('Failed to load global settings:', err)
+        setSettingsLoaded(true)
+      }
+    }
+
+    loadGlobalSettings()
   }, [conversationId])
 
   // Persist conversation settings to server when they change
