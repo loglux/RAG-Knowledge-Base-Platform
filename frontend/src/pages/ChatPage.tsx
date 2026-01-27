@@ -29,6 +29,10 @@ export function ChatPage() {
     const saved = localStorage.getItem('chat_maxContextChars')
     return saved ? Number(saved) : 0
   })
+  const [scoreThreshold, setScoreThreshold] = useState(() => {
+    const saved = localStorage.getItem('chat_scoreThreshold')
+    return saved ? Number(saved) : 0
+  })
   const [llmModel, setLlmModel] = useState(() => {
     return localStorage.getItem('chat_llmModel') || 'gpt-4o'
   })
@@ -56,6 +60,10 @@ export function ChatPage() {
   useEffect(() => {
     localStorage.setItem('chat_maxContextChars', String(maxContextChars))
   }, [maxContextChars])
+
+  useEffect(() => {
+    localStorage.setItem('chat_scoreThreshold', String(scoreThreshold))
+  }, [scoreThreshold])
 
   useEffect(() => {
     localStorage.setItem('chat_llmModel', llmModel)
@@ -94,7 +102,7 @@ export function ChatPage() {
   }, [messages])
 
   const handleSendMessage = (question: string) => {
-    sendMessage(question, topK, temperature, maxContextChars, llmModel, llmProvider, useStructure)
+    sendMessage(question, topK, temperature, maxContextChars, scoreThreshold, llmModel, llmProvider, useStructure)
   }
 
   const handleLLMChange = (model: string, provider: string) => {
@@ -179,12 +187,14 @@ export function ChatPage() {
           topK={topK}
           temperature={temperature}
           maxContextChars={maxContextChars}
+          scoreThreshold={scoreThreshold}
           llmModel={llmModel}
           llmProvider={llmProvider}
           useStructure={useStructure}
           onTopKChange={setTopK}
           onTemperatureChange={setTemperature}
           onMaxContextCharsChange={setMaxContextChars}
+          onScoreThresholdChange={setScoreThreshold}
           onLLMChange={handleLLMChange}
           onUseStructureChange={setUseStructure}
           onClose={() => setShowSettings(false)}

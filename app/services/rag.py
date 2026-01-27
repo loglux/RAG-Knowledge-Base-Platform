@@ -113,6 +113,7 @@ Context follows below.
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
         max_context_chars: Optional[int] = None,
+        score_threshold: Optional[float] = None,
         llm_model: Optional[str] = None,
         llm_provider: Optional[str] = None,
         conversation_history: Optional[List[Dict[str, str]]] = None,
@@ -183,6 +184,7 @@ Context follows below.
                 collection_name=collection_name,
                 embedding_model=embedding_model,
                 top_k=top_k,
+                score_threshold=score_threshold,
                 filters=chunk_filters,
             )
 

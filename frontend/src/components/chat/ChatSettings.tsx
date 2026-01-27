@@ -5,12 +5,14 @@ interface ChatSettingsProps {
   topK: number
   temperature: number
   maxContextChars: number
+  scoreThreshold: number
   llmModel: string
   llmProvider: string
   useStructure: boolean
   onTopKChange: (value: number) => void
   onTemperatureChange: (value: number) => void
   onMaxContextCharsChange: (value: number) => void
+  onScoreThresholdChange: (value: number) => void
   onLLMChange: (model: string, provider: string) => void
   onUseStructureChange: (value: boolean) => void
   onClose: () => void
@@ -20,12 +22,14 @@ export function ChatSettings({
   topK,
   temperature,
   maxContextChars,
+  scoreThreshold,
   llmModel,
   llmProvider,
   useStructure,
   onTopKChange,
   onTemperatureChange,
   onMaxContextCharsChange,
+  onScoreThresholdChange,
   onLLMChange,
   onUseStructureChange,
   onClose,
@@ -95,7 +99,7 @@ export function ChatSettings({
               How many relevant chunks to retrieve from the knowledge base
             </p>
 
-            <label className="block text-sm font-medium text-gray-300 mt-4 mb-2">
+            <label className="block text-sm font-medium text-gray-300 mt-8 mb-2">
               Max context chars (0 = unlimited)
             </label>
             <input
@@ -104,7 +108,7 @@ export function ChatSettings({
               step="1000"
               value={maxContextChars}
               onChange={(e) => onMaxContextCharsChange(Number(e.target.value))}
-              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1 text-gray-100"
+              className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-px text-gray-100"
             />
             <p className="text-xs text-gray-500 mt-1">
               Larger values include more retrieved text in the prompt
@@ -128,6 +132,23 @@ export function ChatSettings({
             <p className="text-xs text-gray-500 mt-1">
               Lower = more focused and deterministic, Higher = more creative and varied
             </p>
+
+            <label className="block text-sm font-medium text-gray-300 mt-4 mb-2">
+              Score threshold (0–1)
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="1"
+              step="0.01"
+              value={scoreThreshold}
+              onChange={(e) => onScoreThresholdChange(Number(e.target.value))}
+              className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-px text-gray-100"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Filter out low‑relevance chunks
+            </p>
+
           </div>
         </div>
 

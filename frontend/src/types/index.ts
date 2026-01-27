@@ -106,6 +106,7 @@ export interface ChatRequest {
   top_k?: number
   temperature?: number
   max_context_chars?: number
+  score_threshold?: number
   llm_model?: string
   llm_provider?: string
   use_structure?: boolean

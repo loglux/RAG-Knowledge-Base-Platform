@@ -34,6 +34,7 @@ export function useChat(kbId: string) {
       topK = 5,
       temperature = 0.7,
       maxContextChars?: number,
+      scoreThreshold?: number,
       llmModel?: string,
       llmProvider?: string,
       useStructure = false
@@ -64,6 +65,7 @@ export function useChat(kbId: string) {
           top_k: topK,
           temperature,
           max_context_chars: maxContextChars,
+          score_threshold: scoreThreshold,
           llm_model: llmModel,
           llm_provider: llmProvider,
           use_structure: useStructure,

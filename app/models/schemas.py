@@ -272,6 +272,12 @@ class ChatRequest(BaseModel):
         ge=0,
         description="Max context length in characters (0 = unlimited)"
     )
+    score_threshold: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Minimum similarity score for retrieved chunks"
+    )
     max_tokens: Optional[int] = Field(
         default=None,
         ge=1,
