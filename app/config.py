@@ -93,7 +93,7 @@ class Settings(BaseSettings):
     CHUNK_OVERLAP: int = Field(default=200, description="Chunk overlap in characters")
     MAX_FILE_SIZE_MB: int = Field(default=50, description="Maximum file size in MB")
     MAX_CONTEXT_CHARS: int = Field(
-        default=20000,
+        default=0,
         description="Maximum assembled context length in characters"
     )
     ALLOWED_FILE_TYPES: str = Field(

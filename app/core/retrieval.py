@@ -242,7 +242,9 @@ class RetrievalEngine:
         context_parts = []
         current_length = 0
 
-        max_length = max_length or settings.MAX_CONTEXT_CHARS
+        max_length = max_length if max_length is not None else settings.MAX_CONTEXT_CHARS
+        if max_length is not None and max_length <= 0:
+            max_length = None
 
         for i, chunk in enumerate(chunks):
             # Format chunk with metadata
@@ -254,7 +256,7 @@ class RetrievalEngine:
             chunk_length = len(chunk_text)
 
             # Check if adding this chunk would exceed max length
-            if current_length + chunk_length > max_length:
+            if max_length is not None and current_length + chunk_length > max_length:
                 logger.warning(
                     f"Context length limit reached ({max_length}), "
                     f"including {i} of {len(chunks)} chunks"

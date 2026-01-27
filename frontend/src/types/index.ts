@@ -105,6 +105,7 @@ export interface ChatRequest {
   conversation_history?: ConversationMessage[]
   top_k?: number
   temperature?: number
+  max_context_chars?: number
   llm_model?: string
   llm_provider?: string
   use_structure?: boolean

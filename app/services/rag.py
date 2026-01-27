@@ -112,6 +112,7 @@ Context follows below.
         top_k: int = 5,
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
+        max_context_chars: Optional[int] = None,
         llm_model: Optional[str] = None,
         llm_provider: Optional[str] = None,
         conversation_history: Optional[List[Dict[str, str]]] = None,
@@ -197,11 +198,16 @@ Context follows below.
 
             # 3. Generate answer with context
             context = retrieval_result.context
-            if chunk_filters:
+            if max_context_chars is not None:
+                context = self.retrieval._assemble_context(
+                    retrieval_result.chunks,
+                    max_length=max_context_chars,
+                )
+            elif chunk_filters:
                 # For structured question retrieval, avoid truncating the target section.
                 context = self.retrieval._assemble_context(
                     retrieval_result.chunks,
-                    max_length=20000,
+                    max_length=max_context_chars,
                 )
             logger.debug(f"Generating answer with {len(retrieval_result.chunks)} chunks")
             answer = await self._generate_answer(

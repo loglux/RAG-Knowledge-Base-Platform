@@ -33,6 +33,7 @@ export function useChat(kbId: string) {
       question: string,
       topK = 5,
       temperature = 0.7,
+      maxContextChars?: number,
       llmModel?: string,
       llmProvider?: string,
       useStructure = false
@@ -62,6 +63,7 @@ export function useChat(kbId: string) {
           conversation_history: history.length > 0 ? history : undefined,
           top_k: topK,
           temperature,
+          max_context_chars: maxContextChars,
           llm_model: llmModel,
           llm_provider: llmProvider,
           use_structure: useStructure,

@@ -84,6 +84,7 @@ async def chat_query(
             top_k=request.top_k,
             temperature=request.temperature,
             max_tokens=request.max_tokens,
+            max_context_chars=request.max_context_chars,
             llm_model=request.llm_model,
             llm_provider=request.llm_provider,
             conversation_history=history_dicts,

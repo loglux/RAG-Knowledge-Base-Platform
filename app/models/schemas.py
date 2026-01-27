@@ -267,6 +267,11 @@ class ChatRequest(BaseModel):
         le=2.0,
         description="LLM temperature for response generation"
     )
+    max_context_chars: Optional[int] = Field(
+        default=None,
+        ge=0,
+        description="Max context length in characters (0 = unlimited)"
+    )
     max_tokens: Optional[int] = Field(
         default=None,
         ge=1,

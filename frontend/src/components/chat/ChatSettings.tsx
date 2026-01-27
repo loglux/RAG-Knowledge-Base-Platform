@@ -4,11 +4,13 @@ import { LLMSelector } from './LLMSelector'
 interface ChatSettingsProps {
   topK: number
   temperature: number
+  maxContextChars: number
   llmModel: string
   llmProvider: string
   useStructure: boolean
   onTopKChange: (value: number) => void
   onTemperatureChange: (value: number) => void
+  onMaxContextCharsChange: (value: number) => void
   onLLMChange: (model: string, provider: string) => void
   onUseStructureChange: (value: boolean) => void
   onClose: () => void
@@ -17,11 +19,13 @@ interface ChatSettingsProps {
 export function ChatSettings({
   topK,
   temperature,
+  maxContextChars,
   llmModel,
   llmProvider,
   useStructure,
   onTopKChange,
   onTemperatureChange,
+  onMaxContextCharsChange,
   onLLMChange,
   onUseStructureChange,
   onClose,
@@ -67,7 +71,10 @@ export function ChatSettings({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* LLM Model */}
           <div>
-            <LLMSelector value={llmModel} onChange={onLLMChange} />
+            <LLMSelector
+              value={llmModel}
+              onChange={onLLMChange}
+            />
           </div>
 
           {/* Top K */}
@@ -86,6 +93,21 @@ export function ChatSettings({
             />
             <p className="text-xs text-gray-500 mt-1">
               How many relevant chunks to retrieve from the knowledge base
+            </p>
+
+            <label className="block text-sm font-medium text-gray-300 mt-4 mb-2">
+              Max context chars (0 = unlimited)
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="1000"
+              value={maxContextChars}
+              onChange={(e) => onMaxContextCharsChange(Number(e.target.value))}
+              className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-1 text-gray-100"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Larger values include more retrieved text in the prompt
             </p>
           </div>
 
@@ -108,6 +130,7 @@ export function ChatSettings({
             </p>
           </div>
         </div>
+
 
         <div className="mt-4 p-3 bg-gray-900 rounded-lg border border-gray-700">
           <p className="text-xs text-gray-400">
