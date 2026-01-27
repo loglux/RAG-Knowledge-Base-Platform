@@ -133,6 +133,7 @@ export function useChat(kbId: string) {
           content: response.answer,
           sources: response.sources,
           timestamp: new Date().toISOString(),
+          model: response.model,
         }
 
         setMessages((prev) => [...prev, assistantMessage])

@@ -67,6 +67,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             <span className="text-xs font-medium opacity-75">
               {isUser ? 'You' : 'Assistant'}
             </span>
+            {!isUser && message.model && (
+              <span className="text-[11px] text-gray-400">{message.model}</span>
+            )}
             <span className="text-xs opacity-50">{timestamp}</span>
           </div>
           <button

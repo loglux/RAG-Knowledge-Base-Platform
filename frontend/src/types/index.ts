@@ -84,6 +84,7 @@ export interface ChatMessage {
   content: string
   sources?: SourceChunk[]
   timestamp: string
+  model?: string
 }
 
 export interface SourceChunk {
