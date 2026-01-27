@@ -122,6 +122,8 @@ The chat UI exposes retrieval controls to tune answer quality:
 - **Temperature**: response randomness. Use 0–0.3 for factual extraction, higher for exploratory/creative explanations.
 - **Use Document Structure**: enables TOC‑aware, section‑targeted retrieval (e.g., “show question 2”).
 
+![Chat settings](chat_settings.png)
+
 ## Repo layout (minimal)
 
 ```
