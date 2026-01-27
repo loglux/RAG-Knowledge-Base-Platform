@@ -33,9 +33,10 @@ export function DashboardPage() {
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => navigate('/settings')}
-                className="text-gray-400 hover:text-white transition-colors text-sm"
+                className="btn-secondary text-sm px-3 py-1.5 flex items-center gap-2"
               >
-                Settings
+                <span aria-hidden="true">⚙️</span>
+                <span>Settings</span>
               </button>
               <div className="text-sm text-gray-400">
                 {loading ? 'Loading...' : `${knowledgeBases.length} knowledge bases`}
