@@ -137,16 +137,17 @@ export function ChatSettings({
               Score threshold (0–1)
             </label>
             <input
-              type="number"
+              type="range"
               min="0"
               max="1"
               step="0.01"
               value={scoreThreshold}
               onChange={(e) => onScoreThresholdChange(Number(e.target.value))}
-              className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-px text-gray-100"
+              className="slider w-full"
             />
+            <div className="text-xs text-gray-400 mt-1">Current: {scoreThreshold.toFixed(2)}</div>
             <p className="text-xs text-gray-500 mt-1">
-              Filter out low‑relevance chunks
+              0 = no filter, higher = stricter filtering of low‑relevance chunks
             </p>
 
           </div>
