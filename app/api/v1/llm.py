@@ -46,6 +46,7 @@ async def list_llm_models():
                         "description": f"Local Ollama model - {model.get('details', {}).get('family', 'Unknown')} family",
                         "size": model.get("size"),
                         "family": model.get("details", {}).get("family"),
+                        "parameter_size": model.get("details", {}).get("parameter_size"),
                     })
         except Exception as e:
             logger.warning(f"Failed to fetch Ollama models: {e}")

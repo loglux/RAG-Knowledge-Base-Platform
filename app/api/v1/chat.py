@@ -54,8 +54,11 @@ async def chat_query(
     Returns answer with sources and confidence scores.
     """
     logger.info(
-        f"Chat query: '{request.question[:50]}...' "
-        f"(KB: {request.knowledge_base_id})"
+        "Chat query: '%s...' (KB: %s, model: %s, provider: %s)",
+        request.question[:50],
+        request.knowledge_base_id,
+        request.llm_model or "default",
+        request.llm_provider or "default",
     )
 
     try:
@@ -163,7 +166,13 @@ async def chat_query(
             db.add(conversation)
             await db.flush()
         else:
-            settings_payload = {
+            existing_settings = {}
+            if conversation.settings_json:
+                try:
+                    existing_settings = json.loads(conversation.settings_json)
+                except Exception:
+                    existing_settings = {}
+            existing_settings.update({
                 "top_k": request.top_k,
                 "temperature": request.temperature,
                 "max_context_chars": request.max_context_chars,
@@ -171,8 +180,8 @@ async def chat_query(
                 "llm_model": request.llm_model,
                 "llm_provider": request.llm_provider,
                 "use_structure": request.use_structure,
-            }
-            conversation.settings_json = json.dumps(settings_payload)
+            })
+            conversation.settings_json = json.dumps(existing_settings)
 
         # 6. Persist messages
         max_index_query = select(func.max(ChatMessageModel.message_index)).where(

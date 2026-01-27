@@ -266,6 +266,7 @@ class ConversationSettings(BaseModel):
     llm_model: Optional[str] = None
     llm_provider: Optional[str] = None
     use_structure: Optional[bool] = None
+    show_ollama: Optional[bool] = None
 
 
 class ConversationDetail(BaseModel):

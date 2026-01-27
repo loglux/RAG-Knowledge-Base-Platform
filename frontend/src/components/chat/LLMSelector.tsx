@@ -9,18 +9,20 @@ interface LLMModel {
   cost_output?: number
   description: string
   family?: string
+  parameter_size?: string
 }
 
 interface LLMSelectorProps {
   value: string
   onChange: (model: string, provider: string) => void
+  showOllama: boolean
+  onShowOllamaChange: (value: boolean) => void
 }
 
-export function LLMSelector({ value, onChange }: LLMSelectorProps) {
+export function LLMSelector({ value, onChange, showOllama, onShowOllamaChange }: LLMSelectorProps) {
   const [models, setModels] = useState<LLMModel[]>([])
   const [loading, setLoading] = useState(true)
   const [groupBy, setGroupBy] = useState<'provider' | 'all'>('provider')
-  const [showOllama, setShowOllama] = useState(false)
 
   useEffect(() => {
     const fetchModels = async () => {
@@ -73,7 +75,7 @@ export function LLMSelector({ value, onChange }: LLMSelectorProps) {
             <input
               type="checkbox"
               checked={showOllama}
-              onChange={(e) => setShowOllama(e.target.checked)}
+              onChange={(e) => onShowOllamaChange(e.target.checked)}
               className="rounded border-gray-600 bg-gray-700 text-primary-500 focus:ring-primary-500"
             />
             Show Ollama (slow)
@@ -141,6 +143,9 @@ export function LLMSelector({ value, onChange }: LLMSelectorProps) {
           <p className="text-xs text-gray-500">{selectedModel.description}</p>
           {selectedModel.family && (
             <p className="text-xs text-gray-600">Family: {selectedModel.family}</p>
+          )}
+          {selectedModel.parameter_size && (
+            <p className="text-xs text-gray-600">Params: {selectedModel.parameter_size}</p>
           )}
         </div>
       )}

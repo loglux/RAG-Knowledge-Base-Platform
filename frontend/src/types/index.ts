@@ -139,6 +139,7 @@ export interface ConversationSettings {
   llm_model?: string
   llm_provider?: string
   use_structure?: boolean
+  show_ollama?: boolean
 }
 
 export interface ConversationDetail {

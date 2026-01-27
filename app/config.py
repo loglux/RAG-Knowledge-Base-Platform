@@ -82,7 +82,7 @@ class Settings(BaseSettings):
         description="Ollama chat model"
     )
     OLLAMA_TIMEOUT_SECONDS: int = Field(
-        default=120,
+        default=180,
         description="Timeout in seconds for Ollama chat requests"
     )
 

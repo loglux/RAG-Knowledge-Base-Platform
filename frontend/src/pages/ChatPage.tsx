@@ -43,6 +43,10 @@ export function ChatPage() {
     const saved = localStorage.getItem('chat_useStructure')
     return saved === 'true'
   })
+  const [showOllama, setShowOllama] = useState(() => {
+    const saved = localStorage.getItem('chat_showOllama')
+    return saved === 'true'
+  })
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -57,7 +61,8 @@ export function ChatPage() {
     localStorage.setItem('chat_llmModel', llmModel)
     localStorage.setItem('chat_llmProvider', llmProvider)
     localStorage.setItem('chat_useStructure', String(useStructure))
-  }, [topK, temperature, maxContextChars, scoreThreshold, llmModel, llmProvider, useStructure])
+    localStorage.setItem('chat_showOllama', String(showOllama))
+  }, [topK, temperature, maxContextChars, scoreThreshold, llmModel, llmProvider, useStructure, showOllama])
 
   // Load conversation settings from server
   useEffect(() => {
@@ -75,6 +80,7 @@ export function ChatPage() {
         if (settings.llm_model) setLlmModel(settings.llm_model)
         if (settings.llm_provider) setLlmProvider(settings.llm_provider)
         if (settings.use_structure !== undefined) setUseStructure(settings.use_structure)
+        if (settings.show_ollama !== undefined) setShowOllama(settings.show_ollama)
       } catch (err) {
         console.error('Failed to load conversation settings:', err)
       }
@@ -94,12 +100,13 @@ export function ChatPage() {
       llm_model: llmModel,
       llm_provider: llmProvider,
       use_structure: useStructure,
+      show_ollama: showOllama,
     }
 
     apiClient.updateConversationSettings(conversationId, payload).catch((err) => {
       console.error('Failed to update conversation settings:', err)
     })
-  }, [conversationId, topK, temperature, maxContextChars, scoreThreshold, llmModel, llmProvider, useStructure])
+  }, [conversationId, topK, temperature, maxContextChars, scoreThreshold, llmModel, llmProvider, useStructure, showOllama])
 
   useEffect(() => {
     const fetchKB = async () => {
@@ -214,12 +221,14 @@ export function ChatPage() {
           scoreThreshold={scoreThreshold}
           llmModel={llmModel}
           llmProvider={llmProvider}
+          showOllama={showOllama}
           useStructure={useStructure}
           onTopKChange={setTopK}
           onTemperatureChange={setTemperature}
           onMaxContextCharsChange={setMaxContextChars}
           onScoreThresholdChange={setScoreThreshold}
           onLLMChange={handleLLMChange}
+          onShowOllamaChange={setShowOllama}
           onUseStructureChange={setUseStructure}
           onClose={() => setShowSettings(false)}
         />
