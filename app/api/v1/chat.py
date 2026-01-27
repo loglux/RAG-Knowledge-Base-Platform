@@ -215,6 +215,7 @@ async def chat_query(
             role="assistant",
             content=rag_response.answer,
             sources_json=json.dumps(sources_payload),
+            model=rag_response.model,
             message_index=assistant_index,
         ))
         conversation.updated_at = datetime.utcnow()
@@ -444,6 +445,7 @@ async def get_conversation_messages(
             role=msg.role,
             content=msg.content,
             sources=sources,
+            model=msg.model,
             timestamp=msg.created_at,
             message_index=msg.message_index,
         ))

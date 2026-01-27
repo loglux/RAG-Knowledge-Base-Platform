@@ -336,6 +336,11 @@ class ChatMessage(Base):
         nullable=True,
         comment="JSON-encoded list of source chunks (assistant messages only)"
     )
+    model: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        comment="LLM model used for assistant messages"
+    )
     message_index: Mapped[int] = mapped_column(Integer, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(

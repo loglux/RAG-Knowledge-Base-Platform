@@ -244,6 +244,7 @@ class ChatMessageResponse(BaseModel):
     role: str = Field(..., description="Message role: user or assistant")
     content: str = Field(..., description="Message content")
     sources: Optional[List[SourceChunk]] = Field(default=None, description="Source chunks for assistant messages")
+    model: Optional[str] = Field(default=None, description="LLM model used for assistant messages")
     timestamp: datetime
     message_index: int
 
