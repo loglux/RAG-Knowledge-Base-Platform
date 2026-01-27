@@ -8,6 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
+import httpx
 
 from app.db.session import get_db
 from app.models.database import (
@@ -30,6 +31,30 @@ from app.dependencies import get_current_user_id
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _format_chat_error(exc: Exception) -> tuple[int, str]:
+    """Map internal errors to safe user-facing messages."""
+    if isinstance(exc, httpx.ReadTimeout):
+        return (
+            status.HTTP_504_GATEWAY_TIMEOUT,
+            "Ollama timed out while generating a response. Try a smaller model or reduce context."
+        )
+    if isinstance(exc, httpx.HTTPStatusError):
+        code = exc.response.status_code if exc.response else status.HTTP_502_BAD_GATEWAY
+        if code == status.HTTP_400_BAD_REQUEST:
+            return (
+                status.HTTP_400_BAD_REQUEST,
+                "Ollama rejected the request (400). Try reducing context or checking model availability."
+            )
+        return (
+            status.HTTP_502_BAD_GATEWAY,
+            "Ollama returned an upstream error. Try again or switch models."
+        )
+    return (
+        status.HTTP_500_INTERNAL_SERVER_ERROR,
+        "Query failed. Please try again."
+    )
 
 
 @router.post("/", response_model=ChatResponse)
@@ -254,10 +279,8 @@ async def chat_query(
         raise
     except Exception as e:
         logger.exception("Chat query failed")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Query failed: {str(e)}"
-        )
+        status_code, message = _format_chat_error(e)
+        raise HTTPException(status_code=status_code, detail=message)
 
 
 @router.get("/knowledge-bases/{kb_id}/stats")
