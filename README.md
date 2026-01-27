@@ -70,13 +70,19 @@ cp .env.example .env
 # add your OPENAI_API_KEY (or other provider keys)
 ```
 
-2) Start services
+2) Read the runbook (dev ops notes, CORS, restart rules)
+
+```text
+RUNBOOK.md
+```
+
+3) Start services
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-3) Open API docs
+4) Open API docs
 
 ```text
 http://localhost:8000/docs
