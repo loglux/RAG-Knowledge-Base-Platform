@@ -72,9 +72,7 @@ cp .env.example .env
 
 2) Read the runbook (dev ops notes, CORS, restart rules)
 
-```text
-RUNBOOK.md
-```
+[RUNBOOK.md](RUNBOOK.md)
 
 3) Start services
 
