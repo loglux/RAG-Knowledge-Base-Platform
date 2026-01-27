@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkMath from 'remark-math'
@@ -15,6 +15,43 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     hour: '2-digit',
     minute: '2-digit',
   })
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    let ok = false
+
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(message.content)
+        ok = true
+      } catch {
+        ok = false
+      }
+    }
+
+    if (!ok) {
+      try {
+        const textarea = document.createElement('textarea')
+        textarea.value = message.content
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.focus()
+        textarea.select()
+        ok = document.execCommand('copy')
+        document.body.removeChild(textarea)
+      } catch {
+        ok = false
+      }
+    }
+
+    if (ok) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1200)
+    } else {
+      setCopied(false)
+    }
+  }
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -25,11 +62,23 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             : 'bg-gray-800 text-gray-100 border border-gray-700'
         }`}
       >
-        <div className="flex items-baseline space-x-2 mb-1">
-          <span className="text-xs font-medium opacity-75">
-            {isUser ? 'You' : 'Assistant'}
-          </span>
-          <span className="text-xs opacity-50">{timestamp}</span>
+        <div className="flex items-baseline justify-between mb-1">
+          <div className="flex items-baseline space-x-2">
+            <span className="text-xs font-medium opacity-75">
+              {isUser ? 'You' : 'Assistant'}
+            </span>
+            <span className="text-xs opacity-50">{timestamp}</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleCopy}
+            className={`text-xs transition-colors ${
+              copied ? 'text-green-400' : 'text-gray-400 hover:text-gray-200'
+            }`}
+            aria-label="Copy message"
+          >
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
         </div>
         <div className="text-sm leading-relaxed prose prose-invert prose-sm max-w-none">
           {isUser ? (
