@@ -41,6 +41,18 @@ export function ChatPage() {
   const [hybridLexicalWeight, setHybridLexicalWeight] = useState(() => {
     return 0.4
   })
+  const [bm25MatchMode, setBm25MatchMode] = useState(() => {
+    return 'balanced'
+  })
+  const [bm25MinShouldMatch, setBm25MinShouldMatch] = useState(() => {
+    return 50
+  })
+  const [bm25UsePhrase, setBm25UsePhrase] = useState(() => {
+    return true
+  })
+  const [bm25Analyzer, setBm25Analyzer] = useState(() => {
+    return 'mixed'
+  })
   const [llmModel, setLlmModel] = useState(() => {
     return 'gpt-4o'
   })
@@ -52,6 +64,9 @@ export function ChatPage() {
   })
   const [opensearchAvailable, setOpensearchAvailable] = useState<boolean | null>(null)
   const [settingsLoaded, setSettingsLoaded] = useState(false)
+  const [kbDefaultsApplied, setKbDefaultsApplied] = useState(false)
+  const [bm25MatchModes, setBm25MatchModes] = useState<string[] | null>(null)
+  const [bm25Analyzers, setBm25Analyzers] = useState<string[] | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -85,6 +100,14 @@ export function ChatPage() {
         if (settings.hybrid_lexical_weight !== undefined && settings.hybrid_lexical_weight !== null) {
           setHybridLexicalWeight(settings.hybrid_lexical_weight)
         }
+        if (settings.bm25_match_mode) setBm25MatchMode(settings.bm25_match_mode)
+        if (settings.bm25_min_should_match !== undefined && settings.bm25_min_should_match !== null) {
+          setBm25MinShouldMatch(settings.bm25_min_should_match)
+        }
+        if (settings.bm25_use_phrase !== undefined && settings.bm25_use_phrase !== null) {
+          setBm25UsePhrase(settings.bm25_use_phrase)
+        }
+        if (settings.bm25_analyzer) setBm25Analyzer(settings.bm25_analyzer)
         if (settings.llm_model) setLlmModel(settings.llm_model)
         if (settings.llm_provider) setLlmProvider(settings.llm_provider)
         if (settings.use_structure !== undefined) setUseStructure(settings.use_structure)
@@ -111,6 +134,10 @@ export function ChatPage() {
         if (data.lexical_top_k !== null) setLexicalTopK(data.lexical_top_k)
         if (data.hybrid_dense_weight !== null) setHybridDenseWeight(data.hybrid_dense_weight)
         if (data.hybrid_lexical_weight !== null) setHybridLexicalWeight(data.hybrid_lexical_weight)
+        if (data.bm25_match_mode) setBm25MatchMode(data.bm25_match_mode)
+        if (data.bm25_min_should_match !== null) setBm25MinShouldMatch(data.bm25_min_should_match)
+        if (data.bm25_use_phrase !== null) setBm25UsePhrase(data.bm25_use_phrase)
+        if (data.bm25_analyzer) setBm25Analyzer(data.bm25_analyzer)
         if (data.llm_model) setLlmModel(data.llm_model)
         if (data.llm_provider) setLlmProvider(data.llm_provider)
         if (data.use_structure !== null) setUseStructure(data.use_structure)
@@ -123,6 +150,21 @@ export function ChatPage() {
 
     loadGlobalSettings()
   }, [conversationId])
+
+  useEffect(() => {
+    const loadSettingsMetadata = async () => {
+      try {
+        const metadata = await apiClient.getSettingsMetadata()
+        setBm25MatchModes(metadata.bm25_match_modes || null)
+        setBm25Analyzers(metadata.bm25_analyzers || null)
+      } catch (err) {
+        setBm25MatchModes(null)
+        setBm25Analyzers(null)
+      }
+    }
+
+    loadSettingsMetadata()
+  }, [])
 
   useEffect(() => {
     const loadInfo = async () => {
@@ -149,6 +191,10 @@ export function ChatPage() {
       lexical_top_k: lexicalTopK,
       hybrid_dense_weight: hybridDenseWeight,
       hybrid_lexical_weight: hybridLexicalWeight,
+      bm25_match_mode: bm25MatchMode,
+      bm25_min_should_match: bm25MinShouldMatch,
+      bm25_use_phrase: bm25UsePhrase,
+      bm25_analyzer: bm25Analyzer,
       llm_model: llmModel,
       llm_provider: llmProvider,
       use_structure: useStructure,
@@ -157,7 +203,7 @@ export function ChatPage() {
     apiClient.updateConversationSettings(conversationId, payload).catch((err) => {
       console.error('Failed to update conversation settings:', err)
     })
-  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, llmModel, llmProvider, useStructure])
+  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, llmModel, llmProvider, useStructure])
 
   useEffect(() => {
     const fetchKB = async () => {
@@ -178,6 +224,23 @@ export function ChatPage() {
     }
   }, [id])
 
+  useEffect(() => {
+    if (!kb || conversationId || kbDefaultsApplied) return
+    if (kb.bm25_match_mode !== undefined && kb.bm25_match_mode !== null) {
+      setBm25MatchMode(kb.bm25_match_mode)
+    }
+    if (kb.bm25_min_should_match !== undefined && kb.bm25_min_should_match !== null) {
+      setBm25MinShouldMatch(kb.bm25_min_should_match)
+    }
+    if (kb.bm25_use_phrase !== undefined && kb.bm25_use_phrase !== null) {
+      setBm25UsePhrase(kb.bm25_use_phrase)
+    }
+    if (kb.bm25_analyzer !== undefined && kb.bm25_analyzer !== null) {
+      setBm25Analyzer(kb.bm25_analyzer)
+    }
+    setKbDefaultsApplied(true)
+  }, [kb, conversationId, kbDefaultsApplied])
+
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -192,6 +255,10 @@ export function ChatPage() {
       lexicalTopK,
       hybridDenseWeight,
       hybridLexicalWeight,
+      bm25MatchMode,
+      bm25MinShouldMatch,
+      bm25UsePhrase,
+      bm25Analyzer,
       maxContextChars,
       scoreThreshold,
       llmModel,
@@ -203,6 +270,38 @@ export function ChatPage() {
   const handleLLMChange = (model: string, provider: string) => {
     setLlmModel(model)
     setLlmProvider(provider)
+  }
+
+  const handleResetDefaults = async () => {
+    try {
+      const data = await apiClient.getAppSettings()
+      if (data.top_k !== null) setTopK(data.top_k)
+      if (data.temperature !== null) setTemperature(data.temperature)
+      if (data.max_context_chars !== null) setMaxContextChars(data.max_context_chars)
+      if (data.score_threshold !== null) setScoreThreshold(data.score_threshold)
+      if (data.retrieval_mode) setRetrievalMode(data.retrieval_mode)
+      if (data.lexical_top_k !== null) setLexicalTopK(data.lexical_top_k)
+      if (data.hybrid_dense_weight !== null) setHybridDenseWeight(data.hybrid_dense_weight)
+      if (data.hybrid_lexical_weight !== null) setHybridLexicalWeight(data.hybrid_lexical_weight)
+      if (data.bm25_match_mode) setBm25MatchMode(data.bm25_match_mode)
+      if (data.bm25_min_should_match !== null) setBm25MinShouldMatch(data.bm25_min_should_match)
+      if (data.bm25_use_phrase !== null) setBm25UsePhrase(data.bm25_use_phrase)
+      if (data.bm25_analyzer) setBm25Analyzer(data.bm25_analyzer)
+      if (data.llm_model) setLlmModel(data.llm_model)
+      if (data.llm_provider) setLlmProvider(data.llm_provider)
+      if (data.use_structure !== null) setUseStructure(data.use_structure)
+
+      if (kb) {
+        if (kb.bm25_match_mode !== null && kb.bm25_match_mode !== undefined) setBm25MatchMode(kb.bm25_match_mode)
+        if (kb.bm25_min_should_match !== null && kb.bm25_min_should_match !== undefined) {
+          setBm25MinShouldMatch(kb.bm25_min_should_match)
+        }
+        if (kb.bm25_use_phrase !== null && kb.bm25_use_phrase !== undefined) setBm25UsePhrase(kb.bm25_use_phrase)
+        if (kb.bm25_analyzer !== null && kb.bm25_analyzer !== undefined) setBm25Analyzer(kb.bm25_analyzer)
+      }
+    } catch (err) {
+      console.error('Failed to reset chat defaults:', err)
+    }
   }
 
   if (kbLoading) {
@@ -287,6 +386,12 @@ export function ChatPage() {
           lexicalTopK={lexicalTopK}
           hybridDenseWeight={hybridDenseWeight}
           hybridLexicalWeight={hybridLexicalWeight}
+          bm25MatchMode={bm25MatchMode}
+          bm25MinShouldMatch={bm25MinShouldMatch}
+          bm25UsePhrase={bm25UsePhrase}
+          bm25Analyzer={bm25Analyzer}
+          bm25MatchModes={bm25MatchModes ?? undefined}
+          bm25Analyzers={bm25Analyzers ?? undefined}
           opensearchAvailable={opensearchAvailable ?? undefined}
           llmModel={llmModel}
           llmProvider={llmProvider}
@@ -299,8 +404,13 @@ export function ChatPage() {
           onLexicalTopKChange={setLexicalTopK}
           onHybridDenseWeightChange={setHybridDenseWeight}
           onHybridLexicalWeightChange={setHybridLexicalWeight}
+          onBm25MatchModeChange={setBm25MatchMode}
+          onBm25MinShouldMatchChange={setBm25MinShouldMatch}
+          onBm25UsePhraseChange={setBm25UsePhrase}
+          onBm25AnalyzerChange={setBm25Analyzer}
           onLLMChange={handleLLMChange}
           onUseStructureChange={setUseStructure}
+          onResetDefaults={handleResetDefaults}
           onClose={() => setShowSettings(false)}
         />
       )}

@@ -38,6 +38,26 @@ class KnowledgeBaseBase(BaseModel):
         description="Max vectors per upsert request"
     )
 
+    # BM25 configuration (optional overrides)
+    bm25_match_mode: Optional[str] = Field(
+        default=None,
+        description="BM25 match mode: strict, balanced, loose"
+    )
+    bm25_min_should_match: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description="BM25 minimum_should_match percentage (0-100)"
+    )
+    bm25_use_phrase: Optional[bool] = Field(
+        default=None,
+        description="Include match_phrase clause in BM25 query"
+    )
+    bm25_analyzer: Optional[str] = Field(
+        default=None,
+        description="BM25 analyzer profile: auto, mixed, ru, en"
+    )
+
     @field_validator("chunk_overlap")
     @classmethod
     def validate_overlap(cls, v: int, info) -> int:
@@ -53,6 +73,10 @@ class KnowledgeBaseCreate(KnowledgeBaseBase):
     chunk_size: Optional[int] = Field(None, ge=100, le=4000)
     chunk_overlap: Optional[int] = Field(None, ge=0, le=1000)
     upsert_batch_size: Optional[int] = Field(None, ge=64, le=1024)
+    bm25_match_mode: Optional[str] = None
+    bm25_min_should_match: Optional[int] = Field(None, ge=0, le=100)
+    bm25_use_phrase: Optional[bool] = None
+    bm25_analyzer: Optional[str] = None
 
 
 class KnowledgeBaseUpdate(BaseModel):
@@ -64,6 +88,10 @@ class KnowledgeBaseUpdate(BaseModel):
     chunk_overlap: Optional[int] = Field(None, ge=0, le=1000)
     chunking_strategy: Optional[ChunkingStrategy] = None
     upsert_batch_size: Optional[int] = Field(None, ge=64, le=1024)
+    bm25_match_mode: Optional[str] = None
+    bm25_min_should_match: Optional[int] = Field(None, ge=0, le=100)
+    bm25_use_phrase: Optional[bool] = None
+    bm25_analyzer: Optional[str] = None
 
 
 class KnowledgeBaseResponse(KnowledgeBaseBase):
@@ -234,6 +262,10 @@ class SourceChunk(BaseModel):
     document_id: str = Field(..., description="Source document ID")
     filename: str = Field(..., description="Source filename")
     chunk_index: int = Field(..., description="Chunk index in document")
+    metadata: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Additional retrieval metadata (source type, scores, etc.)"
+    )
 
 
 class ConversationMessage(BaseModel):
@@ -275,6 +307,10 @@ class ConversationSettings(BaseModel):
     lexical_top_k: Optional[int] = Field(default=None, ge=1, le=200)
     hybrid_dense_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     hybrid_lexical_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    bm25_match_mode: Optional[str] = Field(default=None)
+    bm25_min_should_match: Optional[int] = Field(default=None, ge=0, le=100)
+    bm25_use_phrase: Optional[bool] = Field(default=None)
+    bm25_analyzer: Optional[str] = Field(default=None)
 
 
 class AppSettingsBase(BaseModel):
@@ -290,6 +326,10 @@ class AppSettingsBase(BaseModel):
     lexical_top_k: Optional[int] = Field(default=None, ge=1, le=200)
     hybrid_dense_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     hybrid_lexical_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    bm25_match_mode: Optional[str] = Field(default=None)
+    bm25_min_should_match: Optional[int] = Field(default=None, ge=0, le=100)
+    bm25_use_phrase: Optional[bool] = Field(default=None)
+    bm25_analyzer: Optional[str] = Field(default=None)
     kb_chunk_size: Optional[int] = Field(default=None, ge=100, le=2000)
     kb_chunk_overlap: Optional[int] = Field(default=None, ge=0, le=500)
     kb_upsert_batch_size: Optional[int] = Field(default=None, ge=64, le=1024)
@@ -369,6 +409,24 @@ class ChatRequest(BaseModel):
         ge=0.0,
         le=1.0,
         description="Lexical weight for hybrid retrieval"
+    )
+    bm25_match_mode: Optional[str] = Field(
+        default=None,
+        description="BM25 match mode: strict, balanced, loose"
+    )
+    bm25_min_should_match: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description="BM25 minimum_should_match percentage (0-100)"
+    )
+    bm25_use_phrase: Optional[bool] = Field(
+        default=None,
+        description="Include match_phrase clause in BM25 query"
+    )
+    bm25_analyzer: Optional[str] = Field(
+        default=None,
+        description="BM25 analyzer profile: auto, mixed, ru, en"
     )
     max_context_chars: Optional[int] = Field(
         default=None,

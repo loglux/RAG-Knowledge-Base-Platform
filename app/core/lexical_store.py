@@ -81,7 +81,25 @@ class OpenSearchStore:
                                     "english_stop",
                                     "english_stemmer",
                                 ],
-                            }
+                            },
+                            "kb_analyzer_ru": {
+                                "type": "custom",
+                                "tokenizer": "standard",
+                                "filter": [
+                                    "lowercase",
+                                    "russian_stop",
+                                    "russian_stemmer",
+                                ],
+                            },
+                            "kb_analyzer_en": {
+                                "type": "custom",
+                                "tokenizer": "standard",
+                                "filter": [
+                                    "lowercase",
+                                    "english_stop",
+                                    "english_stemmer",
+                                ],
+                            },
                         },
                     }
                 },
@@ -166,6 +184,10 @@ class OpenSearchStore:
         knowledge_base_id: str,
         limit: int = 10,
         filters: Optional[Dict[str, Any]] = None,
+        match_mode: Optional[str] = None,
+        min_should_match: Optional[int] = None,
+        use_phrase: Optional[bool] = None,
+        analyzer: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Search chunks lexically with BM25."""
         await self.ensure_index()
@@ -179,13 +201,41 @@ class OpenSearchStore:
             if isinstance(chunk_index, dict):
                 filter_clauses.append({"range": {"chunk_index": chunk_index}})
 
+        analyzer_map = {
+            "mixed": "kb_analyzer",
+            "ru": "kb_analyzer_ru",
+            "en": "kb_analyzer_en",
+        }
+        analyzer_name = analyzer_map.get(str(analyzer).lower()) if analyzer else None
+
+        operator = "and" if (match_mode or "").lower() == "strict" else "or"
+        msm_value: Optional[str] = None
+        if min_should_match is not None and min_should_match > 0:
+            msm_value = f"{min_should_match}%"
+        elif (match_mode or "").lower() == "balanced":
+            msm_value = "50%"
+
+        match_body: Dict[str, Any] = {"query": query, "operator": operator}
+        if msm_value:
+            match_body["minimum_should_match"] = msm_value
+        if analyzer_name:
+            match_body["analyzer"] = analyzer_name
+
+        should_clauses = [
+            {"match": {"content": match_body}},
+        ]
+        if use_phrase is not False:
+            phrase_body: Dict[str, Any] = {"query": query}
+            if analyzer_name:
+                phrase_body["analyzer"] = analyzer_name
+            should_clauses.append({"match_phrase": {"content": phrase_body}})
+
         body = {
             "size": limit,
             "query": {
                 "bool": {
-                    "must": [
-                        {"match": {"content": {"query": query, "operator": "and"}}}
-                    ],
+                    "should": should_clauses,
+                    "minimum_should_match": 1,
                     "filter": filter_clauses,
                 }
             },
@@ -202,6 +252,25 @@ class OpenSearchStore:
                 for hit in hits
             ]
         except OpenSearchException as e:
+            if analyzer_name:
+                logger.warning(f"OpenSearch query failed with analyzer '{analyzer_name}', retrying without analyzer: {e}")
+                try:
+                    match_body.pop("analyzer", None)
+                    for clause in should_clauses:
+                        if "match_phrase" in clause:
+                            clause["match_phrase"]["content"].pop("analyzer", None)
+                    response = await self.client.search(index=self.index_name, body=body)
+                    hits = response.get("hits", {}).get("hits", [])
+                    return [
+                        {
+                            "score": hit.get("_score", 0.0),
+                            "source": hit.get("_source", {}),
+                        }
+                        for hit in hits
+                    ]
+                except OpenSearchException as retry_err:
+                    logger.error(f"OpenSearch query failed after analyzer retry: {retry_err}")
+                    raise LexicalStoreException(f"OpenSearch query failed: {retry_err}") from retry_err
             logger.error(f"OpenSearch query failed: {e}")
             raise LexicalStoreException(f"OpenSearch query failed: {e}") from e
 

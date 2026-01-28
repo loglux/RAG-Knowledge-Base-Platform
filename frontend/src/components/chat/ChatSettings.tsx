@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { LLMSelector } from './LLMSelector'
 
 interface ChatSettingsProps {
@@ -10,6 +10,12 @@ interface ChatSettingsProps {
   lexicalTopK: number
   hybridDenseWeight: number
   hybridLexicalWeight: number
+  bm25MatchMode: string
+  bm25MinShouldMatch: number
+  bm25UsePhrase: boolean
+  bm25Analyzer: string
+  bm25MatchModes?: string[]
+  bm25Analyzers?: string[]
   opensearchAvailable?: boolean
   llmModel: string
   llmProvider: string
@@ -22,8 +28,13 @@ interface ChatSettingsProps {
   onLexicalTopKChange: (value: number) => void
   onHybridDenseWeightChange: (value: number) => void
   onHybridLexicalWeightChange: (value: number) => void
+  onBm25MatchModeChange: (value: string) => void
+  onBm25MinShouldMatchChange: (value: number) => void
+  onBm25UsePhraseChange: (value: boolean) => void
+  onBm25AnalyzerChange: (value: string) => void
   onLLMChange: (model: string, provider: string) => void
   onUseStructureChange: (value: boolean) => void
+  onResetDefaults: () => void
   onClose: () => void
 }
 
@@ -36,6 +47,12 @@ export function ChatSettings({
   lexicalTopK,
   hybridDenseWeight,
   hybridLexicalWeight,
+  bm25MatchMode,
+  bm25MinShouldMatch,
+  bm25UsePhrase,
+  bm25Analyzer,
+  bm25MatchModes,
+  bm25Analyzers,
   opensearchAvailable,
   llmModel,
   llmProvider,
@@ -48,8 +65,13 @@ export function ChatSettings({
   onLexicalTopKChange,
   onHybridDenseWeightChange,
   onHybridLexicalWeightChange,
+  onBm25MatchModeChange,
+  onBm25MinShouldMatchChange,
+  onBm25UsePhraseChange,
+  onBm25AnalyzerChange,
   onLLMChange,
   onUseStructureChange,
+  onResetDefaults,
   onClose,
 }: ChatSettingsProps) {
   const safeTopK = Number.isFinite(topK) ? topK : 5
@@ -59,19 +81,36 @@ export function ChatSettings({
   const safeLexicalTopK = Number.isFinite(lexicalTopK) ? lexicalTopK : 20
   const safeHybridDenseWeight = Number.isFinite(hybridDenseWeight) ? hybridDenseWeight : 0.6
   const safeHybridLexicalWeight = Number.isFinite(hybridLexicalWeight) ? hybridLexicalWeight : 0.4
+  const safeBm25MinShouldMatch = Number.isFinite(bm25MinShouldMatch) ? bm25MinShouldMatch : 0
+  const safeBm25UsePhrase = typeof bm25UsePhrase === 'boolean' ? bm25UsePhrase : true
+  const [showAdvancedBm25, setShowAdvancedBm25] = useState(false)
+  const matchModeOptions = bm25MatchModes && bm25MatchModes.length > 0 ? bm25MatchModes : []
+  const analyzerOptions = bm25Analyzers && bm25Analyzers.length > 0 ? bm25Analyzers : []
+  const matchModeValue = bm25MatchMode ?? matchModeOptions[0] ?? ''
+  const analyzerValue = bm25Analyzer ?? analyzerOptions[0] ?? ''
+  const matchModeDisabled = matchModeOptions.length === 0
+  const analyzerDisabled = analyzerOptions.length === 0
 
   return (
     <div className="bg-gray-800 border-b border-gray-700">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-white">Chat Settings</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
-            aria-label="Close settings"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onResetDefaults}
+              className="text-xs px-2 py-1 rounded border border-gray-700 text-gray-300 hover:text-white hover:border-gray-500 transition-colors"
+            >
+              Reset to defaults
+            </button>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white transition-colors"
+              aria-label="Close settings"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Structure-based Search Toggle */}
@@ -198,8 +237,25 @@ export function ChatSettings({
           <div className="mt-6 rounded-lg border border-gray-700 bg-gray-900/60 p-4">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-semibold text-white">BM25 / Hybrid Settings</h4>
-              <span className="text-xs text-gray-400">Lexical + dense weighting</span>
+              <div className="flex items-center gap-2 text-xs">
+                <button
+                  onClick={() => setShowAdvancedBm25(false)}
+                  className={`px-2 py-0.5 rounded border ${showAdvancedBm25 ? 'border-gray-700 text-gray-400' : 'border-primary-500 text-primary-200 bg-primary-500/10'}`}
+                >
+                  Basic
+                </button>
+                <button
+                  onClick={() => setShowAdvancedBm25(true)}
+                  className={`px-2 py-0.5 rounded border ${showAdvancedBm25 ? 'border-primary-500 text-primary-200 bg-primary-500/10' : 'border-gray-700 text-gray-400'}`}
+                >
+                  Advanced
+                </button>
+              </div>
             </div>
+            <p className="mt-2 text-xs text-gray-500">
+              Tune lexical matching and how BM25 blends with vectors. Basic is safe defaults; Advanced changes analyzer
+              and usually requires reindex.
+            </p>
 
             {opensearchAvailable === false && (
               <div className="mt-3 rounded border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
@@ -239,6 +295,9 @@ export function ChatSettings({
                   onChange={(e) => onHybridDenseWeightChange(Number(e.target.value))}
                   className="slider w-full"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Higher = more semantic/vector influence
+                </p>
               </div>
 
               <div>
@@ -254,8 +313,97 @@ export function ChatSettings({
                   onChange={(e) => onHybridLexicalWeightChange(Number(e.target.value))}
                   className="slider w-full"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Higher = more BM25/keyword influence
+                </p>
               </div>
             </div>
+
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Match mode
+                </label>
+                <select
+                  value={matchModeValue}
+                  onChange={(e) => onBm25MatchModeChange(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100"
+                  disabled={matchModeDisabled}
+                >
+                  {matchModeDisabled && <option value="">Loading…</option>}
+                  {matchModeOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Controls how many query terms must appear
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Minimum should match: {safeBm25MinShouldMatch}%
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={safeBm25MinShouldMatch}
+                  onChange={(e) => onBm25MinShouldMatchChange(Number(e.target.value))}
+                  className="slider w-full"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  0 = no minimum, higher = stricter lexical match
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Use phrase match
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={safeBm25UsePhrase}
+                    onChange={(e) => onBm25UsePhraseChange(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
+                  />
+                  Include exact phrase matches
+                </label>
+                <p className="text-xs text-gray-500 mt-1">
+                  Helps when the wording matters, but can miss paraphrases
+                </p>
+              </div>
+            </div>
+
+            {showAdvancedBm25 && (
+              <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Analyzer profile
+                  </label>
+                  <select
+                    value={analyzerValue}
+                    onChange={(e) => onBm25AnalyzerChange(e.target.value)}
+                    className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100"
+                    disabled={analyzerDisabled}
+                  >
+                    {analyzerDisabled && <option value="">Loading…</option>}
+                    {analyzerOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Requires reindex if the analyzer profile changes
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

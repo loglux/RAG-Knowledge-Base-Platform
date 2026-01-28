@@ -68,6 +68,28 @@ class KnowledgeBase(Base):
         comment="Max number of vectors to upsert per request"
     )
 
+    # BM25 (lexical) retrieval configuration (optional overrides)
+    bm25_match_mode: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+        comment="BM25 match mode: strict, balanced, loose"
+    )
+    bm25_min_should_match: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="BM25 minimum_should_match percentage (0-100)"
+    )
+    bm25_use_phrase: Mapped[Optional[bool]] = mapped_column(
+        Boolean,
+        nullable=True,
+        comment="Include match_phrase clause in BM25 query"
+    )
+    bm25_analyzer: Mapped[Optional[str]] = mapped_column(
+        String(20),
+        nullable=True,
+        comment="BM25 analyzer profile: auto, mixed, ru, en"
+    )
+
     # Statistics
     document_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_chunks: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -390,6 +412,10 @@ class AppSettings(Base):
     lexical_top_k: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     hybrid_dense_weight: Mapped[Optional[float]] = mapped_column(sa.Float, nullable=True)
     hybrid_lexical_weight: Mapped[Optional[float]] = mapped_column(sa.Float, nullable=True)
+    bm25_match_mode: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    bm25_min_should_match: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    bm25_use_phrase: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    bm25_analyzer: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     kb_chunk_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     kb_chunk_overlap: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     kb_upsert_batch_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)

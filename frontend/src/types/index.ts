@@ -7,6 +7,10 @@ export interface KnowledgeBase {
   chunk_overlap: number
   upsert_batch_size: number
   chunking_strategy: 'fixed_size' | 'semantic'
+  bm25_match_mode?: string | null
+  bm25_min_should_match?: number | null
+  bm25_use_phrase?: boolean | null
+  bm25_analyzer?: string | null
   collection_name: string
   document_count: number
   total_chunks: number
@@ -27,6 +31,10 @@ export interface CreateKBRequest {
   chunk_overlap?: number
   upsert_batch_size?: number
   chunking_strategy?: 'fixed_size' | 'semantic'
+  bm25_match_mode?: string | null
+  bm25_min_should_match?: number | null
+  bm25_use_phrase?: boolean | null
+  bm25_analyzer?: string | null
 }
 
 export interface EmbeddingModel {
@@ -97,6 +105,7 @@ export interface SourceChunk {
   document_id: string
   filename: string
   chunk_index: number
+  metadata?: Record<string, unknown>
 }
 
 export interface ConversationMessage {
@@ -115,6 +124,10 @@ export interface ChatRequest {
   lexical_top_k?: number
   hybrid_dense_weight?: number
   hybrid_lexical_weight?: number
+  bm25_match_mode?: string | null
+  bm25_min_should_match?: number | null
+  bm25_use_phrase?: boolean | null
+  bm25_analyzer?: string | null
   max_context_chars?: number
   score_threshold?: number
   llm_model?: string
@@ -152,6 +165,10 @@ export interface ConversationSettings {
   lexical_top_k?: number
   hybrid_dense_weight?: number
   hybrid_lexical_weight?: number
+  bm25_match_mode?: string | null
+  bm25_min_should_match?: number | null
+  bm25_use_phrase?: boolean | null
+  bm25_analyzer?: string | null
 }
 
 export interface ConversationDetail {
@@ -185,6 +202,10 @@ export interface AppSettings {
   lexical_top_k: number | null
   hybrid_dense_weight: number | null
   hybrid_lexical_weight: number | null
+  bm25_match_mode: string | null
+  bm25_min_should_match: number | null
+  bm25_use_phrase: boolean | null
+  bm25_analyzer: string | null
   kb_chunk_size: number | null
   kb_chunk_overlap: number | null
   kb_upsert_batch_size: number | null
@@ -204,6 +225,10 @@ export interface AppSettingsUpdate {
   lexical_top_k?: number | null
   hybrid_dense_weight?: number | null
   hybrid_lexical_weight?: number | null
+  bm25_match_mode?: string | null
+  bm25_min_should_match?: number | null
+  bm25_use_phrase?: boolean | null
+  bm25_analyzer?: string | null
   kb_chunk_size?: number | null
   kb_chunk_overlap?: number | null
   kb_upsert_batch_size?: number | null
@@ -226,4 +251,9 @@ export interface ApiInfo {
     chunk_overlap?: number
   }
   supported_formats?: string[]
+}
+
+export interface SettingsMetadata {
+  bm25_match_modes: string[]
+  bm25_analyzers: string[]
 }

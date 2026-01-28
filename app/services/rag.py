@@ -114,6 +114,10 @@ Context follows below.
         lexical_top_k: Optional[int] = None,
         dense_weight: float = 0.6,
         lexical_weight: float = 0.4,
+        bm25_match_mode: Optional[str] = None,
+        bm25_min_should_match: Optional[int] = None,
+        bm25_use_phrase: Optional[bool] = None,
+        bm25_analyzer: Optional[str] = None,
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
         max_context_chars: Optional[int] = None,
@@ -137,6 +141,10 @@ Context follows below.
             lexical_top_k: Lexical top K for BM25 (optional)
             dense_weight: Weight for dense results in hybrid
             lexical_weight: Weight for lexical results in hybrid
+            bm25_match_mode: BM25 match mode (strict, balanced, loose)
+            bm25_min_should_match: BM25 minimum_should_match percentage (0-100)
+            bm25_use_phrase: Include match_phrase clause in BM25 query
+            bm25_analyzer: BM25 analyzer profile (auto, mixed, ru, en)
             temperature: LLM temperature (0-2)
             max_tokens: Maximum tokens in response
             llm_model: Override LLM model for this query
@@ -208,6 +216,10 @@ Context follows below.
                     filters=chunk_filters,
                     dense_weight=dense_weight,
                     lexical_weight=lexical_weight,
+                    bm25_match_mode=bm25_match_mode,
+                    bm25_min_should_match=bm25_min_should_match,
+                    bm25_use_phrase=bm25_use_phrase,
+                    bm25_analyzer=bm25_analyzer,
                 )
             else:
                 logger.debug(f"Retrieving top {top_k} chunks using {embedding_model}")

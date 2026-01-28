@@ -49,6 +49,30 @@ class Settings(BaseSettings):
     OPENSEARCH_USERNAME: Optional[str] = Field(default=None, description="OpenSearch username (optional)")
     OPENSEARCH_PASSWORD: Optional[str] = Field(default=None, description="OpenSearch password (optional)")
     OPENSEARCH_VERIFY_CERTS: bool = Field(default=False, description="Verify OpenSearch TLS certs")
+    BM25_MATCH_MODES: List[str] = Field(
+        default=["strict", "balanced", "loose"],
+        description="Allowed BM25 match modes"
+    )
+    BM25_ANALYZERS: List[str] = Field(
+        default=["auto", "mixed", "ru", "en"],
+        description="Allowed BM25 analyzer profiles"
+    )
+    BM25_DEFAULT_MATCH_MODE: str = Field(
+        default="balanced",
+        description="Default BM25 match mode"
+    )
+    BM25_DEFAULT_MIN_SHOULD_MATCH: int = Field(
+        default=50,
+        description="Default BM25 minimum_should_match percentage"
+    )
+    BM25_DEFAULT_USE_PHRASE: bool = Field(
+        default=True,
+        description="Default BM25 phrase match toggle"
+    )
+    BM25_DEFAULT_ANALYZER: str = Field(
+        default="mixed",
+        description="Default BM25 analyzer profile"
+    )
 
     # OpenAI
     OPENAI_API_KEY: str = Field(..., description="OpenAI API key (required)")
@@ -137,6 +161,15 @@ class Settings(BaseSettings):
         default=100,
         description="Qdrant scroll page size when fetching document chunks"
     )
+
+    @field_validator("BM25_MATCH_MODES", "BM25_ANALYZERS", mode="before")
+    @classmethod
+    def _split_csv_list(cls, v):
+        if v is None:
+            return v
+        if isinstance(v, str):
+            return [item.strip() for item in v.split(",") if item.strip()]
+        return v
 
     # Query Intent Extraction
     QUERY_INTENT_LLM_TEMPERATURE: float = Field(

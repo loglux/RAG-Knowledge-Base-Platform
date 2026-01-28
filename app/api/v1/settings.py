@@ -24,9 +24,22 @@ def _default_app_settings() -> dict:
         "lexical_top_k": 20,
         "hybrid_dense_weight": 0.6,
         "hybrid_lexical_weight": 0.4,
+        "bm25_match_mode": app_settings.BM25_DEFAULT_MATCH_MODE,
+        "bm25_min_should_match": app_settings.BM25_DEFAULT_MIN_SHOULD_MATCH,
+        "bm25_use_phrase": app_settings.BM25_DEFAULT_USE_PHRASE,
+        "bm25_analyzer": app_settings.BM25_DEFAULT_ANALYZER,
         "kb_chunk_size": 1000,
         "kb_chunk_overlap": 200,
         "kb_upsert_batch_size": 256,
+    }
+
+
+@router.get("/metadata")
+async def get_settings_metadata():
+    """Get allowed options for settings controls."""
+    return {
+        "bm25_match_modes": app_settings.BM25_MATCH_MODES,
+        "bm25_analyzers": app_settings.BM25_ANALYZERS,
     }
 
 
@@ -54,6 +67,10 @@ async def get_app_settings(db: AsyncSession = Depends(get_db)):
         lexical_top_k=row.lexical_top_k,
         hybrid_dense_weight=row.hybrid_dense_weight,
         hybrid_lexical_weight=row.hybrid_lexical_weight,
+        bm25_match_mode=row.bm25_match_mode,
+        bm25_min_should_match=row.bm25_min_should_match,
+        bm25_use_phrase=row.bm25_use_phrase,
+        bm25_analyzer=row.bm25_analyzer,
         kb_chunk_size=row.kb_chunk_size,
         kb_chunk_overlap=row.kb_chunk_overlap,
         kb_upsert_batch_size=row.kb_upsert_batch_size,
@@ -92,6 +109,50 @@ async def update_app_settings(
         lexical_top_k=row.lexical_top_k,
         hybrid_dense_weight=row.hybrid_dense_weight,
         hybrid_lexical_weight=row.hybrid_lexical_weight,
+        bm25_match_mode=row.bm25_match_mode,
+        bm25_min_should_match=row.bm25_min_should_match,
+        bm25_use_phrase=row.bm25_use_phrase,
+        bm25_analyzer=row.bm25_analyzer,
+        kb_chunk_size=row.kb_chunk_size,
+        kb_chunk_overlap=row.kb_chunk_overlap,
+        kb_upsert_batch_size=row.kb_upsert_batch_size,
+        created_at=row.created_at,
+        updated_at=row.updated_at,
+    )
+
+
+@router.post("/reset", response_model=AppSettingsResponse)
+async def reset_app_settings(db: AsyncSession = Depends(get_db)):
+    """Reset global application settings to defaults from environment."""
+    result = await db.execute(select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1))
+    row = result.scalar_one_or_none()
+    defaults = _default_app_settings()
+    if row is None:
+        row = AppSettingsModel(**defaults)
+        db.add(row)
+        await db.flush()
+    else:
+        for key, value in defaults.items():
+            setattr(row, key, value)
+    await db.flush()
+
+    return AppSettingsResponse(
+        id=row.id,
+        llm_model=row.llm_model,
+        llm_provider=row.llm_provider,
+        temperature=row.temperature,
+        top_k=row.top_k,
+        max_context_chars=row.max_context_chars,
+        score_threshold=row.score_threshold,
+        use_structure=row.use_structure,
+        retrieval_mode=row.retrieval_mode,
+        lexical_top_k=row.lexical_top_k,
+        hybrid_dense_weight=row.hybrid_dense_weight,
+        hybrid_lexical_weight=row.hybrid_lexical_weight,
+        bm25_match_mode=row.bm25_match_mode,
+        bm25_min_should_match=row.bm25_min_should_match,
+        bm25_use_phrase=row.bm25_use_phrase,
+        bm25_analyzer=row.bm25_analyzer,
         kb_chunk_size=row.kb_chunk_size,
         kb_chunk_overlap=row.kb_chunk_overlap,
         kb_upsert_batch_size=row.kb_upsert_batch_size,

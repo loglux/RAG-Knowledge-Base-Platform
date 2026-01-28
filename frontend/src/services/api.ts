@@ -17,6 +17,7 @@ import type {
   AppSettings,
   AppSettingsUpdate,
   ApiInfo,
+  SettingsMetadata,
 } from '../types/index'
 
 class APIClient {
@@ -201,6 +202,16 @@ class APIClient {
 
   async updateAppSettings(payload: AppSettingsUpdate): Promise<AppSettings> {
     const response = await this.client.put<AppSettings>('/settings', payload)
+    return response.data
+  }
+
+  async getSettingsMetadata(): Promise<SettingsMetadata> {
+    const response = await this.client.get<SettingsMetadata>('/settings/metadata')
+    return response.data
+  }
+
+  async resetAppSettings(): Promise<AppSettings> {
+    const response = await this.client.post<AppSettings>('/settings/reset')
     return response.data
   }
 

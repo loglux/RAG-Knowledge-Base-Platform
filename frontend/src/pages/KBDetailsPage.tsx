@@ -5,7 +5,7 @@ import { useDocuments } from '../hooks/useDocuments'
 import { useDocumentPolling } from '../hooks/useDocumentPolling'
 import { FileUpload } from '../components/documents/FileUpload'
 import { DocumentItem } from '../components/documents/DocumentItem'
-import type { KnowledgeBase } from '../types/index'
+import type { KnowledgeBase, AppSettings } from '../types/index'
 
 export function KBDetailsPage() {
   const { id } = useParams<{ id: string }>()
@@ -23,11 +23,37 @@ export function KBDetailsPage() {
     chunk_size: 1000,
     chunk_overlap: 200,
     upsert_batch_size: 256,
+    bm25_override: false,
+    bm25_match_mode: '',
+    bm25_min_should_match: 0,
+    bm25_use_phrase: true,
+    bm25_analyzer: '',
   })
   const [settingsErrors, setSettingsErrors] = useState<Record<string, string>>({})
   const [settingsSaving, setSettingsSaving] = useState(false)
   const [reindexing, setReindexing] = useState(false)
   const [reindexMessage, setReindexMessage] = useState<string | null>(null)
+  const [bm25MatchModes, setBm25MatchModes] = useState<string[] | null>(null)
+  const [bm25Analyzers, setBm25Analyzers] = useState<string[] | null>(null)
+  const [appDefaults, setAppDefaults] = useState<AppSettings | null>(null)
+
+  const buildSettingsData = (kbData: KnowledgeBase, defaults?: AppSettings | null) => {
+    const bm25Override = kbData.bm25_match_mode !== null
+      || kbData.bm25_min_should_match !== null
+      || kbData.bm25_use_phrase !== null
+      || kbData.bm25_analyzer !== null
+
+    return {
+      chunk_size: kbData.chunk_size,
+      chunk_overlap: kbData.chunk_overlap,
+      upsert_batch_size: kbData.upsert_batch_size,
+      bm25_override: bm25Override,
+      bm25_match_mode: kbData.bm25_match_mode ?? defaults?.bm25_match_mode ?? '',
+      bm25_min_should_match: kbData.bm25_min_should_match ?? defaults?.bm25_min_should_match ?? 0,
+      bm25_use_phrase: kbData.bm25_use_phrase ?? defaults?.bm25_use_phrase ?? true,
+      bm25_analyzer: kbData.bm25_analyzer ?? defaults?.bm25_analyzer ?? '',
+    }
+  }
 
   const {
     documents,
@@ -52,11 +78,7 @@ export function KBDetailsPage() {
         const data = await apiClient.getKnowledgeBase(id!)
         setKb(data)
         setNameDraft(data.name)
-        setSettingsData({
-          chunk_size: data.chunk_size,
-          chunk_overlap: data.chunk_overlap,
-          upsert_batch_size: data.upsert_batch_size,
-        })
+        setSettingsData(buildSettingsData(data, appDefaults))
       } catch (err) {
         setKbError(err instanceof Error ? err.message : 'Failed to load knowledge base')
       } finally {
@@ -68,6 +90,39 @@ export function KBDetailsPage() {
       fetchKB()
     }
   }, [id])
+
+  useEffect(() => {
+    const loadAppDefaults = async () => {
+      try {
+        const data = await apiClient.getAppSettings()
+        setAppDefaults(data)
+      } catch (err) {
+        setAppDefaults(null)
+      }
+    }
+
+    loadAppDefaults()
+  }, [])
+
+  useEffect(() => {
+    if (!kb || isEditingSettings) return
+    setSettingsData(buildSettingsData(kb, appDefaults))
+  }, [kb, appDefaults, isEditingSettings])
+
+  useEffect(() => {
+    const loadSettingsMetadata = async () => {
+      try {
+        const metadata = await apiClient.getSettingsMetadata()
+        setBm25MatchModes(metadata.bm25_match_modes || null)
+        setBm25Analyzers(metadata.bm25_analyzers || null)
+      } catch (err) {
+        setBm25MatchModes(null)
+        setBm25Analyzers(null)
+      }
+    }
+
+    loadSettingsMetadata()
+  }, [])
 
   const validateSettings = (): boolean => {
     const newErrors: Record<string, string> = {}
@@ -88,6 +143,18 @@ export function KBDetailsPage() {
       newErrors.upsert_batch_size = 'Batch size must be between 64 and 1024'
     }
 
+    if (settingsData.bm25_override) {
+      if (bm25MatchModes && bm25MatchModes.length > 0 && !bm25MatchModes.includes(settingsData.bm25_match_mode)) {
+        newErrors.bm25_match_mode = 'Match mode must be one of the allowed values'
+      }
+      if (settingsData.bm25_min_should_match < 0 || settingsData.bm25_min_should_match > 100) {
+        newErrors.bm25_min_should_match = 'Minimum should match must be between 0 and 100'
+      }
+      if (bm25Analyzers && bm25Analyzers.length > 0 && !bm25Analyzers.includes(settingsData.bm25_analyzer)) {
+        newErrors.bm25_analyzer = 'Analyzer must be one of the allowed values'
+      }
+    }
+
     setSettingsErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -102,6 +169,10 @@ export function KBDetailsPage() {
         chunk_size: settingsData.chunk_size,
         chunk_overlap: settingsData.chunk_overlap,
         upsert_batch_size: settingsData.upsert_batch_size,
+        bm25_match_mode: settingsData.bm25_override ? settingsData.bm25_match_mode : null,
+        bm25_min_should_match: settingsData.bm25_override ? settingsData.bm25_min_should_match : null,
+        bm25_use_phrase: settingsData.bm25_override ? settingsData.bm25_use_phrase : null,
+        bm25_analyzer: settingsData.bm25_override ? settingsData.bm25_analyzer : null,
       })
       setKb(updated)
       setIsEditingSettings(false)
@@ -117,11 +188,7 @@ export function KBDetailsPage() {
 
   const handleCancelSettings = () => {
     if (!kb) return
-    setSettingsData({
-      chunk_size: kb.chunk_size,
-      chunk_overlap: kb.chunk_overlap,
-      upsert_batch_size: kb.upsert_batch_size,
-    })
+    setSettingsData(buildSettingsData(kb, appDefaults))
     setSettingsErrors({})
     setIsEditingSettings(false)
   }
@@ -457,6 +524,105 @@ export function KBDetailsPage() {
                   <span>1024</span>
                 </div>
                 {settingsErrors.upsert_batch_size && <p className="mt-1 text-sm text-red-500">{settingsErrors.upsert_batch_size}</p>}
+              </div>
+
+              <div className="border-t border-gray-700 pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-white">BM25 Overrides</h4>
+                  <label className="flex items-center gap-2 text-xs text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={settingsData.bm25_override}
+                      onChange={(e) => setSettingsData({ ...settingsData, bm25_override: e.target.checked })}
+                      className="w-4 h-4 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
+                      disabled={settingsSaving}
+                    />
+                    Override global BM25 defaults
+                  </label>
+                </div>
+
+                {settingsData.bm25_override && (
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="block text-gray-400 mb-2">
+                        Match mode
+                      </label>
+                      <select
+                        value={settingsData.bm25_match_mode || (bm25MatchModes?.[0] ?? '')}
+                        onChange={(e) => setSettingsData({ ...settingsData, bm25_match_mode: e.target.value })}
+                        className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100"
+                        disabled={settingsSaving || !bm25MatchModes || bm25MatchModes.length === 0}
+                      >
+                        {(!bm25MatchModes || bm25MatchModes.length === 0) && <option value="">Loading…</option>}
+                        {bm25MatchModes?.map((mode) => (
+                          <option key={mode} value={mode}>
+                            {mode}
+                          </option>
+                        ))}
+                      </select>
+                      {settingsErrors.bm25_match_mode && (
+                        <p className="mt-1 text-sm text-red-500">{settingsErrors.bm25_match_mode}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-400 mb-2">
+                        Minimum should match: <span className="text-white font-medium">{settingsData.bm25_min_should_match}%</span>
+                      </label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="5"
+                        value={settingsData.bm25_min_should_match}
+                        onChange={(e) => setSettingsData({ ...settingsData, bm25_min_should_match: parseInt(e.target.value) })}
+                        className="w-full"
+                        disabled={settingsSaving}
+                      />
+                      {settingsErrors.bm25_min_should_match && (
+                        <p className="mt-1 text-sm text-red-500">{settingsErrors.bm25_min_should_match}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-400 mb-2">
+                        Use phrase match
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={settingsData.bm25_use_phrase}
+                          onChange={(e) => setSettingsData({ ...settingsData, bm25_use_phrase: e.target.checked })}
+                          className="w-4 h-4 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
+                          disabled={settingsSaving}
+                        />
+                        Include exact phrase matches
+                      </label>
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-400 mb-2">
+                        Analyzer profile
+                      </label>
+                      <select
+                        value={settingsData.bm25_analyzer || (bm25Analyzers?.[0] ?? '')}
+                        onChange={(e) => setSettingsData({ ...settingsData, bm25_analyzer: e.target.value })}
+                        className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100"
+                        disabled={settingsSaving || !bm25Analyzers || bm25Analyzers.length === 0}
+                      >
+                        {(!bm25Analyzers || bm25Analyzers.length === 0) && <option value="">Loading…</option>}
+                        {bm25Analyzers?.map((analyzer) => (
+                          <option key={analyzer} value={analyzer}>
+                            {analyzer}
+                          </option>
+                        ))}
+                      </select>
+                      {settingsErrors.bm25_analyzer && (
+                        <p className="mt-1 text-sm text-red-500">{settingsErrors.bm25_analyzer}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="text-xs text-gray-500">

@@ -91,6 +91,10 @@ class RetrievalEngine:
         filters: Optional[Dict[str, Any]] = None,
         dense_weight: float = 0.6,
         lexical_weight: float = 0.4,
+        bm25_match_mode: Optional[str] = None,
+        bm25_min_should_match: Optional[int] = None,
+        bm25_use_phrase: Optional[bool] = None,
+        bm25_analyzer: Optional[str] = None,
     ) -> RetrievalResult:
         """
         Hybrid retrieval combining dense vectors (Qdrant) and BM25 (OpenSearch).
@@ -119,6 +123,10 @@ class RetrievalEngine:
                 knowledge_base_id=knowledge_base_id,
                 limit=lexical_limit,
                 filters=filters,
+                match_mode=bm25_match_mode,
+                min_should_match=bm25_min_should_match,
+                use_phrase=bm25_use_phrase,
+                analyzer=bm25_analyzer,
             )
             lexical_chunks = self._convert_lexical_results(lexical_hits)
         except Exception as e:
@@ -283,6 +291,8 @@ class RetrievalEngine:
                     "char_count": payload.get("char_count"),
                     "word_count": payload.get("word_count"),
                     "indexed_at": payload.get("indexed_at"),
+                    "source_type": "dense",
+                    "dense_score_raw": float(result.score),
                 },
             )
 
@@ -309,6 +319,8 @@ class RetrievalEngine:
                         "file_type": payload.get("file_type"),
                         "char_count": payload.get("char_count"),
                         "word_count": payload.get("word_count"),
+                        "source_type": "lexical",
+                        "lexical_score_raw": float(result.get("score", 0.0)),
                     },
                 )
             )
@@ -341,17 +353,35 @@ class RetrievalEngine:
         dense_norm = self._normalize_scores(dense_chunks)
         lexical_norm = self._normalize_scores(lexical_chunks)
 
+        dense_by_key = {f"{c.document_id}:{c.chunk_index}": c for c in dense_chunks}
+        lexical_by_key = {f"{c.document_id}:{c.chunk_index}": c for c in lexical_chunks}
+
         combined: Dict[str, RetrievedChunk] = {}
-        for chunk in dense_chunks + lexical_chunks:
-            key = f"{chunk.document_id}:{chunk.chunk_index}"
-            if key not in combined:
-                combined[key] = chunk
+        for key in set(dense_by_key.keys()).union(lexical_by_key.keys()):
+            base = dense_by_key.get(key) or lexical_by_key.get(key)
+            if base:
+                combined[key] = base
 
         for key, chunk in combined.items():
             score = (dense_norm.get(key, 0.0) * dense_weight) + (
                 lexical_norm.get(key, 0.0) * lexical_weight
             )
-            combined[key] = chunk.model_copy(update={"score": score})
+            dense_chunk = dense_by_key.get(key)
+            lexical_chunk = lexical_by_key.get(key)
+            metadata = dict(chunk.metadata or {})
+            metadata.update(
+                {
+                    "source_type": "hybrid" if (dense_chunk and lexical_chunk) else metadata.get("source_type"),
+                    "dense_score_raw": getattr(dense_chunk, "score", None),
+                    "lexical_score_raw": getattr(lexical_chunk, "score", None),
+                    "dense_score_norm": dense_norm.get(key, 0.0),
+                    "lexical_score_norm": lexical_norm.get(key, 0.0),
+                    "combined_score": score,
+                    "dense_weight": dense_weight,
+                    "lexical_weight": lexical_weight,
+                }
+            )
+            combined[key] = chunk.model_copy(update={"score": score, "metadata": metadata})
 
         return sorted(combined.values(), key=lambda c: c.score, reverse=True)
 

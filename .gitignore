@@ -160,7 +160,7 @@ chat*.png
 /*.md
 !/README.md
 !/RUNBOOK.md
-!/RUNBOOK_LOCAL.md
+/RUNBOOK_LOCAL.md
 /antropic_key.txt
 /voyageai_key.txt
 /MobaXterm_NAS_20260125_195638.rtf

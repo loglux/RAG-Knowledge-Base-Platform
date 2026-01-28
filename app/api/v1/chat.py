@@ -10,9 +10,11 @@ from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 import httpx
 
+from app.config import settings as app_settings
 from app.db.session import get_db
 from app.models.database import (
     KnowledgeBase as KnowledgeBaseModel,
+    AppSettings as AppSettingsModel,
     Conversation as ConversationModel,
     ChatMessage as ChatMessageModel,
 )
@@ -31,6 +33,15 @@ from app.dependencies import get_current_user_id
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _bm25_defaults() -> dict:
+    return {
+        "bm25_match_mode": app_settings.BM25_DEFAULT_MATCH_MODE,
+        "bm25_min_should_match": app_settings.BM25_DEFAULT_MIN_SHOULD_MATCH,
+        "bm25_use_phrase": app_settings.BM25_DEFAULT_USE_PHRASE,
+        "bm25_analyzer": app_settings.BM25_DEFAULT_ANALYZER,
+    }
 
 
 def _format_chat_error(exc: Exception) -> tuple[int, str]:
@@ -153,6 +164,29 @@ async def chat_query(
                     for msg in history_messages
                 ]
 
+        # Resolve BM25 settings (request > KB override > global defaults > hard defaults)
+        settings_result = await db.execute(select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1))
+        app_settings = settings_result.scalar_one_or_none()
+        bm25_defaults = _bm25_defaults()
+
+        def _resolve_bm25(field: str):
+            req_val = getattr(request, field, None)
+            if req_val is not None:
+                return req_val
+            kb_val = getattr(kb, field, None)
+            if kb_val is not None:
+                return kb_val
+            if app_settings is not None:
+                app_val = getattr(app_settings, field, None)
+                if app_val is not None:
+                    return app_val
+            return bm25_defaults[field]
+
+        bm25_match_mode = _resolve_bm25("bm25_match_mode")
+        bm25_min_should_match = _resolve_bm25("bm25_min_should_match")
+        bm25_use_phrase = _resolve_bm25("bm25_use_phrase")
+        bm25_analyzer = _resolve_bm25("bm25_analyzer")
+
         rag_response = await rag_service.query(
             question=request.question,
             collection_name=kb.collection_name,
@@ -162,6 +196,10 @@ async def chat_query(
             lexical_top_k=request.lexical_top_k,
             dense_weight=request.hybrid_dense_weight,
             lexical_weight=request.hybrid_lexical_weight,
+            bm25_match_mode=bm25_match_mode,
+            bm25_min_should_match=bm25_min_should_match,
+            bm25_use_phrase=bm25_use_phrase,
+            bm25_analyzer=bm25_analyzer,
             temperature=request.temperature,
             max_tokens=request.max_tokens,
             max_context_chars=request.max_context_chars,
@@ -189,6 +227,10 @@ async def chat_query(
                 "lexical_top_k": request.lexical_top_k,
                 "hybrid_dense_weight": request.hybrid_dense_weight,
                 "hybrid_lexical_weight": request.hybrid_lexical_weight,
+                "bm25_match_mode": bm25_match_mode,
+                "bm25_min_should_match": bm25_min_should_match,
+                "bm25_use_phrase": bm25_use_phrase,
+                "bm25_analyzer": bm25_analyzer,
             }
             conversation = ConversationModel(
                 knowledge_base_id=request.knowledge_base_id,
@@ -217,6 +259,10 @@ async def chat_query(
                 "lexical_top_k": request.lexical_top_k,
                 "hybrid_dense_weight": request.hybrid_dense_weight,
                 "hybrid_lexical_weight": request.hybrid_lexical_weight,
+                "bm25_match_mode": bm25_match_mode,
+                "bm25_min_should_match": bm25_min_should_match,
+                "bm25_use_phrase": bm25_use_phrase,
+                "bm25_analyzer": bm25_analyzer,
             })
             conversation.settings_json = json.dumps(existing_settings)
 
@@ -243,6 +289,7 @@ async def chat_query(
                 "document_id": chunk.document_id,
                 "filename": chunk.filename,
                 "chunk_index": chunk.chunk_index,
+                "metadata": chunk.metadata,
             }
             for chunk in rag_response.sources
         ]
@@ -265,6 +312,7 @@ async def chat_query(
                 document_id=chunk.document_id,
                 filename=chunk.filename,
                 chunk_index=chunk.chunk_index,
+                metadata=chunk.metadata,
             )
             for chunk in rag_response.sources
         ]

@@ -79,7 +79,6 @@ cp .env.example .env
 2) Read the runbook (dev ops notes, CORS, restart rules)
 
 [RUNBOOK.md](RUNBOOK.md)
-Local host-specific notes: [RUNBOOK_LOCAL.md](RUNBOOK_LOCAL.md)
 
 3) Start backend services
 
