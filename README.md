@@ -63,6 +63,8 @@ For structured documents, an optional **Structure‑Aware Retrieval** step build
 
 ## Quick start (Docker)
 
+This starts the **backend services only** (API + DB + Qdrant). The frontend runs locally via Vite.
+
 1) Create env file
 
 ```bash
@@ -74,7 +76,7 @@ cp .env.example .env
 
 [RUNBOOK.md](RUNBOOK.md)
 
-3) Start services
+3) Start backend services
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d
@@ -87,6 +89,8 @@ http://localhost:8000/docs
 ```
 
 ## Quick start (local dev)
+
+This is for running the API on the host (not Docker).
 
 ```bash
 python3.12 -m venv venv
