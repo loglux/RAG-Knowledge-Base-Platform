@@ -72,7 +72,7 @@ export function ChatPage() {
 
   const { messages, isLoading, error, sendMessage, clearMessages, conversationId } = useChat(id!)
 
-  // No localStorage fallback: settings are loaded from server per conversation
+  const settingsDraftKey = `chat_settings_draft_${id}`
 
   // Load conversation settings from server
   useEffect(() => {
@@ -152,6 +152,42 @@ export function ChatPage() {
   }, [conversationId])
 
   useEffect(() => {
+    if (conversationId) return
+    try {
+      const raw = localStorage.getItem(settingsDraftKey)
+      if (!raw) return
+      const draft = JSON.parse(raw)
+      if (draft.top_k !== undefined) setTopK(draft.top_k)
+      if (draft.temperature !== undefined) setTemperature(draft.temperature)
+      if (draft.max_context_chars !== undefined) setMaxContextChars(draft.max_context_chars)
+      if (draft.score_threshold !== undefined) setScoreThreshold(draft.score_threshold)
+      if (draft.retrieval_mode) setRetrievalMode(draft.retrieval_mode)
+      if (draft.lexical_top_k !== undefined && draft.lexical_top_k !== null) {
+        setLexicalTopK(draft.lexical_top_k)
+      }
+      if (draft.hybrid_dense_weight !== undefined && draft.hybrid_dense_weight !== null) {
+        setHybridDenseWeight(draft.hybrid_dense_weight)
+      }
+      if (draft.hybrid_lexical_weight !== undefined && draft.hybrid_lexical_weight !== null) {
+        setHybridLexicalWeight(draft.hybrid_lexical_weight)
+      }
+      if (draft.bm25_match_mode) setBm25MatchMode(draft.bm25_match_mode)
+      if (draft.bm25_min_should_match !== undefined && draft.bm25_min_should_match !== null) {
+        setBm25MinShouldMatch(draft.bm25_min_should_match)
+      }
+      if (draft.bm25_use_phrase !== undefined && draft.bm25_use_phrase !== null) {
+        setBm25UsePhrase(draft.bm25_use_phrase)
+      }
+      if (draft.bm25_analyzer) setBm25Analyzer(draft.bm25_analyzer)
+      if (draft.llm_model) setLlmModel(draft.llm_model)
+      if (draft.llm_provider) setLlmProvider(draft.llm_provider)
+      if (draft.use_structure !== undefined) setUseStructure(draft.use_structure)
+    } catch (err) {
+      console.error('Failed to load draft chat settings:', err)
+    }
+  }, [conversationId, settingsDraftKey])
+
+  useEffect(() => {
     const loadSettingsMetadata = async () => {
       try {
         const metadata = await apiClient.getSettingsMetadata()
@@ -204,6 +240,32 @@ export function ChatPage() {
       console.error('Failed to update conversation settings:', err)
     })
   }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, llmModel, llmProvider, useStructure])
+
+  useEffect(() => {
+    if (conversationId || !settingsLoaded) return
+    const payload: ConversationSettings = {
+      top_k: topK,
+      temperature,
+      max_context_chars: maxContextChars,
+      score_threshold: scoreThreshold,
+      retrieval_mode: retrievalMode,
+      lexical_top_k: lexicalTopK,
+      hybrid_dense_weight: hybridDenseWeight,
+      hybrid_lexical_weight: hybridLexicalWeight,
+      bm25_match_mode: bm25MatchMode,
+      bm25_min_should_match: bm25MinShouldMatch,
+      bm25_use_phrase: bm25UsePhrase,
+      bm25_analyzer: bm25Analyzer,
+      llm_model: llmModel,
+      llm_provider: llmProvider,
+      use_structure: useStructure,
+    }
+    try {
+      localStorage.setItem(settingsDraftKey, JSON.stringify(payload))
+    } catch (err) {
+      console.error('Failed to persist draft chat settings:', err)
+    }
+  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, llmModel, llmProvider, useStructure, settingsDraftKey])
 
   useEffect(() => {
     const fetchKB = async () => {
@@ -266,6 +328,15 @@ export function ChatPage() {
       useStructure
     )
   }
+
+  useEffect(() => {
+    if (!conversationId) return
+    try {
+      localStorage.removeItem(settingsDraftKey)
+    } catch (err) {
+      console.error('Failed to clear draft chat settings:', err)
+    }
+  }, [conversationId, settingsDraftKey])
 
   const handleLLMChange = (model: string, provider: string) => {
     setLlmModel(model)

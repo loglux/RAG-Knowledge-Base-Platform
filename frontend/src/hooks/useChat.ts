@@ -3,6 +3,7 @@ import { apiClient } from '../services/api'
 import type { ChatMessage, ChatRequest } from '../types/index'
 
 const CONVERSATION_KEY_PREFIX = 'chat_conversation_'
+const SETTINGS_DRAFT_KEY_PREFIX = 'chat_settings_draft_'
 
 export function useChat(kbId: string) {
   const conversationKey = `${CONVERSATION_KEY_PREFIX}${kbId}`

@@ -495,6 +495,7 @@ Answer based on the context above:"""
 
             # 4. Find document by name if specified
             target_doc = None
+            preselected_section = None
             if intent.document_name:
                 for doc in documents:
                     if intent.document_name.lower() in doc.filename.lower():
@@ -503,7 +504,7 @@ Answer based on the context above:"""
 
                 if not target_doc:
                     logger.warning(f"Document '{intent.document_name}' not found in KB")
-                    return None
+                    # Fall through to section-based matching across all docs
             else:
                 # No specific document mentioned - find best matching document
                 if len(documents) == 1:
@@ -549,6 +550,28 @@ Answer based on the context above:"""
                         target_doc = documents[0]
                         logger.warning(f"[DEBUG] No document with structure, using first: {target_doc.filename}")
 
+            # If we still don't have a document, try to locate one by section match
+            if not target_doc and intent.section_type and (intent.section_number is not None or intent.section_id):
+                logger.warning("[DEBUG] No document selected, scanning for matching section across documents")
+                analyzer = get_document_analyzer()
+                for doc in documents:
+                    structure = await analyzer.get_structure(doc.id, db)
+                    if not structure or not structure.toc_json:
+                        continue
+                    import json
+                    toc_sections = json.loads(structure.toc_json)
+                    candidate = self._find_matching_section(
+                        toc_sections,
+                        intent.section_type,
+                        intent.section_number,
+                        intent.section_id
+                    )
+                    if candidate:
+                        target_doc = doc
+                        preselected_section = candidate
+                        logger.warning(f"[DEBUG] Found section match in document: {doc.filename}")
+                        break
+
             if not target_doc:
                 logger.warning("[DEBUG] No specific document identified, using semantic search")
                 return None
@@ -564,7 +587,7 @@ Answer based on the context above:"""
             # 6. Parse TOC and find matching section
             import json
             toc_sections = json.loads(structure.toc_json)
-            matching_section = self._find_matching_section(
+            matching_section = preselected_section or self._find_matching_section(
                 toc_sections,
                 intent.section_type,
                 intent.section_number,
