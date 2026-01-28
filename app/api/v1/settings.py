@@ -20,6 +20,9 @@ def _default_app_settings() -> dict:
         "max_context_chars": 0,
         "score_threshold": 0.0,
         "use_structure": False,
+        "kb_chunk_size": 1000,
+        "kb_chunk_overlap": 200,
+        "kb_upsert_batch_size": 256,
     }
 
 
@@ -43,6 +46,9 @@ async def get_app_settings(db: AsyncSession = Depends(get_db)):
         max_context_chars=row.max_context_chars,
         score_threshold=row.score_threshold,
         use_structure=row.use_structure,
+        kb_chunk_size=row.kb_chunk_size,
+        kb_chunk_overlap=row.kb_chunk_overlap,
+        kb_upsert_batch_size=row.kb_upsert_batch_size,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -74,6 +80,9 @@ async def update_app_settings(
         max_context_chars=row.max_context_chars,
         score_threshold=row.score_threshold,
         use_structure=row.use_structure,
+        kb_chunk_size=row.kb_chunk_size,
+        kb_chunk_overlap=row.kb_chunk_overlap,
+        kb_upsert_batch_size=row.kb_upsert_batch_size,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )

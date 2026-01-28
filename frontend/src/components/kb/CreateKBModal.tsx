@@ -23,6 +23,11 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [embeddingModels, setEmbeddingModels] = useState<EmbeddingModel[]>([])
   const [loadingModels, setLoadingModels] = useState(true)
+  const [kbDefaults, setKbDefaults] = useState({
+    chunk_size: 1000,
+    chunk_overlap: 200,
+    upsert_batch_size: 256,
+  })
 
   // Fetch available embedding models
   useEffect(() => {
@@ -38,6 +43,31 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
     }
     fetchModels()
   }, [])
+
+  // Load KB defaults from global settings when modal opens
+  useEffect(() => {
+    if (!isOpen) return
+    const loadDefaults = async () => {
+      try {
+        const settings = await apiClient.getAppSettings()
+        const defaults = {
+          chunk_size: settings.kb_chunk_size ?? 1000,
+          chunk_overlap: settings.kb_chunk_overlap ?? 200,
+          upsert_batch_size: settings.kb_upsert_batch_size ?? 256,
+        }
+        setKbDefaults(defaults)
+        setFormData((prev) => ({
+          ...prev,
+          chunk_size: defaults.chunk_size,
+          chunk_overlap: defaults.chunk_overlap,
+          upsert_batch_size: defaults.upsert_batch_size,
+        }))
+      } catch (error) {
+        console.error('Failed to load KB defaults:', error)
+      }
+    }
+    loadDefaults()
+  }, [isOpen])
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {}
@@ -89,9 +119,9 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
           name: '',
           description: '',
           embedding_model: 'text-embedding-3-large',
-          chunk_size: 1000,
-          chunk_overlap: 200,
-          upsert_batch_size: 256,
+          chunk_size: kbDefaults.chunk_size,
+          chunk_overlap: kbDefaults.chunk_overlap,
+          upsert_batch_size: kbDefaults.upsert_batch_size,
           chunking_strategy: 'fixed_size',
         })
       setErrors({})
@@ -109,9 +139,9 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
         name: '',
         description: '',
         embedding_model: 'text-embedding-3-large',
-        chunk_size: 1000,
-        chunk_overlap: 200,
-        upsert_batch_size: 256,
+        chunk_size: kbDefaults.chunk_size,
+        chunk_overlap: kbDefaults.chunk_overlap,
+        upsert_batch_size: kbDefaults.upsert_batch_size,
         chunking_strategy: 'fixed_size',
       })
       setErrors({})

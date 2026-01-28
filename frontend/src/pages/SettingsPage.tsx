@@ -18,6 +18,9 @@ export function SettingsPage() {
   const [maxContextChars, setMaxContextChars] = useState(0)
   const [scoreThreshold, setScoreThreshold] = useState(0)
   const [useStructure, setUseStructure] = useState(false)
+  const [kbChunkSize, setKbChunkSize] = useState(1000)
+  const [kbChunkOverlap, setKbChunkOverlap] = useState(200)
+  const [kbUpsertBatchSize, setKbUpsertBatchSize] = useState(256)
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -31,6 +34,9 @@ export function SettingsPage() {
         if (data.max_context_chars !== null) setMaxContextChars(data.max_context_chars)
         if (data.score_threshold !== null) setScoreThreshold(data.score_threshold)
         if (data.use_structure !== null) setUseStructure(data.use_structure)
+        if (data.kb_chunk_size !== null) setKbChunkSize(data.kb_chunk_size)
+        if (data.kb_chunk_overlap !== null) setKbChunkOverlap(data.kb_chunk_overlap)
+        if (data.kb_upsert_batch_size !== null) setKbUpsertBatchSize(data.kb_upsert_batch_size)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load settings')
       } finally {
@@ -53,6 +59,9 @@ export function SettingsPage() {
         max_context_chars: maxContextChars,
         score_threshold: scoreThreshold,
         use_structure: useStructure,
+        kb_chunk_size: kbChunkSize,
+        kb_chunk_overlap: kbChunkOverlap,
+        kb_upsert_batch_size: kbUpsertBatchSize,
       })
       setSavedAt(new Date(updated.updated_at).toLocaleTimeString('en-US', {
         hour: '2-digit',
@@ -102,12 +111,13 @@ export function SettingsPage() {
             <p className="mt-4 text-gray-400">Loading settings...</p>
           </div>
         ) : (
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 space-y-6">
-            <div>
-              <LLMSelector value={llmModel} onChange={handleLLMChange} />
-            </div>
+          <div className="space-y-6">
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 space-y-6">
+              <div>
+                <LLMSelector value={llmModel} onChange={handleLLMChange} />
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Number of sources (Top K): {topK}
@@ -177,20 +187,100 @@ export function SettingsPage() {
                 </p>
               </div>
 
-              <div className="md:col-span-2">
-                <label className="flex items-center space-x-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={useStructure}
-                    onChange={(e) => setUseStructure(e.target.checked)}
-                    className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
-                  />
-                  <span className="text-sm text-gray-300">Use Document Structure by default</span>
-                </label>
-                <p className="text-xs text-gray-500 mt-2">
-                  Enable structure-based search when possible
-                </p>
+                <div className="md:col-span-2">
+                  <label className="flex items-center space-x-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={useStructure}
+                      onChange={(e) => setUseStructure(e.target.checked)}
+                      className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
+                    />
+                    <span className="text-sm text-gray-300">Use Document Structure by default</span>
+                  </label>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Enable structure-based search when possible
+                  </p>
+                </div>
               </div>
+            </div>
+
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+              <h2 className="text-sm font-semibold text-gray-300 mb-4">
+                Knowledge Base Defaults
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">
+                    Chunk Size: <span className="text-white font-medium">{kbChunkSize}</span> characters
+                  </label>
+                  <input
+                    type="range"
+                    min="100"
+                    max="2000"
+                    step="100"
+                    value={kbChunkSize}
+                    onChange={(e) => setKbChunkSize(Number(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>100</span>
+                    <span>2000</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Larger chunks preserve more context; smaller chunks improve precision.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">
+                    Chunk Overlap: <span className="text-white font-medium">{kbChunkOverlap}</span> characters
+                    <span className="text-gray-500">
+                      {' '}({kbChunkSize > 0 ? Math.round((kbChunkOverlap / kbChunkSize) * 100) : 0}%)
+                    </span>
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="500"
+                    step="50"
+                    value={kbChunkOverlap}
+                    onChange={(e) => setKbChunkOverlap(Number(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>0</span>
+                    <span>500</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Overlap helps preserve continuity between neighboring chunks.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-400 mb-2">
+                    Upsert Batch Size: <span className="text-white font-medium">{kbUpsertBatchSize}</span>
+                  </label>
+                  <input
+                    type="range"
+                    min="64"
+                    max="1024"
+                    step="64"
+                    value={kbUpsertBatchSize}
+                    onChange={(e) => setKbUpsertBatchSize(Number(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>64</span>
+                    <span>1024</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Larger batches ingest faster but use more memory.
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-3">
+                Changes apply to new or reprocessed documents only.
+              </p>
             </div>
 
             <div className="flex items-center justify-end">

@@ -50,7 +50,9 @@ class KnowledgeBaseBase(BaseModel):
 
 class KnowledgeBaseCreate(KnowledgeBaseBase):
     """Schema for creating a new Knowledge Base."""
-    pass
+    chunk_size: Optional[int] = Field(None, ge=100, le=4000)
+    chunk_overlap: Optional[int] = Field(None, ge=0, le=1000)
+    upsert_batch_size: Optional[int] = Field(None, ge=64, le=1024)
 
 
 class KnowledgeBaseUpdate(BaseModel):
@@ -278,6 +280,9 @@ class AppSettingsBase(BaseModel):
     max_context_chars: Optional[int] = Field(default=None, ge=0)
     score_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     use_structure: Optional[bool] = Field(default=None)
+    kb_chunk_size: Optional[int] = Field(default=None, ge=100, le=2000)
+    kb_chunk_overlap: Optional[int] = Field(default=None, ge=0, le=500)
+    kb_upsert_batch_size: Optional[int] = Field(default=None, ge=64, le=1024)
 
 
 class AppSettingsResponse(AppSettingsBase):

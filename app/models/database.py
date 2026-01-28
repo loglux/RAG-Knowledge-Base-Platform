@@ -372,6 +372,9 @@ class AppSettings(Base):
     max_context_chars: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     score_threshold: Mapped[Optional[float]] = mapped_column(sa.Float, nullable=True)
     use_structure: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    kb_chunk_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    kb_chunk_overlap: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    kb_upsert_batch_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime,

@@ -7,7 +7,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.models.database import KnowledgeBase as KnowledgeBaseModel
+from app.models.database import KnowledgeBase as KnowledgeBaseModel, AppSettings as AppSettingsModel
 from app.models.schemas import (
     KnowledgeBaseCreate,
     KnowledgeBaseUpdate,
@@ -47,6 +47,21 @@ async def create_knowledge_base(
     import uuid
     collection_name = f"kb_{uuid.uuid4().hex[:16]}"
 
+    # Resolve KB defaults from app settings if not provided
+    default_chunk_size = 1000
+    default_chunk_overlap = 200
+    default_upsert_batch_size = 256
+
+    settings_result = await db.execute(select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1))
+    settings_row = settings_result.scalar_one_or_none()
+    if settings_row:
+        if settings_row.kb_chunk_size is not None:
+            default_chunk_size = settings_row.kb_chunk_size
+        if settings_row.kb_chunk_overlap is not None:
+            default_chunk_overlap = settings_row.kb_chunk_overlap
+        if settings_row.kb_upsert_batch_size is not None:
+            default_upsert_batch_size = settings_row.kb_upsert_batch_size
+
     # Create KB
     kb_model = KnowledgeBaseModel(
         name=kb.name,
@@ -55,10 +70,10 @@ async def create_knowledge_base(
         embedding_model=kb.embedding_model,
         embedding_provider=model_config.provider.value,
         embedding_dimension=model_config.dimension,
-        chunk_size=kb.chunk_size,
-        chunk_overlap=kb.chunk_overlap,
+        chunk_size=kb.chunk_size if kb.chunk_size is not None else default_chunk_size,
+        chunk_overlap=kb.chunk_overlap if kb.chunk_overlap is not None else default_chunk_overlap,
         chunking_strategy=kb.chunking_strategy,
-        upsert_batch_size=kb.upsert_batch_size,
+        upsert_batch_size=kb.upsert_batch_size if kb.upsert_batch_size is not None else default_upsert_batch_size,
         user_id=user_id,
     )
 

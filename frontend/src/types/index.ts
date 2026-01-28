@@ -169,6 +169,9 @@ export interface AppSettings {
   max_context_chars: number | null
   score_threshold: number | null
   use_structure: boolean | null
+  kb_chunk_size: number | null
+  kb_chunk_overlap: number | null
+  kb_upsert_batch_size: number | null
   created_at: string
   updated_at: string
 }
@@ -181,4 +184,7 @@ export interface AppSettingsUpdate {
   max_context_chars?: number | null
   score_threshold?: number | null
   use_structure?: boolean | null
+  kb_chunk_size?: number | null
+  kb_chunk_overlap?: number | null
+  kb_upsert_batch_size?: number | null
 }
