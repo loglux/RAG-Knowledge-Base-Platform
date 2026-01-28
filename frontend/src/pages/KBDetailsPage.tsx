@@ -14,6 +14,10 @@ export function KBDetailsPage() {
   const [kb, setKb] = useState<KnowledgeBase | null>(null)
   const [kbLoading, setKbLoading] = useState(true)
   const [kbError, setKbError] = useState<string | null>(null)
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+  const [nameSaving, setNameSaving] = useState(false)
+  const [nameError, setNameError] = useState<string | null>(null)
   const [isEditingSettings, setIsEditingSettings] = useState(false)
   const [settingsData, setSettingsData] = useState({
     chunk_size: 1000,
@@ -45,6 +49,7 @@ export function KBDetailsPage() {
         setKbError(null)
         const data = await apiClient.getKnowledgeBase(id!)
         setKb(data)
+        setNameDraft(data.name)
         setSettingsData({
           chunk_size: data.chunk_size,
           chunk_overlap: data.chunk_overlap,
@@ -119,6 +124,42 @@ export function KBDetailsPage() {
     setIsEditingSettings(false)
   }
 
+  const handleStartEditName = () => {
+    if (!kb) return
+    setNameDraft(kb.name)
+    setNameError(null)
+    setIsEditingName(true)
+  }
+
+  const handleCancelEditName = () => {
+    if (!kb) return
+    setNameDraft(kb.name)
+    setNameError(null)
+    setIsEditingName(false)
+  }
+
+  const handleSaveName = async () => {
+    if (!kb) return
+    const nextName = nameDraft.trim()
+    if (!nextName) {
+      setNameError('Name cannot be empty')
+      return
+    }
+
+    setNameSaving(true)
+    try {
+      const updated = await apiClient.updateKnowledgeBase(kb.id, { name: nextName })
+      setKb(updated)
+      setNameDraft(updated.name)
+      setIsEditingName(false)
+      setNameError(null)
+    } catch (error) {
+      setNameError(error instanceof Error ? error.message : 'Failed to update name')
+    } finally {
+      setNameSaving(false)
+    }
+  }
+
   const handleUpload = async (files: File[]) => {
     for (const file of files) {
       try {
@@ -183,7 +224,53 @@ export function KBDetailsPage() {
                 ← Back
               </button>
               <div>
-                <h1 className="text-2xl font-bold text-white">📖 {kb.name}</h1>
+                {isEditingName ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={nameDraft}
+                      onChange={(e) => setNameDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          handleSaveName()
+                        }
+                        if (e.key === 'Escape') {
+                          e.preventDefault()
+                          handleCancelEditName()
+                        }
+                      }}
+                      className="input text-lg font-semibold py-1 px-3"
+                      placeholder="Knowledge base name"
+                      disabled={nameSaving}
+                    />
+                    <button
+                      onClick={handleSaveName}
+                      className="btn-primary text-sm px-3 py-1.5"
+                      disabled={nameSaving}
+                    >
+                      {nameSaving ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      onClick={handleCancelEditName}
+                      className="btn-secondary text-sm px-3 py-1.5"
+                      disabled={nameSaving}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-2xl font-bold text-white">📖 {kb.name}</h1>
+                    <button
+                      onClick={handleStartEditName}
+                      className="text-gray-400 hover:text-white transition-colors"
+                      aria-label="Edit knowledge base name"
+                    >
+                      ✏️
+                    </button>
+                  </div>
+                )}
+                {nameError && <p className="text-red-400 text-sm mt-1">{nameError}</p>}
                 {kb.description && <p className="text-gray-400 text-sm mt-1">{kb.description}</p>}
               </div>
             </div>
