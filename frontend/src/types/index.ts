@@ -45,6 +45,8 @@ export interface Document {
   file_size: number
   file_type: string
   status: DocumentStatus
+  embeddings_status?: DocumentStatus
+  bm25_status?: DocumentStatus
   chunk_count: number
   knowledge_base_id: string
   user_id: string | null
@@ -60,6 +62,8 @@ export interface DocumentStatusResponse {
   id: string
   filename: string
   status: DocumentStatus
+  embeddings_status?: DocumentStatus
+  bm25_status?: DocumentStatus
   chunk_count: number
   error_message: string | null
 }
@@ -107,6 +111,10 @@ export interface ChatRequest {
   conversation_history?: ConversationMessage[]
   top_k?: number
   temperature?: number
+  retrieval_mode?: 'dense' | 'hybrid'
+  lexical_top_k?: number
+  hybrid_dense_weight?: number
+  hybrid_lexical_weight?: number
   max_context_chars?: number
   score_threshold?: number
   llm_model?: string
@@ -140,6 +148,10 @@ export interface ConversationSettings {
   llm_model?: string
   llm_provider?: string
   use_structure?: boolean
+  retrieval_mode?: 'dense' | 'hybrid'
+  lexical_top_k?: number
+  hybrid_dense_weight?: number
+  hybrid_lexical_weight?: number
 }
 
 export interface ConversationDetail {
@@ -169,6 +181,10 @@ export interface AppSettings {
   max_context_chars: number | null
   score_threshold: number | null
   use_structure: boolean | null
+  retrieval_mode: 'dense' | 'hybrid' | null
+  lexical_top_k: number | null
+  hybrid_dense_weight: number | null
+  hybrid_lexical_weight: number | null
   kb_chunk_size: number | null
   kb_chunk_overlap: number | null
   kb_upsert_batch_size: number | null
@@ -184,7 +200,30 @@ export interface AppSettingsUpdate {
   max_context_chars?: number | null
   score_threshold?: number | null
   use_structure?: boolean | null
+  retrieval_mode?: 'dense' | 'hybrid' | null
+  lexical_top_k?: number | null
+  hybrid_dense_weight?: number | null
+  hybrid_lexical_weight?: number | null
   kb_chunk_size?: number | null
   kb_chunk_overlap?: number | null
   kb_upsert_batch_size?: number | null
+}
+
+export interface ApiInfo {
+  version: string
+  environment: string
+  features: {
+    async_processing: boolean
+    cache: boolean
+    metrics: boolean
+  }
+  integrations?: {
+    opensearch_available?: boolean
+  }
+  limits?: {
+    max_file_size_mb?: number
+    max_chunk_size?: number
+    chunk_overlap?: number
+  }
+  supported_formats?: string[]
 }

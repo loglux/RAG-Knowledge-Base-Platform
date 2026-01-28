@@ -381,6 +381,8 @@ async def reprocess_document(
 
     # Update status to pending
     doc.status = DocumentStatus.PENDING
+    doc.embeddings_status = DocumentStatus.PENDING
+    doc.bm25_status = DocumentStatus.PENDING
     doc.error_message = None
     await db.commit()
     await db.refresh(doc)
@@ -427,6 +429,8 @@ async def _reprocess_document_background(document_id: UUID):
 
                 if doc:
                     doc.status = DocumentStatus.FAILED
+                    doc.embeddings_status = DocumentStatus.FAILED
+                    doc.bm25_status = DocumentStatus.FAILED
                     doc.error_message = f"Reprocessing failed: {str(e)}"
                     db.add(doc)
                     await db.commit()
@@ -476,6 +480,8 @@ async def get_document_status(
             "id": str(doc.id),
             "filename": doc.filename,
             "status": doc_status,
+            "embeddings_status": (doc.embeddings_status.value if hasattr(doc.embeddings_status, 'value') else str(doc.embeddings_status)) if doc.embeddings_status else None,
+            "bm25_status": (doc.bm25_status.value if hasattr(doc.bm25_status, 'value') else str(doc.bm25_status)) if doc.bm25_status else None,
             "chunk_count": doc.chunk_count or 0,
             "error_message": doc.error_message,
         }

@@ -6,6 +6,11 @@ interface ChatSettingsProps {
   temperature: number
   maxContextChars: number
   scoreThreshold: number
+  retrievalMode: 'dense' | 'hybrid'
+  lexicalTopK: number
+  hybridDenseWeight: number
+  hybridLexicalWeight: number
+  opensearchAvailable?: boolean
   llmModel: string
   llmProvider: string
   useStructure: boolean
@@ -13,6 +18,10 @@ interface ChatSettingsProps {
   onTemperatureChange: (value: number) => void
   onMaxContextCharsChange: (value: number) => void
   onScoreThresholdChange: (value: number) => void
+  onRetrievalModeChange: (value: 'dense' | 'hybrid') => void
+  onLexicalTopKChange: (value: number) => void
+  onHybridDenseWeightChange: (value: number) => void
+  onHybridLexicalWeightChange: (value: number) => void
   onLLMChange: (model: string, provider: string) => void
   onUseStructureChange: (value: boolean) => void
   onClose: () => void
@@ -23,6 +32,11 @@ export function ChatSettings({
   temperature,
   maxContextChars,
   scoreThreshold,
+  retrievalMode,
+  lexicalTopK,
+  hybridDenseWeight,
+  hybridLexicalWeight,
+  opensearchAvailable,
   llmModel,
   llmProvider,
   useStructure,
@@ -30,10 +44,22 @@ export function ChatSettings({
   onTemperatureChange,
   onMaxContextCharsChange,
   onScoreThresholdChange,
+  onRetrievalModeChange,
+  onLexicalTopKChange,
+  onHybridDenseWeightChange,
+  onHybridLexicalWeightChange,
   onLLMChange,
   onUseStructureChange,
   onClose,
 }: ChatSettingsProps) {
+  const safeTopK = Number.isFinite(topK) ? topK : 5
+  const safeTemperature = Number.isFinite(temperature) ? temperature : 0.7
+  const safeMaxContextChars = Number.isFinite(maxContextChars) ? maxContextChars : 0
+  const safeScoreThreshold = Number.isFinite(scoreThreshold) ? scoreThreshold : 0
+  const safeLexicalTopK = Number.isFinite(lexicalTopK) ? lexicalTopK : 20
+  const safeHybridDenseWeight = Number.isFinite(hybridDenseWeight) ? hybridDenseWeight : 0.6
+  const safeHybridLexicalWeight = Number.isFinite(hybridLexicalWeight) ? hybridLexicalWeight : 0.4
+
   return (
     <div className="bg-gray-800 border-b border-gray-700">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -79,19 +105,34 @@ export function ChatSettings({
               value={llmModel}
               onChange={onLLMChange}
             />
+
+            <label className="block text-sm font-medium text-gray-300 mt-8 mb-2">
+              Retrieval mode
+            </label>
+            <select
+              value={retrievalMode}
+              onChange={(e) => onRetrievalModeChange(e.target.value as 'dense' | 'hybrid')}
+              className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100"
+            >
+              <option value="dense">Dense (vector)</option>
+              <option value="hybrid">Hybrid (BM25 + vector)</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              Hybrid combines lexical BM25 with semantic vectors
+            </p>
           </div>
 
           {/* Top K */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              Number of sources (Top K): {topK}
+              Number of sources (Top K): {safeTopK}
             </label>
             <input
               type="range"
               min="1"
               max="100"
               step="1"
-              value={topK}
+              value={safeTopK}
               onChange={(e) => onTopKChange(Number(e.target.value))}
               className="slider w-full"
             />
@@ -106,26 +147,27 @@ export function ChatSettings({
               type="number"
               min="0"
               step="1000"
-              value={maxContextChars}
+              value={safeMaxContextChars}
               onChange={(e) => onMaxContextCharsChange(Number(e.target.value))}
               className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-px text-gray-100"
             />
             <p className="text-xs text-gray-500 mt-1">
               Larger values include more retrieved text in the prompt
             </p>
+
           </div>
 
           {/* Temperature */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              Temperature: {temperature.toFixed(1)}
+              Temperature: {safeTemperature.toFixed(1)}
             </label>
             <input
               type="range"
               min="0"
               max="2"
               step="0.1"
-              value={temperature}
+              value={safeTemperature}
               onChange={(e) => onTemperatureChange(Number(e.target.value))}
               className="slider w-full"
             />
@@ -141,18 +183,81 @@ export function ChatSettings({
               min="0"
               max="1"
               step="0.01"
-              value={scoreThreshold}
+              value={safeScoreThreshold}
               onChange={(e) => onScoreThresholdChange(Number(e.target.value))}
               className="slider w-full"
             />
-            <div className="text-xs text-gray-400 mt-1">Current: {scoreThreshold.toFixed(2)}</div>
+            <div className="text-xs text-gray-400 mt-1">Current: {safeScoreThreshold.toFixed(2)}</div>
             <p className="text-xs text-gray-500 mt-1">
               0 = no filter, higher = stricter filtering of low‑relevance chunks
             </p>
-
           </div>
         </div>
 
+        {retrievalMode === 'hybrid' && (
+          <div className="mt-6 rounded-lg border border-gray-700 bg-gray-900/60 p-4">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-white">BM25 / Hybrid Settings</h4>
+              <span className="text-xs text-gray-400">Lexical + dense weighting</span>
+            </div>
+
+            {opensearchAvailable === false && (
+              <div className="mt-3 rounded border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
+                OpenSearch is not reachable. Hybrid search may fail until it is available.
+              </div>
+            )}
+
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Lexical Top K: {safeLexicalTopK}
+                </label>
+                <input
+                  type="range"
+                  min="1"
+                  max="200"
+                  step="1"
+                  value={safeLexicalTopK}
+                  onChange={(e) => onLexicalTopKChange(Number(e.target.value))}
+                  className="slider w-full"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Candidate pool from BM25 before merging
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Hybrid dense weight: {safeHybridDenseWeight.toFixed(2)}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={safeHybridDenseWeight}
+                  onChange={(e) => onHybridDenseWeightChange(Number(e.target.value))}
+                  className="slider w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Hybrid lexical weight: {safeHybridLexicalWeight.toFixed(2)}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={safeHybridLexicalWeight}
+                  onChange={(e) => onHybridLexicalWeightChange(Number(e.target.value))}
+                  className="slider w-full"
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mt-4 p-3 bg-gray-900 rounded-lg border border-gray-700">
           <p className="text-xs text-gray-400">

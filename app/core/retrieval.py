@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from app.core.embeddings_factory import create_embedding_service
 from app.core.embeddings_base import BaseEmbeddingService
 from app.core.vector_store import get_vector_store, QdrantVectorStore, SearchResult
+from app.core.lexical_store import get_lexical_store, OpenSearchStore
 from app.config import settings
 
 
@@ -61,6 +62,7 @@ class RetrievalEngine:
     def __init__(
         self,
         vector_store: Optional[QdrantVectorStore] = None,
+        lexical_store: Optional[OpenSearchStore] = None,
     ):
         """
         Initialize retrieval engine.
@@ -72,8 +74,77 @@ class RetrievalEngine:
             Embedding service is created per-query based on KB's embedding model.
         """
         self.vector_store = vector_store or get_vector_store()
+        self.lexical_store = lexical_store or get_lexical_store()
 
         logger.info("Initialized RetrievalEngine")
+
+    async def retrieve_hybrid(
+        self,
+        query: str,
+        collection_name: str,
+        embedding_model: str,
+        knowledge_base_id: str,
+        top_k: int = 5,
+        dense_top_k: Optional[int] = None,
+        lexical_top_k: Optional[int] = None,
+        score_threshold: Optional[float] = None,
+        filters: Optional[Dict[str, Any]] = None,
+        dense_weight: float = 0.6,
+        lexical_weight: float = 0.4,
+    ) -> RetrievalResult:
+        """
+        Hybrid retrieval combining dense vectors (Qdrant) and BM25 (OpenSearch).
+        """
+        if not query or not query.strip():
+            raise ValueError("Query cannot be empty")
+
+        dense_limit = dense_top_k or max(top_k, 10)
+        lexical_limit = lexical_top_k or max(top_k, 10)
+
+        # Dense search
+        dense_results = await self.vector_store.search(
+            collection_name=collection_name,
+            query_vector=await create_embedding_service(model=embedding_model).generate_embedding(query),
+            limit=dense_limit,
+            score_threshold=score_threshold,
+            filter_conditions=filters,
+        )
+        dense_chunks = self._convert_search_results(dense_results)
+
+        # Lexical search
+        lexical_chunks: List[RetrievedChunk] = []
+        try:
+            lexical_hits = await self.lexical_store.search(
+                query=query,
+                knowledge_base_id=knowledge_base_id,
+                limit=lexical_limit,
+                filters=filters,
+            )
+            lexical_chunks = self._convert_lexical_results(lexical_hits)
+        except Exception as e:
+            logger.warning(f"Lexical search failed, using dense only: {e}")
+
+        # Normalize and merge
+        merged = self._merge_hybrid_results(
+            dense_chunks=dense_chunks,
+            lexical_chunks=lexical_chunks,
+            dense_weight=dense_weight,
+            lexical_weight=lexical_weight,
+        )
+
+        # Apply score threshold if provided (normalized 0..1 scale)
+        if score_threshold is not None:
+            merged = [c for c in merged if c.score >= score_threshold]
+
+        merged = merged[:top_k]
+        context = self._assemble_context(merged)
+
+        return RetrievalResult(
+            query=query,
+            chunks=merged,
+            total_found=len(merged),
+            context=context,
+        )
 
     async def retrieve(
         self,
@@ -218,6 +289,71 @@ class RetrievalEngine:
             chunks.append(chunk)
 
         return chunks
+
+    def _convert_lexical_results(
+        self,
+        search_results: List[Dict[str, Any]],
+    ) -> List[RetrievedChunk]:
+        chunks: List[RetrievedChunk] = []
+        for result in search_results:
+            payload = result.get("source", {})
+            chunks.append(
+                RetrievedChunk(
+                    text=payload.get("content", ""),
+                    score=float(result.get("score", 0.0)),
+                    document_id=payload.get("document_id", ""),
+                    filename=payload.get("filename", "unknown"),
+                    chunk_index=payload.get("chunk_index", 0),
+                    metadata={
+                        "knowledge_base_id": payload.get("knowledge_base_id"),
+                        "file_type": payload.get("file_type"),
+                        "char_count": payload.get("char_count"),
+                        "word_count": payload.get("word_count"),
+                    },
+                )
+            )
+        return chunks
+
+    @staticmethod
+    def _normalize_scores(chunks: List[RetrievedChunk]) -> Dict[str, float]:
+        if not chunks:
+            return {}
+        max_score = max(c.score for c in chunks) or 1.0
+        norm = {}
+        for c in chunks:
+            key = f"{c.document_id}:{c.chunk_index}"
+            norm[key] = c.score / max_score
+        return norm
+
+    def _merge_hybrid_results(
+        self,
+        *,
+        dense_chunks: List[RetrievedChunk],
+        lexical_chunks: List[RetrievedChunk],
+        dense_weight: float,
+        lexical_weight: float,
+    ) -> List[RetrievedChunk]:
+        total_weight = dense_weight + lexical_weight
+        if total_weight > 0:
+            dense_weight = dense_weight / total_weight
+            lexical_weight = lexical_weight / total_weight
+
+        dense_norm = self._normalize_scores(dense_chunks)
+        lexical_norm = self._normalize_scores(lexical_chunks)
+
+        combined: Dict[str, RetrievedChunk] = {}
+        for chunk in dense_chunks + lexical_chunks:
+            key = f"{chunk.document_id}:{chunk.chunk_index}"
+            if key not in combined:
+                combined[key] = chunk
+
+        for key, chunk in combined.items():
+            score = (dense_norm.get(key, 0.0) * dense_weight) + (
+                lexical_norm.get(key, 0.0) * lexical_weight
+            )
+            combined[key] = chunk.model_copy(update={"score": score})
+
+        return sorted(combined.values(), key=lambda c: c.score, reverse=True)
 
     def _assemble_context(
         self,

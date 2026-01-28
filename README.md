@@ -3,11 +3,13 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![Qdrant](https://img.shields.io/badge/Qdrant-FF6B6B?logo=qdrant&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
+![OpenSearch](https://img.shields.io/badge/OpenSearch-005EB8?logo=opensearch&logoColor=white)
 ![OpenAI](https://img.shields.io/badge/OpenAI-111111?logo=openai&logoColor=white)
 ![Anthropic](https://img.shields.io/badge/Anthropic-191919?logo=anthropic&logoColor=white)
 ![Voyage](https://img.shields.io/badge/Voyage-1B1F23?logo=voyage&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-000000?logo=ollama&logoColor=white)
 ![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=111111)
+![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
 
 Knowledge Base Platform is a production-ready RAG backend with a clean API and a modern web UI. It ingests documents, builds a semantic index in Qdrant, and answers questions with grounded citations. It also generates document structure (TOC metadata) to enable section-aware retrieval and precise "show me question X" queries.
@@ -27,6 +29,7 @@ It can be used as a standalone service or integrated into other products via its
 - Document ingestion and chunking (txt, md)
 - Embedding-based semantic search over unstructured documents
 - Qdrant-backed vector index for fast similarity search
+- Optional BM25 lexical index (OpenSearch) for hybrid retrieval
 - Structured document analysis and TOC metadata
 - RAG answers with citations
 - FastAPI backend + React frontend
@@ -36,9 +39,10 @@ It can be used as a standalone service or integrated into other products via its
 
 - **API**: FastAPI, async SQLAlchemy
 - **Vector DB**: Qdrant
+- **Lexical Search**: OpenSearch (BM25)
 - **Metadata DB**: PostgreSQL
 - **Embeddings**: text embeddings for unstructured data
-- **RAG**: Custom retrieval + LLM generation pipeline
+- **RAG**: Custom retrieval (dense or hybrid) + LLM generation pipeline
 - **Frontend**: Vite + React
 
 ## How it works
@@ -57,13 +61,13 @@ Vectorization turns unstructured text into numeric vectors that capture meaning,
 
 ## Retrieval and citations
 
-The system performs **semantic retrieval**: it embeds the user query, finds the closest chunk vectors, and assembles them into a context window for the LLM. Because the answer is grounded in retrieved chunks, we can return **citations** (source snippets) alongside the response.
+The system performs **semantic retrieval**: it embeds the user query, finds the closest chunk vectors, and assembles them into a context window for the LLM. You can also enable **hybrid retrieval** (BM25 + vectors), which boosts exact keyword matches while preserving semantic recall. Because the answer is grounded in retrieved chunks, we can return **citations** (source snippets) alongside the response.
 
 For structured documents, an optional **Structure‑Aware Retrieval** step builds a TOC and section metadata. This enables section‑targeted queries (e.g., “show Question 2”), returning full, verbatim excerpts rather than a generic summary.
 
 ## Quick start (Docker)
 
-This starts the **backend services only** (API + DB + Qdrant). The frontend runs locally via Vite.
+This starts the **backend services only** (API + DB + Qdrant + OpenSearch). The frontend runs locally via Vite.
 
 1) Create env file
 
@@ -75,6 +79,7 @@ cp .env.example .env
 2) Read the runbook (dev ops notes, CORS, restart rules)
 
 [RUNBOOK.md](RUNBOOK.md)
+Local host-specific notes: [RUNBOOK_LOCAL.md](RUNBOOK_LOCAL.md)
 
 3) Start backend services
 
@@ -97,7 +102,7 @@ python3.12 -m venv venv
 source venv/bin/activate
 pip install -r requirements-dev.txt
 
-docker compose -f docker-compose.dev.yml up -d db qdrant
+docker compose -f docker-compose.dev.yml up -d db qdrant opensearch
 alembic upgrade head
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
@@ -119,6 +124,7 @@ Key settings:
 - `QDRANT_URL` and `DATABASE_URL`
 - `OLLAMA_BASE_URL` (optional for local models)
 - `MAX_CONTEXT_CHARS` (0 = unlimited)
+- `OPENSEARCH_URL` (optional; required for BM25/hybrid)
 
 ## Chat settings (UI)
 
@@ -129,6 +135,10 @@ The chat UI exposes retrieval controls to tune answer quality:
 - **Score threshold**: minimum similarity score (0–1) to filter low‑relevance chunks. 0 disables filtering; 0.2–0.4 is a good starting range.
 - **Temperature**: response randomness. Use 0–0.3 for factual extraction, higher for exploratory/creative explanations.
 - **Use Document Structure**: enables TOC‑aware, section‑targeted retrieval (e.g., “show question 2”).
+- **Retrieval mode**: dense (vectors) or hybrid (BM25 + vectors).
+- **BM25 controls** (hybrid only): lexical top‑K and weight blending.
+
+When you first enable hybrid search on an existing KB, use **Reindex for BM25** to populate the lexical index.
 
 ![Chat settings](chat_settings.png)
 

@@ -1,13 +1,15 @@
 """Knowledge Base CRUD endpoints."""
+import logging
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.models.database import KnowledgeBase as KnowledgeBaseModel, AppSettings as AppSettingsModel
+from app.models.database import KnowledgeBase as KnowledgeBaseModel, AppSettings as AppSettingsModel, Document as DocumentModel
+from app.models.enums import DocumentStatus
 from app.models.schemas import (
     KnowledgeBaseCreate,
     KnowledgeBaseUpdate,
@@ -16,6 +18,8 @@ from app.models.schemas import (
 )
 from app.dependencies import get_current_user_id
 from app.core.embeddings_base import EMBEDDING_MODELS
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -211,9 +215,7 @@ async def delete_knowledge_base(
     """
     from app.models.database import Document as DocumentModel
     from app.core.vector_store import get_vector_store
-    import logging
-
-    logger = logging.getLogger(__name__)
+    from app.core.lexical_store import get_lexical_store
 
     # Get existing KB
     query = select(KnowledgeBaseModel).where(
@@ -268,4 +270,69 @@ async def delete_knowledge_base(
         logger.error(f"Failed to delete Qdrant collection '{kb.collection_name}': {e}")
         # Don't fail the request if Qdrant deletion fails - KB is already marked deleted
 
+    # 4. Delete OpenSearch chunks
+    try:
+        lexical_store = get_lexical_store()
+        await lexical_store.delete_by_kb_id(str(kb_id))
+        logger.info(f"Deleted OpenSearch chunks for KB '{kb.name}'")
+    except Exception as e:
+        logger.error(f"Failed to delete OpenSearch chunks for KB '{kb.name}': {e}")
+
     return None
+
+
+@router.post("/{kb_id}/reprocess", response_model=dict)
+async def reprocess_knowledge_base(
+    kb_id: UUID,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """
+    Reprocess all documents in a knowledge base.
+
+    This re-chunks and re-embeds documents to keep vector and BM25 indices aligned.
+    """
+    # Get KB
+    query = select(KnowledgeBaseModel).where(
+        KnowledgeBaseModel.id == kb_id,
+        KnowledgeBaseModel.is_deleted == False,
+    )
+    result = await db.execute(query)
+    kb = result.scalar_one_or_none()
+
+    if not kb:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Knowledge base {kb_id} not found",
+        )
+
+    # Get documents
+    doc_query = select(DocumentModel).where(
+        DocumentModel.knowledge_base_id == kb_id,
+        DocumentModel.is_deleted == False,
+    )
+    doc_result = await db.execute(doc_query)
+    documents = doc_result.scalars().all()
+
+    from app.api.v1.documents import _reprocess_document_background
+
+    queued = 0
+    for doc in documents:
+        if doc.status == DocumentStatus.PROCESSING:
+            continue
+        doc.status = DocumentStatus.PENDING
+        doc.embeddings_status = DocumentStatus.PENDING
+        doc.bm25_status = DocumentStatus.PENDING
+        doc.error_message = None
+        background_tasks.add_task(
+            _reprocess_document_background,
+            document_id=doc.id,
+        )
+        queued += 1
+
+    await db.commit()
+
+    logger.info(f"Queued {queued} documents for reprocessing (kb={kb_id})")
+
+    return {"queued": queued, "knowledge_base_id": str(kb_id)}

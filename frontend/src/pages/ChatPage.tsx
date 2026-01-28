@@ -29,6 +29,18 @@ export function ChatPage() {
   const [scoreThreshold, setScoreThreshold] = useState(() => {
     return 0
   })
+  const [retrievalMode, setRetrievalMode] = useState<'dense' | 'hybrid'>(() => {
+    return 'dense'
+  })
+  const [lexicalTopK, setLexicalTopK] = useState(() => {
+    return 20
+  })
+  const [hybridDenseWeight, setHybridDenseWeight] = useState(() => {
+    return 0.6
+  })
+  const [hybridLexicalWeight, setHybridLexicalWeight] = useState(() => {
+    return 0.4
+  })
   const [llmModel, setLlmModel] = useState(() => {
     return 'gpt-4o'
   })
@@ -38,6 +50,7 @@ export function ChatPage() {
   const [useStructure, setUseStructure] = useState(() => {
     return false
   })
+  const [opensearchAvailable, setOpensearchAvailable] = useState<boolean | null>(null)
   const [settingsLoaded, setSettingsLoaded] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -62,6 +75,16 @@ export function ChatPage() {
         if (settings.temperature !== undefined) setTemperature(settings.temperature)
         if (settings.max_context_chars !== undefined) setMaxContextChars(settings.max_context_chars)
         if (settings.score_threshold !== undefined) setScoreThreshold(settings.score_threshold)
+        if (settings.retrieval_mode) setRetrievalMode(settings.retrieval_mode)
+        if (settings.lexical_top_k !== undefined && settings.lexical_top_k !== null) {
+          setLexicalTopK(settings.lexical_top_k)
+        }
+        if (settings.hybrid_dense_weight !== undefined && settings.hybrid_dense_weight !== null) {
+          setHybridDenseWeight(settings.hybrid_dense_weight)
+        }
+        if (settings.hybrid_lexical_weight !== undefined && settings.hybrid_lexical_weight !== null) {
+          setHybridLexicalWeight(settings.hybrid_lexical_weight)
+        }
         if (settings.llm_model) setLlmModel(settings.llm_model)
         if (settings.llm_provider) setLlmProvider(settings.llm_provider)
         if (settings.use_structure !== undefined) setUseStructure(settings.use_structure)
@@ -84,6 +107,10 @@ export function ChatPage() {
         if (data.temperature !== null) setTemperature(data.temperature)
         if (data.max_context_chars !== null) setMaxContextChars(data.max_context_chars)
         if (data.score_threshold !== null) setScoreThreshold(data.score_threshold)
+        if (data.retrieval_mode) setRetrievalMode(data.retrieval_mode)
+        if (data.lexical_top_k !== null) setLexicalTopK(data.lexical_top_k)
+        if (data.hybrid_dense_weight !== null) setHybridDenseWeight(data.hybrid_dense_weight)
+        if (data.hybrid_lexical_weight !== null) setHybridLexicalWeight(data.hybrid_lexical_weight)
         if (data.llm_model) setLlmModel(data.llm_model)
         if (data.llm_provider) setLlmProvider(data.llm_provider)
         if (data.use_structure !== null) setUseStructure(data.use_structure)
@@ -97,6 +124,19 @@ export function ChatPage() {
     loadGlobalSettings()
   }, [conversationId])
 
+  useEffect(() => {
+    const loadInfo = async () => {
+      try {
+        const info = await apiClient.getApiInfo()
+        setOpensearchAvailable(info.integrations?.opensearch_available ?? null)
+      } catch (err) {
+        setOpensearchAvailable(null)
+      }
+    }
+
+    loadInfo()
+  }, [])
+
   // Persist conversation settings to server when they change
   useEffect(() => {
     if (!conversationId || !settingsLoaded) return
@@ -105,6 +145,10 @@ export function ChatPage() {
       temperature,
       max_context_chars: maxContextChars,
       score_threshold: scoreThreshold,
+      retrieval_mode: retrievalMode,
+      lexical_top_k: lexicalTopK,
+      hybrid_dense_weight: hybridDenseWeight,
+      hybrid_lexical_weight: hybridLexicalWeight,
       llm_model: llmModel,
       llm_provider: llmProvider,
       use_structure: useStructure,
@@ -113,7 +157,7 @@ export function ChatPage() {
     apiClient.updateConversationSettings(conversationId, payload).catch((err) => {
       console.error('Failed to update conversation settings:', err)
     })
-  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, llmModel, llmProvider, useStructure])
+  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, llmModel, llmProvider, useStructure])
 
   useEffect(() => {
     const fetchKB = async () => {
@@ -140,7 +184,20 @@ export function ChatPage() {
   }, [messages])
 
   const handleSendMessage = (question: string) => {
-    sendMessage(question, topK, temperature, maxContextChars, scoreThreshold, llmModel, llmProvider, useStructure)
+    sendMessage(
+      question,
+      topK,
+      temperature,
+      retrievalMode,
+      lexicalTopK,
+      hybridDenseWeight,
+      hybridLexicalWeight,
+      maxContextChars,
+      scoreThreshold,
+      llmModel,
+      llmProvider,
+      useStructure
+    )
   }
 
   const handleLLMChange = (model: string, provider: string) => {
@@ -226,6 +283,11 @@ export function ChatPage() {
           temperature={temperature}
           maxContextChars={maxContextChars}
           scoreThreshold={scoreThreshold}
+          retrievalMode={retrievalMode}
+          lexicalTopK={lexicalTopK}
+          hybridDenseWeight={hybridDenseWeight}
+          hybridLexicalWeight={hybridLexicalWeight}
+          opensearchAvailable={opensearchAvailable ?? undefined}
           llmModel={llmModel}
           llmProvider={llmProvider}
           useStructure={useStructure}
@@ -233,6 +295,10 @@ export function ChatPage() {
           onTemperatureChange={setTemperature}
           onMaxContextCharsChange={setMaxContextChars}
           onScoreThresholdChange={setScoreThreshold}
+          onRetrievalModeChange={setRetrievalMode}
+          onLexicalTopKChange={setLexicalTopK}
+          onHybridDenseWeightChange={setHybridDenseWeight}
+          onHybridLexicalWeightChange={setHybridLexicalWeight}
           onLLMChange={handleLLMChange}
           onUseStructureChange={setUseStructure}
           onClose={() => setShowSettings(false)}

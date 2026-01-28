@@ -148,6 +148,20 @@ class Document(Base):
         nullable=False,
         index=True
     )
+    embeddings_status: Mapped[DocumentStatus] = mapped_column(
+        SQLEnum(DocumentStatus),
+        default=DocumentStatus.PENDING,
+        nullable=False,
+        index=True,
+        comment="Embedding/Qdrant indexing status"
+    )
+    bm25_status: Mapped[DocumentStatus] = mapped_column(
+        SQLEnum(DocumentStatus),
+        default=DocumentStatus.PENDING,
+        nullable=False,
+        index=True,
+        comment="BM25/OpenSearch indexing status"
+    )
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Chunking results
@@ -372,6 +386,10 @@ class AppSettings(Base):
     max_context_chars: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     score_threshold: Mapped[Optional[float]] = mapped_column(sa.Float, nullable=True)
     use_structure: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    retrieval_mode: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    lexical_top_k: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    hybrid_dense_weight: Mapped[Optional[float]] = mapped_column(sa.Float, nullable=True)
+    hybrid_lexical_weight: Mapped[Optional[float]] = mapped_column(sa.Float, nullable=True)
     kb_chunk_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     kb_chunk_overlap: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     kb_upsert_batch_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)

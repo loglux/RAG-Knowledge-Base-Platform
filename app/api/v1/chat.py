@@ -158,6 +158,10 @@ async def chat_query(
             collection_name=kb.collection_name,
             embedding_model=kb.embedding_model,  # Pass KB's embedding model
             top_k=request.top_k,
+            retrieval_mode=request.retrieval_mode,
+            lexical_top_k=request.lexical_top_k,
+            dense_weight=request.hybrid_dense_weight,
+            lexical_weight=request.hybrid_lexical_weight,
             temperature=request.temperature,
             max_tokens=request.max_tokens,
             max_context_chars=request.max_context_chars,
@@ -181,6 +185,10 @@ async def chat_query(
                 "llm_model": request.llm_model,
                 "llm_provider": request.llm_provider,
                 "use_structure": request.use_structure,
+                "retrieval_mode": request.retrieval_mode,
+                "lexical_top_k": request.lexical_top_k,
+                "hybrid_dense_weight": request.hybrid_dense_weight,
+                "hybrid_lexical_weight": request.hybrid_lexical_weight,
             }
             conversation = ConversationModel(
                 knowledge_base_id=request.knowledge_base_id,
@@ -205,6 +213,10 @@ async def chat_query(
                 "llm_model": request.llm_model,
                 "llm_provider": request.llm_provider,
                 "use_structure": request.use_structure,
+                "retrieval_mode": request.retrieval_mode,
+                "lexical_top_k": request.lexical_top_k,
+                "hybrid_dense_weight": request.hybrid_dense_weight,
+                "hybrid_lexical_weight": request.hybrid_lexical_weight,
             })
             conversation.settings_json = json.dumps(existing_settings)
 

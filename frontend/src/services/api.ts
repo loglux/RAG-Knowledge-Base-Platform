@@ -16,6 +16,7 @@ import type {
   EmbeddingModel,
   AppSettings,
   AppSettingsUpdate,
+  ApiInfo,
 } from '../types/index'
 
 class APIClient {
@@ -69,6 +70,11 @@ class APIClient {
 
   async deleteKnowledgeBase(id: string): Promise<void> {
     await this.client.delete(`/knowledge-bases/${id}`)
+  }
+
+  async reprocessKnowledgeBase(id: string): Promise<{ queued: number; knowledge_base_id: string }> {
+    const response = await this.client.post<{ queued: number; knowledge_base_id: string }>(`/knowledge-bases/${id}/reprocess`)
+    return response.data
   }
 
   // Documents
@@ -195,6 +201,11 @@ class APIClient {
 
   async updateAppSettings(payload: AppSettingsUpdate): Promise<AppSettings> {
     const response = await this.client.put<AppSettings>('/settings', payload)
+    return response.data
+  }
+
+  async getApiInfo(): Promise<ApiInfo> {
+    const response = await this.client.get<ApiInfo>('/info')
     return response.data
   }
 }

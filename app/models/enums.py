@@ -30,3 +30,10 @@ class FileType(str, Enum):
     # HTML = "html"
     # CSV = "csv"
     # JSON = "json"
+
+
+class RetrievalMode(str, Enum):
+    """Retrieval mode for RAG."""
+
+    DENSE = "dense"
+    HYBRID = "hybrid"

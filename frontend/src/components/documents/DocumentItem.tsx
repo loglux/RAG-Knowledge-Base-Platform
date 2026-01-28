@@ -81,6 +81,36 @@ export function DocumentItem({ document, onReprocess, onDelete, onAnalyze }: Doc
     }
   }
 
+  const getIndexStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return '✅'
+      case 'processing':
+        return '⚙️'
+      case 'pending':
+        return '⏳'
+      case 'failed':
+        return '❌'
+      default:
+        return '•'
+    }
+  }
+
+  const getIndexStatusClass = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'border-green-500/40 text-green-400 bg-green-500/10'
+      case 'processing':
+        return 'border-blue-500/40 text-blue-400 bg-blue-500/10'
+      case 'pending':
+        return 'border-yellow-500/40 text-yellow-400 bg-yellow-500/10'
+      case 'failed':
+        return 'border-red-500/40 text-red-400 bg-red-500/10'
+      default:
+        return 'border-gray-500/40 text-gray-400 bg-gray-500/10'
+    }
+  }
+
   const handleDelete = () => {
     if (onDelete && confirm(`Delete "${document.filename}"?`)) {
       onDelete(document.id)
@@ -163,6 +193,27 @@ export function DocumentItem({ document, onReprocess, onDelete, onAnalyze }: Doc
               <span>{formatFileSize(document.file_size)}</span>
               <span>•</span>
               <span>📅 {formatDate(document.created_at)}</span>
+            </div>
+
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+              {(() => {
+                const embeddingsStatus = document.embeddings_status ?? document.status
+                const bm25Status = document.bm25_status ?? 'pending'
+                return (
+                  <>
+                    <span
+                      className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 ${getIndexStatusClass(embeddingsStatus)}`}
+                    >
+                      Embeddings {getIndexStatusIcon(embeddingsStatus)}
+                    </span>
+                    <span
+                      className={`inline-flex items-center gap-1 rounded border px-2 py-0.5 ${getIndexStatusClass(bm25Status)}`}
+                    >
+                      BM25 {getIndexStatusIcon(bm25Status)}
+                    </span>
+                  </>
+                )
+              })()}
             </div>
 
             {document.error_message && (

@@ -26,6 +26,7 @@ from app.core.vector_store import (
     QdrantVectorStore,
     VectorStoreException,
 )
+from app.core.lexical_store import get_lexical_store, OpenSearchStore
 from app.services.chunking import get_chunking_service, ChunkingService, Chunk
 
 
@@ -47,6 +48,7 @@ class DocumentProcessor:
     def __init__(
         self,
         vector_store: Optional[QdrantVectorStore] = None,
+        lexical_store: Optional[OpenSearchStore] = None,
         chunking_service: Optional[ChunkingService] = None,
     ):
         """
@@ -60,6 +62,7 @@ class DocumentProcessor:
             Embedding service is created per-document based on KB's embedding model.
         """
         self.vector_store = vector_store or get_vector_store()
+        self.lexical_store = lexical_store or get_lexical_store()
         self.chunking = chunking_service or get_chunking_service()
 
         logger.info("Initialized DocumentProcessor")
@@ -97,7 +100,11 @@ class DocumentProcessor:
 
             # 4. Update status to processing
             await self._update_document_status(
-                document, DocumentStatus.PROCESSING, db
+                document,
+                DocumentStatus.PROCESSING,
+                db,
+                embeddings_status=DocumentStatus.PROCESSING,
+                bm25_status=DocumentStatus.PENDING,
             )
 
             # 5. Ensure collection exists
@@ -163,14 +170,50 @@ class DocumentProcessor:
                 batch_size=kb.upsert_batch_size,
             )
 
-            # 11. Update document status to completed
+            # Mark embeddings as completed once Qdrant insert succeeds
+            await self._update_index_statuses(
+                document,
+                db,
+                embeddings_status=DocumentStatus.COMPLETED,
+            )
+
+            # 11. Index chunks in OpenSearch (lexical)
+            try:
+                await self._update_index_statuses(
+                    document,
+                    db,
+                    bm25_status=DocumentStatus.PROCESSING,
+                )
+                lexical_chunks = self._build_lexical_chunks(chunks)
+                await self.lexical_store.index_chunks(
+                    knowledge_base_id=str(kb.id),
+                    document_id=str(document.id),
+                    filename=document.filename,
+                    file_type=str(document.file_type),
+                    chunks=lexical_chunks,
+                    batch_size=kb.upsert_batch_size,
+                )
+                await self._update_index_statuses(
+                    document,
+                    db,
+                    bm25_status=DocumentStatus.COMPLETED,
+                )
+            except Exception as e:
+                logger.warning(f"OpenSearch indexing failed: {e}")
+                await self._update_index_statuses(
+                    document,
+                    db,
+                    bm25_status=DocumentStatus.FAILED,
+                )
+
+            # 12. Update document status to completed
             document.chunk_count = len(chunks)
             document.processed_at = datetime.utcnow()
             await self._update_document_status(
                 document, DocumentStatus.COMPLETED, db
             )
 
-            # 12. Recalculate KB statistics (prevents desync from incremental updates)
+            # 13. Recalculate KB statistics (prevents desync from incremental updates)
             total_chunks = await db.scalar(
                 select(func.coalesce(func.sum(Document.chunk_count), 0)).where(
                     Document.knowledge_base_id == kb.id,
@@ -198,7 +241,11 @@ class DocumentProcessor:
                 document = await self._load_document(document_id, db)
                 document.error_message = str(e)
                 await self._update_document_status(
-                    document, DocumentStatus.FAILED, db
+                    document,
+                    DocumentStatus.FAILED,
+                    db,
+                    embeddings_status=DocumentStatus.FAILED,
+                    bm25_status=DocumentStatus.FAILED,
                 )
             except Exception as update_error:
                 logger.error(f"Failed to update document status: {update_error}")
@@ -241,6 +288,11 @@ class DocumentProcessor:
             except Exception as e:
                 logger.warning(f"Failed to delete old vectors: {e}")
 
+            try:
+                await self.lexical_store.delete_by_document_id(str(document_id))
+            except Exception as e:
+                logger.warning(f"Failed to delete OpenSearch chunks: {e}")
+
             # Process document
             return await self.process_document(document_id, db)
 
@@ -269,6 +321,9 @@ class DocumentProcessor:
                 document_id=str(document_id),
             )
             logger.info(f"Successfully deleted vectors for document {document_id}")
+
+            await self.lexical_store.delete_by_document_id(str(document_id))
+            logger.info(f"Successfully deleted OpenSearch chunks for document {document_id}")
 
         except Exception as e:
             logger.error(f"Failed to delete vectors for document {document_id}: {e}")
@@ -313,14 +368,36 @@ class DocumentProcessor:
         document: Document,
         status: DocumentStatus,
         db: AsyncSession,
+        embeddings_status: Optional[DocumentStatus] = None,
+        bm25_status: Optional[DocumentStatus] = None,
     ):
         """Update document status in database."""
         document.status = status
+        if embeddings_status is not None:
+            document.embeddings_status = embeddings_status
+        if bm25_status is not None:
+            document.bm25_status = bm25_status
         db.add(document)
         await db.commit()
         await db.refresh(document)
 
         logger.info(f"Updated document {document.id} status to {status.value}")
+
+    async def _update_index_statuses(
+        self,
+        document: Document,
+        db: AsyncSession,
+        embeddings_status: Optional[DocumentStatus] = None,
+        bm25_status: Optional[DocumentStatus] = None,
+    ):
+        """Update per-index statuses without changing overall status."""
+        if embeddings_status is not None:
+            document.embeddings_status = embeddings_status
+        if bm25_status is not None:
+            document.bm25_status = bm25_status
+        db.add(document)
+        await db.commit()
+        await db.refresh(document)
 
     async def _ensure_collection_exists(self, kb: KnowledgeBase):
         """Ensure Qdrant collection exists for the knowledge base."""
@@ -382,6 +459,21 @@ class DocumentProcessor:
             payloads.append(payload)
 
         return payloads
+
+    @staticmethod
+    def _build_lexical_chunks(chunks: List[Chunk]) -> List[Dict[str, Any]]:
+        """Build OpenSearch chunk documents."""
+        lexical_chunks = []
+        for chunk in chunks:
+            lexical_chunks.append(
+                {
+                    "chunk_index": chunk.index,
+                    "text": chunk.content,
+                    "char_count": chunk.char_count,
+                    "word_count": chunk.word_count,
+                }
+            )
+        return lexical_chunks
 
 
 # Dependency injection

@@ -7,7 +7,7 @@ Keep it practical: steps, context, and troubleshooting.
 
 ## 1) Architecture & Responsibility
 
-**Backend** runs in Docker (API + DB + Qdrant).  
+**Backend** runs in Docker (API + DB + Qdrant + OpenSearch).  
 **Frontend** runs locally with Vite (dev UX, instant HMR, no rebuilds).
 
 Why this split:
@@ -31,18 +31,19 @@ These are local conventions only—ports can be changed if needed (including the
 - UI: `http://<host>:5174`
 - API: `http://<host>:8004`
 - Health: `http://<host>:8004/api/v1/health`
+- OpenSearch: `http://<host>:9200`
 
 ---
 
 ## 3) Backend (Docker)
 
-Start backend services (order matters: db/qdrant first, then api):
+Start backend services (order matters: db/qdrant/opensearch first, then api):
 ```bash
-docker compose -f docker-compose.dev.yml up -d db qdrant api
+docker compose -f docker-compose.dev.yml up -d db qdrant opensearch api
 ```
 
 Why:
-- DB/Qdrant must be running before the API.
+- DB/Qdrant/OpenSearch must be running before the API.
 - Docker guarantees stable dependencies.
 
 ---
@@ -81,6 +82,8 @@ and never try to call `localhost` on the client machine.
 Important:
 - `CORS_ORIGINS` must include the frontend origin:
   `http://<host>:5174`
+- `OPENSEARCH_URL` should point to the OpenSearch container:
+  `http://opensearch:9200`
 
 ### Frontend `frontend/.env`
 ```
@@ -106,7 +109,16 @@ docker exec kb-platform-api printenv CORS_ORIGINS
 
 ---
 
-## 8) Verification Checklist
+## 8) Migrations
+
+If you pull backend changes, run migrations inside the API container:
+```bash
+docker exec kb-platform-api alembic upgrade head
+```
+
+---
+
+## 9) Verification Checklist
 
 1) API health:
 ```bash
@@ -124,7 +136,17 @@ Open `http://<host>:5174`
 
 ---
 
-## 9) Common Errors
+## 10) BM25 / Hybrid Notes
+
+- Hybrid search requires OpenSearch to be reachable.
+- Existing documents need **reprocessing** to populate BM25.
+  Use the KB UI action: **Reindex for BM25**.
+- Documents show per‑index status badges:
+  **Embeddings** (Qdrant) and **BM25** (OpenSearch).
+
+---
+
+## 11) Common Errors
 
 ### CORS errors in browser
 Cause:

@@ -43,6 +43,13 @@ class Settings(BaseSettings):
         description="Default vector embedding size (fallback, actual size determined by embedding model)"
     )
 
+    # OpenSearch (BM25 lexical search)
+    OPENSEARCH_URL: str = Field(default="http://localhost:9200", description="OpenSearch HTTP URL")
+    OPENSEARCH_INDEX: str = Field(default="kb_chunks", description="OpenSearch index for lexical chunks")
+    OPENSEARCH_USERNAME: Optional[str] = Field(default=None, description="OpenSearch username (optional)")
+    OPENSEARCH_PASSWORD: Optional[str] = Field(default=None, description="OpenSearch password (optional)")
+    OPENSEARCH_VERIFY_CERTS: bool = Field(default=False, description="Verify OpenSearch TLS certs")
+
     # OpenAI
     OPENAI_API_KEY: str = Field(..., description="OpenAI API key (required)")
     OPENAI_EMBEDDING_MODEL: str = Field(

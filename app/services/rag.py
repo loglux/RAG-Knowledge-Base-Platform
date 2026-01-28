@@ -110,6 +110,10 @@ Context follows below.
         collection_name: str,
         embedding_model: str,
         top_k: int = 5,
+        retrieval_mode: str = "dense",
+        lexical_top_k: Optional[int] = None,
+        dense_weight: float = 0.6,
+        lexical_weight: float = 0.4,
         temperature: float = 0.7,
         max_tokens: Optional[int] = None,
         max_context_chars: Optional[int] = None,
@@ -129,6 +133,10 @@ Context follows below.
             collection_name: Qdrant collection to search
             embedding_model: Embedding model used by this KB (for query embedding)
             top_k: Number of chunks to retrieve
+            retrieval_mode: Retrieval mode (dense, hybrid)
+            lexical_top_k: Lexical top K for BM25 (optional)
+            dense_weight: Weight for dense results in hybrid
+            lexical_weight: Weight for lexical results in hybrid
             temperature: LLM temperature (0-2)
             max_tokens: Maximum tokens in response
             llm_model: Override LLM model for this query
@@ -148,7 +156,11 @@ Context follows below.
         if not question or not question.strip():
             raise ValueError("Question cannot be empty")
 
-        logger.info(f"RAG query: '{question[:50]}...' (collection={collection_name}, use_structure={use_structure})")
+        mode = retrieval_mode.value if hasattr(retrieval_mode, "value") else str(retrieval_mode)
+        logger.info(
+            f"RAG query: '{question[:50]}...' "
+            f"(collection={collection_name}, mode={mode}, use_structure={use_structure})"
+        )
 
         # Create LLM service with overrides if provided
         llm_service = self.llm_service
@@ -178,15 +190,35 @@ Context follows below.
                         logger.warning("[DEBUG] Structure filters returned None, using semantic search")
 
             # 2. Retrieve relevant chunks (with optional structure filters)
-            logger.debug(f"Retrieving top {top_k} chunks using {embedding_model}")
-            retrieval_result = await self.retrieval.retrieve(
-                query=question,
-                collection_name=collection_name,
-                embedding_model=embedding_model,
-                top_k=top_k,
-                score_threshold=score_threshold,
-                filters=chunk_filters,
-            )
+            if mode == "hybrid":
+                if not kb_id:
+                    logger.warning("Hybrid retrieval requires kb_id, falling back to dense search")
+                    mode = "dense"
+
+            if mode == "hybrid":
+                logger.debug(f"Hybrid retrieval (top_k={top_k}, lexical_top_k={lexical_top_k})")
+                retrieval_result = await self.retrieval.retrieve_hybrid(
+                    query=question,
+                    collection_name=collection_name,
+                    embedding_model=embedding_model,
+                    knowledge_base_id=str(kb_id),
+                    top_k=top_k,
+                    lexical_top_k=lexical_top_k,
+                    score_threshold=score_threshold,
+                    filters=chunk_filters,
+                    dense_weight=dense_weight,
+                    lexical_weight=lexical_weight,
+                )
+            else:
+                logger.debug(f"Retrieving top {top_k} chunks using {embedding_model}")
+                retrieval_result = await self.retrieval.retrieve(
+                    query=question,
+                    collection_name=collection_name,
+                    embedding_model=embedding_model,
+                    top_k=top_k,
+                    score_threshold=score_threshold,
+                    filters=chunk_filters,
+                )
 
             if not retrieval_result.has_results:
                 logger.warning("No relevant chunks found")

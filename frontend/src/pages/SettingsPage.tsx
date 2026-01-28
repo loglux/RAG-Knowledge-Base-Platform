@@ -17,10 +17,15 @@ export function SettingsPage() {
   const [topK, setTopK] = useState(5)
   const [maxContextChars, setMaxContextChars] = useState(0)
   const [scoreThreshold, setScoreThreshold] = useState(0)
+  const [retrievalMode, setRetrievalMode] = useState<'dense' | 'hybrid'>('dense')
+  const [lexicalTopK, setLexicalTopK] = useState(20)
+  const [hybridDenseWeight, setHybridDenseWeight] = useState(0.6)
+  const [hybridLexicalWeight, setHybridLexicalWeight] = useState(0.4)
   const [useStructure, setUseStructure] = useState(false)
   const [kbChunkSize, setKbChunkSize] = useState(1000)
   const [kbChunkOverlap, setKbChunkOverlap] = useState(200)
   const [kbUpsertBatchSize, setKbUpsertBatchSize] = useState(256)
+  const [opensearchAvailable, setOpensearchAvailable] = useState<boolean | null>(null)
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -34,6 +39,10 @@ export function SettingsPage() {
         if (data.max_context_chars !== null) setMaxContextChars(data.max_context_chars)
         if (data.score_threshold !== null) setScoreThreshold(data.score_threshold)
         if (data.use_structure !== null) setUseStructure(data.use_structure)
+        if (data.retrieval_mode) setRetrievalMode(data.retrieval_mode)
+        if (data.lexical_top_k !== null) setLexicalTopK(data.lexical_top_k)
+        if (data.hybrid_dense_weight !== null) setHybridDenseWeight(data.hybrid_dense_weight)
+        if (data.hybrid_lexical_weight !== null) setHybridLexicalWeight(data.hybrid_lexical_weight)
         if (data.kb_chunk_size !== null) setKbChunkSize(data.kb_chunk_size)
         if (data.kb_chunk_overlap !== null) setKbChunkOverlap(data.kb_chunk_overlap)
         if (data.kb_upsert_batch_size !== null) setKbUpsertBatchSize(data.kb_upsert_batch_size)
@@ -45,6 +54,19 @@ export function SettingsPage() {
     }
 
     loadSettings()
+  }, [])
+
+  useEffect(() => {
+    const loadInfo = async () => {
+      try {
+        const info = await apiClient.getApiInfo()
+        setOpensearchAvailable(info.integrations?.opensearch_available ?? null)
+      } catch (err) {
+        setOpensearchAvailable(null)
+      }
+    }
+
+    loadInfo()
   }, [])
 
   const handleSave = async () => {
@@ -59,6 +81,10 @@ export function SettingsPage() {
         max_context_chars: maxContextChars,
         score_threshold: scoreThreshold,
         use_structure: useStructure,
+        retrieval_mode: retrievalMode,
+        lexical_top_k: lexicalTopK,
+        hybrid_dense_weight: hybridDenseWeight,
+        hybrid_lexical_weight: hybridLexicalWeight,
         kb_chunk_size: kbChunkSize,
         kb_chunk_overlap: kbChunkOverlap,
         kb_upsert_batch_size: kbUpsertBatchSize,
@@ -134,6 +160,26 @@ export function SettingsPage() {
                 <p className="text-xs text-gray-500 mt-1">
                   Default number of chunks to retrieve
                 </p>
+
+                <label className="block text-sm font-medium text-gray-300 mt-6 mb-2">
+                  Retrieval mode
+                </label>
+                <select
+                  value={retrievalMode}
+                  onChange={(e) => setRetrievalMode(e.target.value as 'dense' | 'hybrid')}
+                  className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100"
+                >
+                  <option value="dense">Dense (vector)</option>
+                  <option value="hybrid">Hybrid (BM25 + vector)</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Default retrieval strategy for new chats
+                </p>
+                {retrievalMode === 'hybrid' && opensearchAvailable === false && (
+                  <div className="mt-2 rounded border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
+                    OpenSearch is not reachable. Hybrid search may fail until it is available.
+                  </div>
+                )}
               </div>
 
               <div>
@@ -186,6 +232,58 @@ export function SettingsPage() {
                   Default context limit
                 </p>
               </div>
+
+              {retrievalMode === 'hybrid' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Lexical Top K: {lexicalTopK}
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="200"
+                      step="1"
+                      value={lexicalTopK}
+                      onChange={(e) => setLexicalTopK(Number(e.target.value))}
+                      className="slider w-full"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Candidate pool from BM25 before merge
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Hybrid dense weight: {hybridDenseWeight.toFixed(2)}
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={hybridDenseWeight}
+                      onChange={(e) => setHybridDenseWeight(Number(e.target.value))}
+                      className="slider w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Hybrid lexical weight: {hybridLexicalWeight.toFixed(2)}
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      value={hybridLexicalWeight}
+                      onChange={(e) => setHybridLexicalWeight(Number(e.target.value))}
+                      className="slider w-full"
+                    />
+                  </div>
+                </>
+              )}
 
                 <div className="md:col-span-2">
                   <label className="flex items-center space-x-3 cursor-pointer">

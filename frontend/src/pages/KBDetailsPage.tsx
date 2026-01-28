@@ -26,6 +26,8 @@ export function KBDetailsPage() {
   })
   const [settingsErrors, setSettingsErrors] = useState<Record<string, string>>({})
   const [settingsSaving, setSettingsSaving] = useState(false)
+  const [reindexing, setReindexing] = useState(false)
+  const [reindexMessage, setReindexMessage] = useState<string | null>(null)
 
   const {
     documents,
@@ -122,6 +124,25 @@ export function KBDetailsPage() {
     })
     setSettingsErrors({})
     setIsEditingSettings(false)
+  }
+
+  const handleReindexBm25 = async () => {
+    if (!kb) return
+    const confirmed = window.confirm(
+      'Reprocess all documents to rebuild BM25 index? This will re-chunk and re-embed every document.'
+    )
+    if (!confirmed) return
+
+    try {
+      setReindexing(true)
+      setReindexMessage(null)
+      const result = await apiClient.reprocessKnowledgeBase(kb.id)
+      setReindexMessage(`Queued ${result.queued} documents for reprocessing.`)
+    } catch (error) {
+      setReindexMessage(error instanceof Error ? error.message : 'Failed to reprocess documents')
+    } finally {
+      setReindexing(false)
+    }
   }
 
   const handleStartEditName = () => {
@@ -489,6 +510,22 @@ export function KBDetailsPage() {
                 <span className="text-white ml-2 font-mono text-xs">{kb.collection_name}</span>
               </div>
             </div>
+          )}
+
+          <div className="mt-6 flex items-center justify-between">
+            <div className="text-xs text-gray-500">
+              Reindex is required to include existing documents in BM25 hybrid search.
+            </div>
+            <button
+              onClick={handleReindexBm25}
+              className="btn-secondary text-xs px-3 py-1.5"
+              disabled={reindexing}
+            >
+              {reindexing ? 'Reindexing…' : 'Reindex for BM25'}
+            </button>
+          </div>
+          {reindexMessage && (
+            <div className="mt-2 text-xs text-gray-400">{reindexMessage}</div>
           )}
         </div>
       </main>

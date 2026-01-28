@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.models.enums import DocumentStatus, ChunkingStrategy, FileType
+from app.models.enums import DocumentStatus, ChunkingStrategy, FileType, RetrievalMode
 
 
 # ============================================================================
@@ -144,6 +144,8 @@ class DocumentResponse(DocumentBase):
     file_size: int
     content_hash: str
     status: DocumentStatus
+    embeddings_status: DocumentStatus
+    bm25_status: DocumentStatus
     error_message: Optional[str] = None
     chunk_count: int
     user_id: Optional[UUID] = None
@@ -269,6 +271,10 @@ class ConversationSettings(BaseModel):
     llm_model: Optional[str] = None
     llm_provider: Optional[str] = None
     use_structure: Optional[bool] = None
+    retrieval_mode: Optional[RetrievalMode] = Field(default=None)
+    lexical_top_k: Optional[int] = Field(default=None, ge=1, le=200)
+    hybrid_dense_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    hybrid_lexical_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
 
 
 class AppSettingsBase(BaseModel):
@@ -280,6 +286,10 @@ class AppSettingsBase(BaseModel):
     max_context_chars: Optional[int] = Field(default=None, ge=0)
     score_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     use_structure: Optional[bool] = Field(default=None)
+    retrieval_mode: Optional[RetrievalMode] = Field(default=None)
+    lexical_top_k: Optional[int] = Field(default=None, ge=1, le=200)
+    hybrid_dense_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    hybrid_lexical_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     kb_chunk_size: Optional[int] = Field(default=None, ge=100, le=2000)
     kb_chunk_overlap: Optional[int] = Field(default=None, ge=0, le=500)
     kb_upsert_batch_size: Optional[int] = Field(default=None, ge=64, le=1024)
@@ -337,6 +347,28 @@ class ChatRequest(BaseModel):
         ge=0.0,
         le=2.0,
         description="LLM temperature for response generation"
+    )
+    retrieval_mode: RetrievalMode = Field(
+        default=RetrievalMode.DENSE,
+        description="Retrieval mode (dense or hybrid)"
+    )
+    lexical_top_k: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=200,
+        description="Lexical top K for hybrid (optional)"
+    )
+    hybrid_dense_weight: float = Field(
+        default=0.6,
+        ge=0.0,
+        le=1.0,
+        description="Dense weight for hybrid retrieval"
+    )
+    hybrid_lexical_weight: float = Field(
+        default=0.4,
+        ge=0.0,
+        le=1.0,
+        description="Lexical weight for hybrid retrieval"
     )
     max_context_chars: Optional[int] = Field(
         default=None,
