@@ -11,6 +11,7 @@ export interface KnowledgeBase {
   bm25_min_should_match?: number | null
   bm25_use_phrase?: boolean | null
   bm25_analyzer?: string | null
+  structure_llm_model?: string | null
   collection_name: string
   document_count: number
   total_chunks: number
@@ -35,6 +36,7 @@ export interface CreateKBRequest {
   bm25_min_should_match?: number | null
   bm25_use_phrase?: boolean | null
   bm25_analyzer?: string | null
+  structure_llm_model?: string | null
 }
 
 export interface EmbeddingModel {
@@ -206,6 +208,7 @@ export interface AppSettings {
   bm25_min_should_match: number | null
   bm25_use_phrase: boolean | null
   bm25_analyzer: string | null
+  structure_requests_per_minute: number | null
   kb_chunk_size: number | null
   kb_chunk_overlap: number | null
   kb_upsert_batch_size: number | null
@@ -229,6 +232,7 @@ export interface AppSettingsUpdate {
   bm25_min_should_match?: number | null
   bm25_use_phrase?: boolean | null
   bm25_analyzer?: string | null
+  structure_requests_per_minute?: number | null
   kb_chunk_size?: number | null
   kb_chunk_overlap?: number | null
   kb_upsert_batch_size?: number | null

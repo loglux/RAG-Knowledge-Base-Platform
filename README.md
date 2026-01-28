@@ -123,7 +123,21 @@ Key settings:
 - `QDRANT_URL` and `DATABASE_URL`
 - `OLLAMA_BASE_URL` (optional for local models)
 - `MAX_CONTEXT_CHARS` (0 = unlimited)
+- `STRUCTURE_ANALYSIS_REQUESTS_PER_MINUTE` (TOC analysis throttle; 0 = unlimited)
 - `OPENSEARCH_URL` (optional; required for BM25/hybrid)
+
+## Global settings (UI)
+
+Global Settings define defaults for new chats and retrieval behavior:
+
+- **Default LLM model**
+- **Top K / Max context / Score threshold / Temperature**
+- **Use Document Structure** default
+- **TOC requests per minute** (throttles structure analysis to avoid rate limits)
+- **General Knowledge Base Configuration** (chunk size/overlap, batch size, chunking strategy)
+
+These defaults are applied unless a specific knowledge base overrides them.
+They are saved in the backend and used to initialize new chats and KBs.
 
 ## Chat settings (UI)
 
@@ -137,9 +151,20 @@ The chat UI exposes retrieval controls to tune answer quality:
 - **Retrieval mode**: dense (vectors) or hybrid (BM25 + vectors).
 - **BM25 controls** (hybrid only): lexical top‑K and weight blending.
 
+### How these settings interact
+
+- **Score threshold vs TOC**: TOC/structure queries can return chunks with lower similarity scores. If you see missing sections or “not found” responses, set **Score threshold = 0** (no filtering) before running TOC‑style queries.
+- **Top K and Max context**: higher Top K increases recall, but you may need a higher Max context to avoid truncation.
+- **Hybrid mode**: BM25 improves exact‑term matches. For paraphrases, keep some weight on dense vectors.
+
 When you first enable hybrid search on an existing KB, use **Reindex for BM25** to populate the lexical index.
 
 ![Chat settings](chat_settings.png)
+
+## KB settings (UI)
+
+Each knowledge base can override the **TOC / Structure model** used for document structure analysis. If override is disabled, the global LLM model is used.
+KB‑level configuration (chunk size/overlap, batch size, chunking strategy) is set per KB and affects only new or reprocessed documents.
 
 ## Repo layout (minimal)
 

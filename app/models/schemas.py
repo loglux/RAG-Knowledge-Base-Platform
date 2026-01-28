@@ -57,6 +57,10 @@ class KnowledgeBaseBase(BaseModel):
         default=None,
         description="BM25 analyzer profile: auto, mixed, ru, en"
     )
+    structure_llm_model: Optional[str] = Field(
+        default=None,
+        description="LLM model for document structure (TOC) analysis"
+    )
 
     @field_validator("chunk_overlap")
     @classmethod
@@ -77,6 +81,7 @@ class KnowledgeBaseCreate(KnowledgeBaseBase):
     bm25_min_should_match: Optional[int] = Field(None, ge=0, le=100)
     bm25_use_phrase: Optional[bool] = None
     bm25_analyzer: Optional[str] = None
+    structure_llm_model: Optional[str] = None
 
 
 class KnowledgeBaseUpdate(BaseModel):
@@ -92,6 +97,7 @@ class KnowledgeBaseUpdate(BaseModel):
     bm25_min_should_match: Optional[int] = Field(None, ge=0, le=100)
     bm25_use_phrase: Optional[bool] = None
     bm25_analyzer: Optional[str] = None
+    structure_llm_model: Optional[str] = None
 
 
 class KnowledgeBaseResponse(KnowledgeBaseBase):
@@ -330,6 +336,7 @@ class AppSettingsBase(BaseModel):
     bm25_min_should_match: Optional[int] = Field(default=None, ge=0, le=100)
     bm25_use_phrase: Optional[bool] = Field(default=None)
     bm25_analyzer: Optional[str] = Field(default=None)
+    structure_requests_per_minute: Optional[int] = Field(default=None, ge=0, le=120)
     kb_chunk_size: Optional[int] = Field(default=None, ge=100, le=2000)
     kb_chunk_overlap: Optional[int] = Field(default=None, ge=0, le=500)
     kb_upsert_batch_size: Optional[int] = Field(default=None, ge=64, le=1024)

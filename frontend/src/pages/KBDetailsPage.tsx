@@ -5,6 +5,7 @@ import { useDocuments } from '../hooks/useDocuments'
 import { useDocumentPolling } from '../hooks/useDocumentPolling'
 import { FileUpload } from '../components/documents/FileUpload'
 import { DocumentItem } from '../components/documents/DocumentItem'
+import { LLMSelector } from '../components/chat/LLMSelector'
 import type { KnowledgeBase, AppSettings } from '../types/index'
 
 export function KBDetailsPage() {
@@ -28,14 +29,20 @@ export function KBDetailsPage() {
     bm25_min_should_match: 0,
     bm25_use_phrase: true,
     bm25_analyzer: '',
+    structure_llm_model: '',
   })
   const [settingsErrors, setSettingsErrors] = useState<Record<string, string>>({})
   const [settingsSaving, setSettingsSaving] = useState(false)
+  const [structureModelOverride, setStructureModelOverride] = useState(false)
   const [reindexing, setReindexing] = useState(false)
   const [reindexMessage, setReindexMessage] = useState<string | null>(null)
   const [bm25MatchModes, setBm25MatchModes] = useState<string[] | null>(null)
   const [bm25Analyzers, setBm25Analyzers] = useState<string[] | null>(null)
   const [appDefaults, setAppDefaults] = useState<AppSettings | null>(null)
+  const [bulkAnalyzing, setBulkAnalyzing] = useState(false)
+  const [bulkSkipAnalyzed, setBulkSkipAnalyzed] = useState(true)
+  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 })
+  const [bulkError, setBulkError] = useState<string | null>(null)
 
   const buildSettingsData = (kbData: KnowledgeBase, defaults?: AppSettings | null) => {
     const bm25Override = kbData.bm25_match_mode !== null
@@ -52,6 +59,7 @@ export function KBDetailsPage() {
       bm25_min_should_match: kbData.bm25_min_should_match ?? defaults?.bm25_min_should_match ?? 0,
       bm25_use_phrase: kbData.bm25_use_phrase ?? defaults?.bm25_use_phrase ?? true,
       bm25_analyzer: kbData.bm25_analyzer ?? defaults?.bm25_analyzer ?? '',
+      structure_llm_model: kbData.structure_llm_model ?? '',
     }
   }
 
@@ -107,6 +115,7 @@ export function KBDetailsPage() {
   useEffect(() => {
     if (!kb || isEditingSettings) return
     setSettingsData(buildSettingsData(kb, appDefaults))
+    setStructureModelOverride(Boolean(kb.structure_llm_model))
   }, [kb, appDefaults, isEditingSettings])
 
   useEffect(() => {
@@ -155,6 +164,14 @@ export function KBDetailsPage() {
       }
     }
 
+    if (structureModelOverride && !settingsData.structure_llm_model) {
+      newErrors.structure_llm_model = 'Select a model or disable override'
+    }
+
+    if (settingsData.structure_llm_model && settingsData.structure_llm_model.length > 100) {
+      newErrors.structure_llm_model = 'Model name is too long'
+    }
+
     setSettingsErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -173,6 +190,7 @@ export function KBDetailsPage() {
         bm25_min_should_match: settingsData.bm25_override ? settingsData.bm25_min_should_match : null,
         bm25_use_phrase: settingsData.bm25_override ? settingsData.bm25_use_phrase : null,
         bm25_analyzer: settingsData.bm25_override ? settingsData.bm25_analyzer : null,
+        structure_llm_model: structureModelOverride ? (settingsData.structure_llm_model || null) : null,
       })
       setKb(updated)
       setIsEditingSettings(false)
@@ -189,6 +207,7 @@ export function KBDetailsPage() {
   const handleCancelSettings = () => {
     if (!kb) return
     setSettingsData(buildSettingsData(kb, appDefaults))
+    setStructureModelOverride(Boolean(kb.structure_llm_model))
     setSettingsErrors({})
     setIsEditingSettings(false)
   }
@@ -257,6 +276,45 @@ export function KBDetailsPage() {
         throw error
       }
     }
+  }
+
+  const handleAnalyzeAll = async () => {
+    if (bulkAnalyzing) return
+    setBulkError(null)
+
+    const candidates = documents.filter((doc) => doc.status === 'completed')
+    if (candidates.length === 0) {
+      setBulkError('No completed documents to analyze.')
+      return
+    }
+
+    setBulkAnalyzing(true)
+    setBulkProgress({ done: 0, total: candidates.length })
+
+    let processed = 0
+    for (const doc of candidates) {
+      try {
+        if (bulkSkipAnalyzed) {
+          const structure = await apiClient.getDocumentStructure(doc.id)
+          if (structure?.has_structure) {
+            processed += 1
+            setBulkProgress({ done: processed, total: candidates.length })
+            continue
+          }
+        }
+
+        const analysis = await apiClient.analyzeDocument(doc.id)
+        await apiClient.applyDocumentStructure(doc.id, analysis)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to analyze document'
+        setBulkError(message)
+      } finally {
+        processed += 1
+        setBulkProgress({ done: processed, total: candidates.length })
+      }
+    }
+
+    setBulkAnalyzing(false)
   }
 
   const handleDelete = async () => {
@@ -396,7 +454,34 @@ export function KBDetailsPage() {
             <span>⟳</span>
             <span>Refresh</span>
           </button>
+          <button
+            onClick={handleAnalyzeAll}
+            disabled={bulkAnalyzing}
+            className="btn-secondary flex items-center space-x-2 disabled:opacity-60"
+          >
+            <span>🔍</span>
+            <span>{bulkAnalyzing ? 'Analyzing…' : 'Analyze All'}</span>
+          </button>
+          <label className="flex items-center space-x-2 text-sm text-gray-400">
+            <input
+              type="checkbox"
+              checked={bulkSkipAnalyzed}
+              onChange={(e) => setBulkSkipAnalyzed(e.target.checked)}
+              className="rounded border-gray-600 bg-gray-800"
+            />
+            <span>Skip already analyzed</span>
+          </label>
         </div>
+        {bulkError && (
+          <div className="mb-4 p-3 rounded border border-red-500 bg-red-500/10 text-red-400 text-sm">
+            {bulkError}
+          </div>
+        )}
+        {bulkAnalyzing && (
+          <div className="mb-4 text-xs text-gray-400">
+            Analyzing documents: {bulkProgress.done}/{bulkProgress.total}
+          </div>
+        )}
 
         {/* Documents Section */}
         <div className="mb-8">
@@ -524,6 +609,38 @@ export function KBDetailsPage() {
                   <span>1024</span>
                 </div>
                 {settingsErrors.upsert_batch_size && <p className="mt-1 text-sm text-red-500">{settingsErrors.upsert_batch_size}</p>}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-gray-400">
+                    TOC / Structure model
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={structureModelOverride}
+                      onChange={(e) => setStructureModelOverride(e.target.checked)}
+                      className="w-4 h-4 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
+                      disabled={settingsSaving}
+                    />
+                    Override global model
+                  </label>
+                </div>
+                <div className={structureModelOverride ? '' : 'opacity-60 pointer-events-none'}>
+                  <LLMSelector
+                    value={structureModelOverride ? settingsData.structure_llm_model : (appDefaults?.llm_model || '')}
+                    onChange={(model, _provider) => setSettingsData({ ...settingsData, structure_llm_model: model })}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {structureModelOverride
+                    ? 'Model used for TOC analysis in this KB'
+                    : `Using global default: ${appDefaults?.llm_model || 'not set'}`}
+                </p>
+                {settingsErrors.structure_llm_model && (
+                  <p className="mt-1 text-sm text-red-500">{settingsErrors.structure_llm_model}</p>
+                )}
               </div>
 
               <div className="border-t border-gray-700 pt-4">
@@ -666,6 +783,12 @@ export function KBDetailsPage() {
               <div>
                 <span className="text-gray-400">Upsert Batch Size:</span>
                 <span className="text-white ml-2 font-medium">{kb.upsert_batch_size}</span>
+              </div>
+              <div>
+                <span className="text-gray-400">TOC / Structure model:</span>
+                <span className="text-white ml-2 font-medium">
+                  {kb.structure_llm_model || 'Default'}
+                </span>
               </div>
               <div>
                 <span className="text-gray-400">Chunking Strategy:</span>

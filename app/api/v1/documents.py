@@ -1,5 +1,8 @@
 """Document management endpoints."""
 from typing import Optional
+from collections import deque
+import asyncio
+import time
 from uuid import UUID
 import hashlib
 import logging
@@ -9,7 +12,12 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.models.database import Document as DocumentModel, KnowledgeBase as KnowledgeBaseModel
+from app.models.database import (
+    Document as DocumentModel,
+    KnowledgeBase as KnowledgeBaseModel,
+    AppSettings as AppSettingsModel,
+)
+from app.config import settings as app_settings
 from app.models.schemas import (
     DocumentCreate,
     DocumentResponse,
@@ -24,6 +32,23 @@ from app.services.document_processor import get_document_processor, DocumentProc
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+_structure_request_times: deque[float] = deque()
+_structure_request_lock = asyncio.Lock()
+
+
+async def _check_structure_rate_limit(limit: Optional[int]) -> Optional[int]:
+    if not limit or limit <= 0:
+        return None
+    now = time.time()
+    async with _structure_request_lock:
+        while _structure_request_times and now - _structure_request_times[0] >= 60:
+            _structure_request_times.popleft()
+        if len(_structure_request_times) >= limit:
+            retry = int(60 - (now - _structure_request_times[0]))
+            return max(retry, 1)
+        _structure_request_times.append(now)
+    return None
 
 
 async def _process_document_background(document_id: UUID):
@@ -542,11 +567,26 @@ async def analyze_document_structure(
         )
 
     try:
+        settings_result = await db.execute(select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1))
+        settings_row = settings_result.scalar_one_or_none()
+        rpm_limit = (
+            settings_row.structure_requests_per_minute
+            if settings_row and settings_row.structure_requests_per_minute is not None
+            else app_settings.STRUCTURE_ANALYSIS_REQUESTS_PER_MINUTE
+        )
+        retry_after = await _check_structure_rate_limit(rpm_limit)
+        if retry_after is not None:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Rate limit exceeded. Retry in {retry_after} seconds."
+            )
+
         analyzer = get_document_analyzer()
         analysis = await analyzer.analyze_document(
             document_id=doc_id,
             db=db,
-            collection_name=kb.collection_name
+            collection_name=kb.collection_name,
+            llm_model=kb.structure_llm_model or None,
         )
 
         return {

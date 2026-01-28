@@ -89,6 +89,11 @@ class KnowledgeBase(Base):
         nullable=True,
         comment="BM25 analyzer profile: auto, mixed, ru, en"
     )
+    structure_llm_model: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        comment="LLM model for document structure (TOC) analysis"
+    )
 
     # Statistics
     document_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -416,6 +421,7 @@ class AppSettings(Base):
     bm25_min_should_match: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     bm25_use_phrase: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     bm25_analyzer: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    structure_requests_per_minute: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     kb_chunk_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     kb_chunk_overlap: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     kb_upsert_batch_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)

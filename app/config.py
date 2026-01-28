@@ -153,6 +153,10 @@ class Settings(BaseSettings):
         default="claude-haiku-4-5-20251001",
         description="LLM model for structure analysis"
     )
+    STRUCTURE_ANALYSIS_REQUESTS_PER_MINUTE: int = Field(
+        default=10,
+        description="Max structure analysis requests per minute (0 = unlimited)"
+    )
     STRUCTURE_ANALYSIS_LLM_TEMPERATURE: float = Field(
         default=0.3,
         description="LLM temperature for structure analysis (lower = more consistent JSON)"

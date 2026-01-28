@@ -30,6 +30,7 @@ export function SettingsPage() {
   const [bm25MatchModes, setBm25MatchModes] = useState<string[] | null>(null)
   const [bm25Analyzers, setBm25Analyzers] = useState<string[] | null>(null)
   const [useStructure, setUseStructure] = useState(false)
+  const [structureRequestsPerMinute, setStructureRequestsPerMinute] = useState(10)
   const [kbChunkSize, setKbChunkSize] = useState(1000)
   const [kbChunkOverlap, setKbChunkOverlap] = useState(200)
   const [kbUpsertBatchSize, setKbUpsertBatchSize] = useState(256)
@@ -55,6 +56,9 @@ export function SettingsPage() {
         if (data.bm25_min_should_match !== null) setBm25MinShouldMatch(data.bm25_min_should_match)
         if (data.bm25_use_phrase !== null) setBm25UsePhrase(data.bm25_use_phrase)
         if (data.bm25_analyzer) setBm25Analyzer(data.bm25_analyzer)
+        if (data.structure_requests_per_minute !== null) {
+          setStructureRequestsPerMinute(data.structure_requests_per_minute)
+        }
         if (data.kb_chunk_size !== null) setKbChunkSize(data.kb_chunk_size)
         if (data.kb_chunk_overlap !== null) setKbChunkOverlap(data.kb_chunk_overlap)
         if (data.kb_upsert_batch_size !== null) setKbUpsertBatchSize(data.kb_upsert_batch_size)
@@ -116,6 +120,7 @@ export function SettingsPage() {
         bm25_min_should_match: bm25MinShouldMatch,
         bm25_use_phrase: bm25UsePhrase,
         bm25_analyzer: bm25Analyzer,
+        structure_requests_per_minute: structureRequestsPerMinute,
         kb_chunk_size: kbChunkSize,
         kb_chunk_overlap: kbChunkOverlap,
         kb_upsert_batch_size: kbUpsertBatchSize,
@@ -256,6 +261,23 @@ export function SettingsPage() {
                   </label>
                   <p className="text-xs text-gray-500 mt-2">
                     Enable structure-based search when possible
+                  </p>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    TOC requests per minute: {structureRequestsPerMinute}
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="120"
+                    step="1"
+                    value={structureRequestsPerMinute}
+                    onChange={(e) => setStructureRequestsPerMinute(Number(e.target.value))}
+                    className="slider w-full"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    0 = unlimited. Limits structure analysis requests to avoid provider rate limits.
                   </p>
                 </div>
               </div>

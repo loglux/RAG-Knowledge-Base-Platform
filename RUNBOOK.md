@@ -116,6 +116,8 @@ If you pull backend changes, run migrations inside the API container:
 docker exec kb-platform-api alembic upgrade head
 ```
 
+Note: Alembic revision IDs in this repo use numeric IDs (e.g., `012`, `013`). Ensure `revision` and `down_revision` follow this scheme to avoid resolution errors.
+
 ---
 
 ## 9) Verification Checklist
