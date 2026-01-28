@@ -293,18 +293,19 @@ export function KBDetailsPage() {
 
     let processed = 0
     for (const doc of candidates) {
+      let shouldAnalyze = true
       try {
         if (bulkSkipAnalyzed) {
           const structure = await apiClient.getDocumentStructure(doc.id)
           if (structure?.has_structure) {
-            processed += 1
-            setBulkProgress({ done: processed, total: candidates.length })
-            continue
+            shouldAnalyze = false
           }
         }
 
-        const analysis = await apiClient.analyzeDocument(doc.id)
-        await apiClient.applyDocumentStructure(doc.id, analysis)
+        if (shouldAnalyze) {
+          const analysis = await apiClient.analyzeDocument(doc.id)
+          await apiClient.applyDocumentStructure(doc.id, analysis)
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to analyze document'
         setBulkError(message)
