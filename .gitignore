@@ -167,4 +167,6 @@ chat*.png
 
 # Alembic
 alembic/versions/*.pyc
-frontend/DEPLOYMENT.md
+
+# Local deployment and runbook files with private data
+*_LOCAL.md
