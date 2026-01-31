@@ -26,7 +26,10 @@ It can be used as a standalone service or integrated into other products via its
 
 ## Key features
 
-- Document ingestion and chunking (txt, md)
+- **Document ingestion with smart chunking** (txt, md):
+  - Simple: fast fixed-size chunking
+  - Smart: recursive chunking respecting semantic boundaries (recommended)
+  - Semantic: planned - embedding-based boundary detection
 - Embedding-based semantic search over unstructured documents
 - Qdrant-backed vector index for fast similarity search
 - Optional BM25 lexical index (OpenSearch) for hybrid retrieval

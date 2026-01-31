@@ -226,6 +226,125 @@ class FixedSizeChunking(ChunkingStrategy):
         return end
 
 
+class RecursiveChunking(ChunkingStrategy):
+    """
+    Recursive chunking strategy using LangChain RecursiveCharacterTextSplitter.
+
+    Splits text recursively by different separators to respect document structure:
+    1. Paragraphs (double newlines)
+    2. Single newlines
+    3. Sentences (periods with space)
+    4. Words (spaces)
+    5. Characters (fallback)
+
+    This approach is "smart" - it preserves natural text boundaries while
+    maintaining target chunk sizes.
+    """
+
+    def __init__(
+        self,
+        chunk_size: Optional[int] = None,
+        chunk_overlap: Optional[int] = None,
+    ):
+        """
+        Initialize recursive chunking strategy.
+
+        Args:
+            chunk_size: Maximum chunk size in characters (default: from settings)
+            chunk_overlap: Number of overlapping characters between chunks (default: from settings)
+        """
+        self.chunk_size = chunk_size or settings.MAX_CHUNK_SIZE
+        self.chunk_overlap = chunk_overlap or settings.CHUNK_OVERLAP
+
+        if self.chunk_overlap >= self.chunk_size:
+            raise ValueError("Chunk overlap must be smaller than chunk size")
+
+        # Import here to avoid circular dependencies
+        try:
+            from langchain_text_splitters import RecursiveCharacterTextSplitter
+        except ImportError:
+            raise ImportError(
+                "langchain-text-splitters is required for RecursiveChunking. "
+                "Install it with: pip install langchain-text-splitters"
+            )
+
+        # Initialize LangChain splitter with hierarchical separators
+        self.splitter = RecursiveCharacterTextSplitter(
+            chunk_size=self.chunk_size,
+            chunk_overlap=self.chunk_overlap,
+            length_function=len,
+            is_separator_regex=False,
+            # Hierarchical separators: paragraph → line → sentence → word → char
+            separators=[
+                "\n\n",  # Paragraph boundaries
+                "\n",    # Line boundaries
+                ". ",    # Sentence boundaries
+                " ",     # Word boundaries
+                "",      # Character-level (fallback)
+            ],
+        )
+
+        logger.info(
+            f"Initialized RecursiveChunking: size={self.chunk_size}, "
+            f"overlap={self.chunk_overlap}"
+        )
+
+    def split(self, text: str, metadata: Optional[dict] = None) -> List[Chunk]:
+        """
+        Split text into chunks using recursive strategy.
+
+        Args:
+            text: Text to split
+            metadata: Optional metadata to attach to all chunks
+
+        Returns:
+            List of Chunk objects
+        """
+        if not text or not text.strip():
+            logger.warning("Empty text provided for chunking")
+            return []
+
+        # Use LangChain splitter
+        langchain_chunks = self.splitter.split_text(text)
+
+        if not langchain_chunks:
+            logger.warning("No chunks created from text")
+            return []
+
+        # Convert LangChain chunks to our Chunk objects
+        chunks: List[Chunk] = []
+        current_pos = 0
+
+        for idx, chunk_content in enumerate(langchain_chunks):
+            # Find chunk position in original text
+            start_char = text.find(chunk_content, current_pos)
+            if start_char == -1:
+                # Fallback if exact match not found (shouldn't happen)
+                start_char = current_pos
+
+            end_char = start_char + len(chunk_content)
+
+            chunks.append(
+                Chunk(
+                    content=chunk_content.strip(),
+                    index=idx,
+                    start_char=start_char,
+                    end_char=end_char,
+                    metadata=metadata or {},
+                )
+            )
+
+            # Move position for next chunk search
+            current_pos = start_char + 1
+
+        logger.info(
+            f"Split text of {len(text)} chars into {len(chunks)} chunks "
+            f"(avg size: {len(text) // len(chunks) if chunks else 0})"
+        )
+
+        return chunks
+
+
 class SemanticChunking(ChunkingStrategy):
     """
     Semantic chunking strategy (placeholder for future implementation).
@@ -309,19 +428,59 @@ class ChunkingService:
 def get_chunking_service(
     chunk_size: Optional[int] = None,
     chunk_overlap: Optional[int] = None,
+    strategy_name: str = "simple",
 ) -> ChunkingService:
     """
-    Get a chunking service instance with fixed-size strategy.
+    Get a chunking service instance with specified strategy.
 
     Args:
         chunk_size: Optional chunk size override
         chunk_overlap: Optional chunk overlap override
+        strategy_name: Chunking strategy ("simple", "smart", "semantic")
 
     Returns:
         ChunkingService instance
+
+    Raises:
+        ValueError: If strategy_name is invalid
     """
-    strategy = FixedSizeChunking(
+    # Import enum here to avoid circular dependency
+    from app.models.enums import ChunkingStrategy as ChunkingStrategyEnum
+
+    # Map strategy names to classes
+    strategy_map = {
+        "simple": FixedSizeChunking,
+        ChunkingStrategyEnum.SIMPLE.value: FixedSizeChunking,
+        "smart": RecursiveChunking,
+        ChunkingStrategyEnum.SMART.value: RecursiveChunking,
+        "semantic": SemanticChunking,
+        ChunkingStrategyEnum.SEMANTIC.value: SemanticChunking,
+        # Legacy support (old enum values from DB)
+        "fixed_size": FixedSizeChunking,
+        "FIXED_SIZE": FixedSizeChunking,  # Old PostgreSQL enum value
+        ChunkingStrategyEnum.FIXED_SIZE.value: FixedSizeChunking,
+        "paragraph": RecursiveChunking,
+        "PARAGRAPH": RecursiveChunking,  # Old PostgreSQL enum value
+        ChunkingStrategyEnum.PARAGRAPH.value: RecursiveChunking,
+    }
+
+    strategy_class = strategy_map.get(strategy_name)
+    if not strategy_class:
+        logger.warning(
+            f"Unknown chunking strategy '{strategy_name}', falling back to 'simple'"
+        )
+        strategy_class = FixedSizeChunking
+
+    # Create strategy instance
+    if strategy_class == SemanticChunking:
+        # SemanticChunking not yet implemented
+        logger.warning("Semantic chunking not yet implemented, falling back to 'smart'")
+        strategy_class = RecursiveChunking
+
+    strategy = strategy_class(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
     )
+
+    logger.info(f"Created chunking service with strategy: {strategy_class.__name__}")
     return ChunkingService(strategy=strategy)

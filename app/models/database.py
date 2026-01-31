@@ -57,8 +57,8 @@ class KnowledgeBase(Base):
     chunk_size: Mapped[int] = mapped_column(Integer, default=1000, nullable=False)
     chunk_overlap: Mapped[int] = mapped_column(Integer, default=200, nullable=False)
     chunking_strategy: Mapped[ChunkingStrategy] = mapped_column(
-        SQLEnum(ChunkingStrategy),
-        default=ChunkingStrategy.FIXED_SIZE,
+        SQLEnum(ChunkingStrategy, values_callable=lambda x: [e.value for e in x]),
+        default=ChunkingStrategy.SIMPLE,
         nullable=False
     )
     upsert_batch_size: Mapped[int] = mapped_column(
@@ -156,7 +156,10 @@ class Document(Base):
 
     # Document metadata
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
-    file_type: Mapped[FileType] = mapped_column(SQLEnum(FileType), nullable=False)
+    file_type: Mapped[FileType] = mapped_column(
+        SQLEnum(FileType, values_callable=lambda x: [e.value for e in x]),
+        nullable=False
+    )
     file_size: Mapped[int] = mapped_column(Integer, nullable=False, comment="File size in bytes")
 
     # Content
@@ -170,20 +173,20 @@ class Document(Base):
 
     # Processing status
     status: Mapped[DocumentStatus] = mapped_column(
-        SQLEnum(DocumentStatus),
+        SQLEnum(DocumentStatus, values_callable=lambda x: [e.value for e in x]),
         default=DocumentStatus.PENDING,
         nullable=False,
         index=True
     )
     embeddings_status: Mapped[DocumentStatus] = mapped_column(
-        SQLEnum(DocumentStatus),
+        SQLEnum(DocumentStatus, values_callable=lambda x: [e.value for e in x]),
         default=DocumentStatus.PENDING,
         nullable=False,
         index=True,
         comment="Embedding/Qdrant indexing status"
     )
     bm25_status: Mapped[DocumentStatus] = mapped_column(
-        SQLEnum(DocumentStatus),
+        SQLEnum(DocumentStatus, values_callable=lambda x: [e.value for e in x]),
         default=DocumentStatus.PENDING,
         nullable=False,
         index=True,

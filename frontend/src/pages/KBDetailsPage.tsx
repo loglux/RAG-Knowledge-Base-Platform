@@ -12,6 +12,48 @@ export function KBDetailsPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
+  const getChunkingStrategyDisplay = (strategy: string) => {
+    const strategies: Record<string, { icon: string; label: string; description: string }> = {
+      simple: {
+        icon: '⚡',
+        label: 'Simple (Fixed-Size)',
+        description: 'Fast chunking at fixed character positions',
+      },
+      smart: {
+        icon: '🧠',
+        label: 'Smart (Recursive)',
+        description: 'Intelligent chunking respecting boundaries',
+      },
+      semantic: {
+        icon: '🎯',
+        label: 'Semantic',
+        description: 'Advanced semantic boundary detection',
+      },
+      // Legacy support
+      fixed_size: {
+        icon: '⚡',
+        label: 'Simple (Fixed-Size)',
+        description: 'Fast chunking at fixed character positions',
+      },
+      FIXED_SIZE: {
+        icon: '⚡',
+        label: 'Simple (Fixed-Size)',
+        description: 'Fast chunking at fixed character positions',
+      },
+      paragraph: {
+        icon: '🧠',
+        label: 'Smart (Recursive)',
+        description: 'Intelligent chunking respecting boundaries',
+      },
+      PARAGRAPH: {
+        icon: '🧠',
+        label: 'Smart (Recursive)',
+        description: 'Intelligent chunking respecting boundaries',
+      },
+    }
+    return strategies[strategy] || { icon: '📝', label: strategy, description: 'Unknown strategy' }
+  }
+
   const [kb, setKb] = useState<KnowledgeBase | null>(null)
   const [kbLoading, setKbLoading] = useState(true)
   const [kbError, setKbError] = useState<string | null>(null)
@@ -791,9 +833,21 @@ export function KBDetailsPage() {
                   {kb.structure_llm_model || 'Default'}
                 </span>
               </div>
-              <div>
+              <div className="md:col-span-2">
                 <span className="text-gray-400">Chunking Strategy:</span>
-                <span className="text-white ml-2 font-medium">{kb.chunking_strategy}</span>
+                <div className="mt-2 p-3 bg-gray-800 border border-gray-700 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <span className="text-xl">{getChunkingStrategyDisplay(kb.chunking_strategy).icon}</span>
+                    <div>
+                      <div className="text-sm font-medium text-white">
+                        {getChunkingStrategyDisplay(kb.chunking_strategy).label}
+                      </div>
+                      <div className="text-xs text-gray-400 mt-0.5">
+                        {getChunkingStrategyDisplay(kb.chunking_strategy).description}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
               <div>
                 <span className="text-gray-400">Collection:</span>

@@ -17,7 +17,7 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
     chunk_size: 1000,
     chunk_overlap: 200,
     upsert_batch_size: 256,
-    chunking_strategy: 'fixed_size',
+    chunking_strategy: 'smart',
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -122,7 +122,7 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
           chunk_size: kbDefaults.chunk_size,
           chunk_overlap: kbDefaults.chunk_overlap,
           upsert_batch_size: kbDefaults.upsert_batch_size,
-          chunking_strategy: 'fixed_size',
+          chunking_strategy: 'smart',
         })
       setErrors({})
       onClose()
@@ -159,6 +159,39 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
       default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30'
     }
   }
+
+  const chunkingStrategies = [
+    {
+      value: 'simple',
+      label: 'Simple (Fixed-Size)',
+      description: 'Fast, basic chunking. Splits text at fixed character positions with overlap.',
+      icon: '⚡',
+      recommended: false,
+      recommendedChunkSize: '1000-1500',
+      recommendedOverlap: '150-250 (15-20% of size)',
+    },
+    {
+      value: 'smart',
+      label: 'Smart (Recursive)',
+      description: 'Intelligent chunking that respects paragraph, sentence, and word boundaries.',
+      icon: '🧠',
+      recommended: true,
+      recommendedChunkSize: '1500-2000',
+      recommendedOverlap: '250-350 (15-20% of size)',
+    },
+    {
+      value: 'semantic',
+      label: 'Semantic (Coming Soon)',
+      description: 'Advanced chunking using embeddings to identify semantic boundaries.',
+      icon: '🎯',
+      recommended: false,
+      disabled: true,
+      recommendedChunkSize: 'TBD',
+      recommendedOverlap: 'TBD',
+    },
+  ]
+
+  const selectedStrategy = chunkingStrategies.find(s => s.value === formData.chunking_strategy)
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Create Knowledge Base" maxWidth="lg">
@@ -240,6 +273,62 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
                 </div>
               )}
             </>
+          )}
+        </div>
+
+        {/* Chunking Strategy Selector */}
+        <div>
+          <label htmlFor="chunking-strategy" className="block text-sm font-medium text-gray-300 mb-2">
+            Chunking Strategy <span className="text-red-500">*</span>
+          </label>
+          <select
+            id="chunking-strategy"
+            value={formData.chunking_strategy}
+            onChange={(e) => setFormData({ ...formData, chunking_strategy: e.target.value })}
+            className="input w-full"
+            disabled={isSubmitting}
+          >
+            {chunkingStrategies.map((strategy) => (
+              <option key={strategy.value} value={strategy.value} disabled={strategy.disabled}>
+                {strategy.icon} {strategy.label} {strategy.recommended ? '(Recommended)' : ''}
+              </option>
+            ))}
+          </select>
+
+          {selectedStrategy && (
+            <div className="mt-3 p-3 bg-gray-800 border border-gray-700 rounded-lg">
+              <div className="flex items-start gap-2">
+                <span className="text-2xl">{selectedStrategy.icon}</span>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-medium text-white">{selectedStrategy.label}</span>
+                    {selectedStrategy.recommended && (
+                      <span className="px-2 py-0.5 text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded">
+                        Recommended
+                      </span>
+                    )}
+                    {selectedStrategy.disabled && (
+                      <span className="px-2 py-0.5 text-xs bg-gray-500/20 text-gray-400 border border-gray-500/30 rounded">
+                        Coming Soon
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mb-2">{selectedStrategy.description}</p>
+                  {selectedStrategy.recommendedChunkSize && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-gray-500">
+                        💡 Recommended chunk size: <span className="text-blue-400">{selectedStrategy.recommendedChunkSize}</span> chars
+                      </p>
+                      {selectedStrategy.recommendedOverlap && (
+                        <p className="text-xs text-gray-500">
+                        💡 Recommended overlap: <span className="text-blue-400">{selectedStrategy.recommendedOverlap}</span> chars
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
         </div>
 

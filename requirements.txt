@@ -36,3 +36,4 @@ aiofiles==23.2.1
 python-dotenv==1.0.1
 tenacity==8.2.3
 httpx==0.26.0
+langchain-text-splitters==1.1.0

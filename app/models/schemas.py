@@ -76,6 +76,10 @@ class KnowledgeBaseCreate(KnowledgeBaseBase):
     """Schema for creating a new Knowledge Base."""
     chunk_size: Optional[int] = Field(None, ge=100, le=4000)
     chunk_overlap: Optional[int] = Field(None, ge=0, le=1000)
+    chunking_strategy: Optional[ChunkingStrategy] = Field(
+        default=ChunkingStrategy.SMART,
+        description="Chunking strategy: simple (fixed-size), smart (recursive), semantic (future)"
+    )
     upsert_batch_size: Optional[int] = Field(None, ge=64, le=1024)
     bm25_match_mode: Optional[str] = None
     bm25_min_should_match: Optional[int] = Field(None, ge=0, le=100)

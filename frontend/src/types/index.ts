@@ -6,7 +6,7 @@ export interface KnowledgeBase {
   chunk_size: number
   chunk_overlap: number
   upsert_batch_size: number
-  chunking_strategy: 'fixed_size' | 'semantic'
+  chunking_strategy: 'simple' | 'smart' | 'semantic' | 'fixed_size' | 'FIXED_SIZE' | 'paragraph' | 'PARAGRAPH'
   bm25_match_mode?: string | null
   bm25_min_should_match?: number | null
   bm25_use_phrase?: boolean | null
@@ -31,7 +31,7 @@ export interface CreateKBRequest {
   chunk_size?: number
   chunk_overlap?: number
   upsert_batch_size?: number
-  chunking_strategy?: 'fixed_size' | 'semantic'
+  chunking_strategy?: 'simple' | 'smart' | 'semantic' | 'fixed_size' | 'FIXED_SIZE' | 'paragraph' | 'PARAGRAPH'
   bm25_match_mode?: string | null
   bm25_min_should_match?: number | null
   bm25_use_phrase?: boolean | null

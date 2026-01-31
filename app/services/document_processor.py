@@ -115,6 +115,7 @@ class DocumentProcessor:
             chunking_service = get_chunking_service(
                 chunk_size=kb.chunk_size,
                 chunk_overlap=kb.chunk_overlap,
+                strategy_name=kb.chunking_strategy.value if hasattr(kb.chunking_strategy, 'value') else str(kb.chunking_strategy),
             )
 
             # 7. Split document into chunks
