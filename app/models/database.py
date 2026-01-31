@@ -58,7 +58,7 @@ class KnowledgeBase(Base):
     chunk_overlap: Mapped[int] = mapped_column(Integer, default=200, nullable=False)
     chunking_strategy: Mapped[ChunkingStrategy] = mapped_column(
         SQLEnum(ChunkingStrategy, values_callable=lambda x: [e.value for e in x]),
-        default=ChunkingStrategy.SIMPLE,
+        default=ChunkingStrategy.SMART,
         nullable=False
     )
     upsert_batch_size: Mapped[int] = mapped_column(
