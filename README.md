@@ -184,6 +184,39 @@ MMR (Maximal Marginal Relevance) balances relevance and diversity in search resu
 - Without MMR: 4 chunks from Unit 1, 2 from Unit 14, 1 from Unit 2, 1 from Unit 8
 - With MMR (0.6): 3 chunks from Unit 1, 2 from Unit 5, 1 each from Units 4, 8, 12 → more diverse sources
 
+### When NOT to use MMR (important!)
+
+MMR is **not always better**. It can hurt answer quality when sequential information is needed:
+
+**❌ Don't use MMR for:**
+
+| Query Type | Why MMR Hurts | Example |
+|------------|---------------|---------|
+| **Sequential explanations** | Breaks logical flow by skipping intermediate steps | "Explain the rounding rules" → With MMR: gets intro + conclusion but misses rules 1-3. Without MMR: gets complete sequential explanation |
+| **Step-by-step instructions** | Scatters steps across different sections | "How to install the software" → With MMR: step 1, step 5, troubleshooting. Without: steps 1-6 in order |
+| **Mathematical proofs** | Misses critical intermediate steps | "Prove theorem X" → With MMR: theorem statement + conclusion, missing proof steps |
+| **Technical procedures** | Jumps between prerequisites and advanced steps | "Configure authentication" → With MMR: overview + edge cases, missing basic setup |
+| **Definition lookups** | Gets related concepts instead of the definition | "What is an API?" → With MMR: mentions of APIs in different contexts vs. focused definition |
+
+**✅ Use MMR for:**
+
+| Query Type | Why MMR Helps | Example |
+|------------|---------------|---------|
+| **Comparative questions** | Brings perspectives from different sections | "Compare Python vs JavaScript" → gets examples from multiple contexts |
+| **Topic overviews** | Samples diverse aspects of a subject | "What is machine learning?" → gets theory, applications, examples from different chapters |
+| **Exploratory research** | Discovers unexpected connections | "Applications of blockchain" → finds use cases across finance, healthcare, supply chain |
+| **Multi-faceted questions** | Needs information from multiple independent sources | "Pros and cons of microservices" → gets architectural, operational, cost perspectives |
+| **Brainstorming** | Maximum idea diversity from varied sources | "Innovation strategies" → collects diverse approaches from different case studies |
+
+**Real example from production:**
+
+Query: *"Tell me about rounding methods"*
+
+- **With MMR (0.6)**: Retrieved chunks from 5 different sections → mentioned "preliminary rounding" but **missed the 3 main rounding rules** (most important part). Answer was incomplete.
+- **Without MMR**: Retrieved chunks from 1 section sequentially → got **all 3 rules + examples + edge cases**. Complete answer.
+
+**Rule of thumb:** If your query expects information from **one logical section** of a document (rules, procedures, definitions), **disable MMR**. If you're exploring a topic across **multiple independent sources**, **enable MMR**.
+
 ### How these settings interact
 
 - **Score threshold vs TOC**: TOC/structure queries can return chunks with lower similarity scores. If you see missing sections or "not found" responses, set **Score threshold = 0** (no filtering) before running TOC‑style queries.
