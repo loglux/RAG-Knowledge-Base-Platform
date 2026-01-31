@@ -66,6 +66,7 @@ export function KBDetailsPage() {
     chunk_size: 1000,
     chunk_overlap: 200,
     upsert_batch_size: 256,
+    chunking_strategy: 'smart' as 'simple' | 'smart' | 'semantic',
     bm25_override: false,
     bm25_match_mode: '',
     bm25_min_should_match: 0,
@@ -96,6 +97,7 @@ export function KBDetailsPage() {
       chunk_size: kbData.chunk_size,
       chunk_overlap: kbData.chunk_overlap,
       upsert_batch_size: kbData.upsert_batch_size,
+      chunking_strategy: kbData.chunking_strategy as 'simple' | 'smart' | 'semantic',
       bm25_override: bm25Override,
       bm25_match_mode: kbData.bm25_match_mode ?? defaults?.bm25_match_mode ?? '',
       bm25_min_should_match: kbData.bm25_min_should_match ?? defaults?.bm25_min_should_match ?? 0,
@@ -228,6 +230,7 @@ export function KBDetailsPage() {
         chunk_size: settingsData.chunk_size,
         chunk_overlap: settingsData.chunk_overlap,
         upsert_batch_size: settingsData.upsert_batch_size,
+        chunking_strategy: settingsData.chunking_strategy,
         bm25_match_mode: settingsData.bm25_override ? settingsData.bm25_match_mode : null,
         bm25_min_should_match: settingsData.bm25_override ? settingsData.bm25_min_should_match : null,
         bm25_use_phrase: settingsData.bm25_override ? settingsData.bm25_use_phrase : null,
@@ -266,6 +269,36 @@ export function KBDetailsPage() {
       setReindexMessage(null)
       const result = await apiClient.reprocessKnowledgeBase(kb.id)
       setReindexMessage(`Queued ${result.queued} documents for reprocessing.`)
+    } catch (error) {
+      setReindexMessage(error instanceof Error ? error.message : 'Failed to reprocess documents')
+    } finally {
+      setReindexing(false)
+    }
+  }
+
+  const handleReprocessWithNewStrategy = async () => {
+    if (!kb) return
+    const strategyLabel = {
+      simple: 'Simple (Fixed-Size)',
+      smart: 'Smart (Recursive)',
+      semantic: 'Semantic',
+    }[kb.chunking_strategy] || kb.chunking_strategy
+
+    const confirmed = window.confirm(
+      `Reprocess all documents with current chunking strategy (${strategyLabel})?\n\n` +
+      'This will:\n' +
+      '• Re-chunk every document using the current strategy\n' +
+      '• Re-embed all chunks\n' +
+      '• Rebuild both vector and BM25 indexes\n\n' +
+      'This operation cannot be undone.'
+    )
+    if (!confirmed) return
+
+    try {
+      setReindexing(true)
+      setReindexMessage(null)
+      const result = await apiClient.reprocessKnowledgeBase(kb.id)
+      setReindexMessage(`Queued ${result.queued} documents for reprocessing with ${strategyLabel} strategy.`)
     } catch (error) {
       setReindexMessage(error instanceof Error ? error.message : 'Failed to reprocess documents')
     } finally {
@@ -585,6 +618,27 @@ export function KBDetailsPage() {
 
           {isEditingSettings ? (
             <div className="space-y-4 text-sm">
+              {/* Chunking Strategy */}
+              <div>
+                <label htmlFor="kb-chunking-strategy" className="block text-gray-400 mb-2">
+                  Chunking Strategy
+                </label>
+                <select
+                  id="kb-chunking-strategy"
+                  value={settingsData.chunking_strategy}
+                  onChange={(e) => setSettingsData({ ...settingsData, chunking_strategy: e.target.value as 'simple' | 'smart' | 'semantic' })}
+                  className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100"
+                  disabled={settingsSaving}
+                >
+                  <option value="simple">⚡ Simple (Fixed-Size)</option>
+                  <option value="smart">🧠 Smart (Recursive) - Recommended</option>
+                  <option value="semantic" disabled>🎯 Semantic (Coming Soon)</option>
+                </select>
+                <p className="mt-2 text-xs text-yellow-500">
+                  ⚠️ Changing this affects only NEW documents. To apply to existing documents, save settings and use "Reprocess All Documents" button below.
+                </p>
+              </div>
+
               <div>
                 <label htmlFor="kb-chunk-size" className="block text-gray-400 mb-2">
                   Chunk Size: <span className="text-white font-medium">{settingsData.chunk_size}</span> characters
@@ -868,6 +922,20 @@ export function KBDetailsPage() {
               {reindexing ? 'Reindexing…' : 'Reindex for BM25'}
             </button>
           </div>
+
+          <div className="mt-4 flex items-center justify-between">
+            <div className="text-xs text-gray-500">
+              Reprocess documents to apply current chunking strategy to existing documents.
+            </div>
+            <button
+              onClick={handleReprocessWithNewStrategy}
+              className="btn-secondary text-xs px-3 py-1.5"
+              disabled={reindexing}
+            >
+              {reindexing ? 'Reprocessing…' : 'Reprocess All Documents'}
+            </button>
+          </div>
+
           {reindexMessage && (
             <div className="mt-2 text-xs text-gray-400">{reindexMessage}</div>
           )}
