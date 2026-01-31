@@ -167,3 +167,4 @@ chat*.png
 
 # Alembic
 alembic/versions/*.pyc
+frontend/DEPLOYMENT.md
