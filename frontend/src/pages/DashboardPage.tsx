@@ -10,9 +10,15 @@ export function DashboardPage() {
     knowledgeBases,
     loading,
     error,
+    page,
+    totalPages,
+    total,
     createKnowledgeBase,
     deleteKnowledgeBase,
-  } = useKnowledgeBases()
+    nextPage,
+    prevPage,
+    goToPage,
+  } = useKnowledgeBases(12)
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
@@ -39,7 +45,7 @@ export function DashboardPage() {
                 <span>Settings</span>
               </button>
               <div className="text-sm text-gray-400">
-                {loading ? 'Loading...' : `${knowledgeBases.length} knowledge bases`}
+                {loading ? 'Loading...' : `${total} knowledge base${total !== 1 ? 's' : ''}`}
               </div>
             </div>
           </div>
@@ -94,16 +100,80 @@ export function DashboardPage() {
 
         {/* Knowledge Bases Grid */}
         {!loading && knowledgeBases.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {knowledgeBases.map((kb) => (
-              <div key={kb.id} onClick={() => handleCardClick(kb.id)}>
-                <KBCard
-                  kb={kb}
-                  onDelete={deleteKnowledgeBase}
-                />
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {knowledgeBases.map((kb) => (
+                <div key={kb.id} onClick={() => handleCardClick(kb.id)}>
+                  <KBCard
+                    kb={kb}
+                    onDelete={deleteKnowledgeBase}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-8 flex items-center justify-between border-t border-gray-700 pt-6">
+                <div className="text-sm text-gray-400">
+                  Page {page} of {totalPages} · {total} total
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={prevPage}
+                    disabled={page === 1}
+                    className="btn-secondary px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    ← Previous
+                  </button>
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
+                      // Show first page, last page, current page, and pages around current
+                      const showPage =
+                        pageNum === 1 ||
+                        pageNum === totalPages ||
+                        Math.abs(pageNum - page) <= 1
+
+                      // Show ellipsis
+                      const showEllipsisBefore = pageNum === page - 2 && page > 3
+                      const showEllipsisAfter = pageNum === page + 2 && page < totalPages - 2
+
+                      if (showEllipsisBefore || showEllipsisAfter) {
+                        return (
+                          <span key={pageNum} className="px-2 text-gray-500">
+                            ...
+                          </span>
+                        )
+                      }
+
+                      if (!showPage) return null
+
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => goToPage(pageNum)}
+                          className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                            pageNum === page
+                              ? 'bg-primary-500 text-white'
+                              : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <button
+                    onClick={nextPage}
+                    disabled={page === totalPages}
+                    className="btn-secondary px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next →
+                  </button>
+                </div>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </main>
 
