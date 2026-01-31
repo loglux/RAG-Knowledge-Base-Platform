@@ -13,7 +13,7 @@ pydantic==2.5.3
 pydantic-settings==2.1.0
 
 # Vector Database
-qdrant-client==1.7.3
+qdrant-client==1.16.2
 opensearch-py==2.5.0
 
 # LLM & Embedding APIs
