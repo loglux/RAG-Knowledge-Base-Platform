@@ -95,6 +95,8 @@ class RetrievalEngine:
         bm25_min_should_match: Optional[int] = None,
         bm25_use_phrase: Optional[bool] = None,
         bm25_analyzer: Optional[str] = None,
+        use_mmr: bool = False,
+        mmr_diversity: float = 0.5,
     ) -> RetrievalResult:
         """
         Hybrid retrieval combining dense vectors (Qdrant) and BM25 (OpenSearch).
@@ -112,6 +114,8 @@ class RetrievalEngine:
             limit=dense_limit,
             score_threshold=score_threshold,
             filter_conditions=filters,
+            use_mmr=use_mmr,
+            mmr_diversity=mmr_diversity,
         )
         dense_chunks = self._convert_search_results(dense_results)
 
@@ -162,6 +166,8 @@ class RetrievalEngine:
         top_k: int = 5,
         score_threshold: Optional[float] = None,
         filters: Optional[Dict[str, Any]] = None,
+        use_mmr: bool = False,
+        mmr_diversity: float = 0.5,
     ) -> RetrievalResult:
         """
         Retrieve relevant chunks for a query.
@@ -173,6 +179,8 @@ class RetrievalEngine:
             top_k: Number of top results to return (default: 5)
             score_threshold: Minimum similarity score (optional)
             filters: Optional metadata filters
+            use_mmr: Enable MMR for diversity-aware search (default: False)
+            mmr_diversity: MMR diversity parameter 0.0-1.0 (default: 0.5 balanced)
 
         Returns:
             RetrievalResult with chunks and assembled context
@@ -199,13 +207,15 @@ class RetrievalEngine:
             query_embedding = await embeddings_service.generate_embedding(query)
 
             # 3. Search vector store
-            logger.debug(f"Searching vector store (top_k={top_k})")
+            logger.debug(f"Searching vector store (top_k={top_k}, mmr={use_mmr})")
             search_results = await self.vector_store.search(
                 collection_name=collection_name,
                 query_vector=query_embedding,
                 limit=top_k,
                 score_threshold=score_threshold,
                 filter_conditions=filters,
+                use_mmr=use_mmr,
+                mmr_diversity=mmr_diversity,
             )
 
             # 4. Convert to RetrievedChunk objects

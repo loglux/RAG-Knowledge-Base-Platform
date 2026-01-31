@@ -62,6 +62,12 @@ export function ChatPage() {
   const [useStructure, setUseStructure] = useState(() => {
     return false
   })
+  const [useMmr, setUseMmr] = useState(() => {
+    return false
+  })
+  const [mmrDiversity, setMmrDiversity] = useState(() => {
+    return 0.5
+  })
   const [opensearchAvailable, setOpensearchAvailable] = useState<boolean | null>(null)
   const [settingsLoaded, setSettingsLoaded] = useState(false)
   const [kbDefaultsApplied, setKbDefaultsApplied] = useState(false)
@@ -111,6 +117,10 @@ export function ChatPage() {
         if (settings.llm_model) setLlmModel(settings.llm_model)
         if (settings.llm_provider) setLlmProvider(settings.llm_provider)
         if (settings.use_structure !== undefined) setUseStructure(settings.use_structure)
+        if (settings.use_mmr !== undefined) setUseMmr(settings.use_mmr)
+        if (settings.mmr_diversity !== undefined && settings.mmr_diversity !== null) {
+          setMmrDiversity(settings.mmr_diversity)
+        }
         setSettingsLoaded(true)
       } catch (err) {
         console.error('Failed to load conversation settings:', err)
@@ -325,7 +335,9 @@ export function ChatPage() {
       scoreThreshold,
       llmModel,
       llmProvider,
-      useStructure
+      useStructure,
+      useMmr,
+      mmrDiversity
     )
   }
 
@@ -467,6 +479,8 @@ export function ChatPage() {
           llmModel={llmModel}
           llmProvider={llmProvider}
           useStructure={useStructure}
+          useMmr={useMmr}
+          mmrDiversity={mmrDiversity}
           onTopKChange={setTopK}
           onTemperatureChange={setTemperature}
           onMaxContextCharsChange={setMaxContextChars}
@@ -481,6 +495,8 @@ export function ChatPage() {
           onBm25AnalyzerChange={setBm25Analyzer}
           onLLMChange={handleLLMChange}
           onUseStructureChange={setUseStructure}
+          onUseMmrChange={setUseMmr}
+          onMmrDiversityChange={setMmrDiversity}
           onResetDefaults={handleResetDefaults}
           onClose={() => setShowSettings(false)}
         />
@@ -530,6 +546,11 @@ export function ChatPage() {
                   <details className="mt-4 space-y-2">
                     <summary className="text-xs text-gray-500 font-medium cursor-pointer select-none sources-summary">
                       <span>SOURCES ({message.sources.length})</span>
+                      {message.use_mmr && (
+                        <span className="ml-2 px-2 py-0.5 text-[10px] bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded">
+                          MMR {message.mmr_diversity?.toFixed(1)}
+                        </span>
+                      )}
                       <span className="sources-caret ml-2">▸</span>
                     </summary>
                     <div className="grid grid-cols-1 gap-2 mt-2">

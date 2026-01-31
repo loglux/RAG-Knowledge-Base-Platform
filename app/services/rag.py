@@ -126,6 +126,8 @@ Context follows below.
         llm_provider: Optional[str] = None,
         conversation_history: Optional[List[Dict[str, str]]] = None,
         use_structure: bool = False,
+        use_mmr: bool = False,
+        mmr_diversity: float = 0.5,
         db: Optional[AsyncSession] = None,
         kb_id: Optional[UUID] = None,
     ) -> RAGResponse:
@@ -204,7 +206,7 @@ Context follows below.
                     mode = "dense"
 
             if mode == "hybrid":
-                logger.debug(f"Hybrid retrieval (top_k={top_k}, lexical_top_k={lexical_top_k})")
+                logger.debug(f"Hybrid retrieval (top_k={top_k}, lexical_top_k={lexical_top_k}, mmr={use_mmr})")
                 retrieval_result = await self.retrieval.retrieve_hybrid(
                     query=question,
                     collection_name=collection_name,
@@ -220,9 +222,11 @@ Context follows below.
                     bm25_min_should_match=bm25_min_should_match,
                     bm25_use_phrase=bm25_use_phrase,
                     bm25_analyzer=bm25_analyzer,
+                    use_mmr=use_mmr,
+                    mmr_diversity=mmr_diversity,
                 )
             else:
-                logger.debug(f"Retrieving top {top_k} chunks using {embedding_model}")
+                logger.debug(f"Retrieving top {top_k} chunks using {embedding_model} (mmr={use_mmr})")
                 retrieval_result = await self.retrieval.retrieve(
                     query=question,
                     collection_name=collection_name,
@@ -230,6 +234,8 @@ Context follows below.
                     top_k=top_k,
                     score_threshold=score_threshold,
                     filters=chunk_filters,
+                    use_mmr=use_mmr,
+                    mmr_diversity=mmr_diversity,
                 )
 
             if not retrieval_result.has_results:

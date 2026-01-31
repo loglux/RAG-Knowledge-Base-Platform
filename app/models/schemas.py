@@ -467,6 +467,16 @@ class ChatRequest(BaseModel):
         default=False,
         description="Use document structure for search (experimental, default: OFF)"
     )
+    use_mmr: bool = Field(
+        default=False,
+        description="Enable MMR (Maximal Marginal Relevance) for diversity-aware search"
+    )
+    mmr_diversity: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="MMR diversity parameter (0.0=pure relevance, 1.0=pure diversity)"
+    )
 
 
 class ChatResponse(BaseModel):
@@ -479,6 +489,8 @@ class ChatResponse(BaseModel):
     model: str = Field(..., description="Model used for generation")
     knowledge_base_id: UUID = Field(..., description="Knowledge base queried")
     conversation_id: Optional[UUID] = Field(default=None, description="Conversation ID for persistent chat")
+    use_mmr: Optional[bool] = Field(default=None, description="Whether MMR was used")
+    mmr_diversity: Optional[float] = Field(default=None, description="MMR diversity parameter (0.0-1.0)")
 
 
 # ============================================================================

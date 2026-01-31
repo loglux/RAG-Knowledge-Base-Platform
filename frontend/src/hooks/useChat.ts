@@ -100,7 +100,9 @@ export function useChat(kbId: string) {
       scoreThreshold?: number,
       llmModel?: string,
       llmProvider?: string,
-      useStructure = false
+      useStructure = false,
+      useMmr = false,
+      mmrDiversity = 0.5
     ) => {
       if (!question.trim()) return
 
@@ -134,6 +136,8 @@ export function useChat(kbId: string) {
           llm_model: llmModel,
           llm_provider: llmProvider,
           use_structure: useStructure,
+          use_mmr: useMmr,
+          mmr_diversity: mmrDiversity,
         }
 
         const response = await apiClient.chat(request)
@@ -153,6 +157,8 @@ export function useChat(kbId: string) {
           sources: response.sources,
           timestamp: new Date().toISOString(),
           model: response.model,
+          use_mmr: response.use_mmr,
+          mmr_diversity: response.mmr_diversity,
         }
 
         setMessages((prev) => [...prev, assistantMessage])

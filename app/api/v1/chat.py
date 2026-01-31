@@ -208,6 +208,8 @@ async def chat_query(
             llm_provider=request.llm_provider,
             conversation_history=history_dicts,
             use_structure=request.use_structure,
+            use_mmr=request.use_mmr,
+            mmr_diversity=request.mmr_diversity,
             db=db,
             kb_id=request.knowledge_base_id,
         )
@@ -231,6 +233,8 @@ async def chat_query(
                 "bm25_min_should_match": bm25_min_should_match,
                 "bm25_use_phrase": bm25_use_phrase,
                 "bm25_analyzer": bm25_analyzer,
+                "use_mmr": request.use_mmr,
+                "mmr_diversity": request.mmr_diversity,
             }
             conversation = ConversationModel(
                 knowledge_base_id=request.knowledge_base_id,
@@ -263,6 +267,8 @@ async def chat_query(
                 "bm25_min_should_match": bm25_min_should_match,
                 "bm25_use_phrase": bm25_use_phrase,
                 "bm25_analyzer": bm25_analyzer,
+                "use_mmr": request.use_mmr,
+                "mmr_diversity": request.mmr_diversity,
             })
             conversation.settings_json = json.dumps(existing_settings)
 
@@ -325,6 +331,8 @@ async def chat_query(
             model=rag_response.model,
             knowledge_base_id=request.knowledge_base_id,
             conversation_id=conversation.id,
+            use_mmr=request.use_mmr if request.use_mmr else None,
+            mmr_diversity=request.mmr_diversity if request.use_mmr else None,
         )
 
         logger.info(

@@ -32,6 +32,7 @@ It can be used as a standalone service or integrated into other products via its
   - Semantic: planned - embedding-based boundary detection
 - Embedding-based semantic search over unstructured documents
 - Qdrant-backed vector index for fast similarity search
+- **MMR (Maximal Marginal Relevance)** for diversity-aware search
 - Optional BM25 lexical index (OpenSearch) for hybrid retrieval
 - Structured document analysis and TOC metadata
 - RAG answers with citations
@@ -150,15 +151,45 @@ The chat UI exposes retrieval controls to tune answer quality:
 - **Max context chars**: limit for assembled context (0 = unlimited). Lower values reduce cost/latency; higher values preserve more context.
 - **Score threshold**: minimum similarity score (0–1) to filter low‑relevance chunks. 0 disables filtering; 0.2–0.4 is a good starting range.
 - **Temperature**: response randomness. Use 0–0.3 for factual extraction, higher for exploratory/creative explanations.
-- **Use Document Structure**: enables TOC‑aware, section‑targeted retrieval (e.g., “show question 2”).
+- **Use Document Structure**: enables TOC‑aware, section‑targeted retrieval (e.g., "show question 2").
+- **Use MMR (Maximal Marginal Relevance)**: enables diversity-aware search to avoid retrieving too many similar chunks from the same section. Balances relevance and diversity.
+- **MMR Diversity** (when MMR enabled): controls the relevance-diversity tradeoff (0.0–1.0). See detailed guidance below.
 - **Retrieval mode**: dense (vectors) or hybrid (BM25 + vectors).
 - **BM25 controls** (hybrid only): lexical top‑K and weight blending.
 
+### MMR Diversity Parameter Guide
+
+MMR (Maximal Marginal Relevance) balances relevance and diversity in search results. Higher diversity values sacrifice some relevance to retrieve chunks from more varied sources.
+
+**Diversity parameter (0.0 - 1.0):**
+
+| Value | Documents | Behavior | Use Case |
+|-------|-----------|----------|----------|
+| **0.0** | ~4 docs | Pure relevance (standard vector search) | Highest precision needed |
+| **0.3** | ~5 docs | Slight diversity, high relevance | Legal docs, technical specs |
+| **0.5** | ~6 docs | **Balanced (recommended default)** ⭐ | General use, Q&A |
+| **0.7** | ~8 docs | High diversity, varied sources | Research, exploration |
+| **1.0** | ~8 docs | Maximum diversity (lower relevance) | Broad topic overview |
+
+**Trade-off:**
+- **Higher diversity** → More different documents, but average relevance score drops (0.67 → 0.59)
+- **Lower diversity** → Higher relevance, but chunks may come from same sections
+
+**When to use:**
+- `0.3-0.4` — Precision-critical tasks (legal, medical, technical specifications)
+- `0.5-0.6` — Default balanced mode for most queries
+- `0.7-0.8` — Exploratory research, brainstorming, broad topic surveys
+
+**Example impact** (Top K = 8):
+- Without MMR: 4 chunks from Unit 1, 2 from Unit 14, 1 from Unit 2, 1 from Unit 8
+- With MMR (0.6): 3 chunks from Unit 1, 2 from Unit 5, 1 each from Units 4, 8, 12 → more diverse sources
+
 ### How these settings interact
 
-- **Score threshold vs TOC**: TOC/structure queries can return chunks with lower similarity scores. If you see missing sections or “not found” responses, set **Score threshold = 0** (no filtering) before running TOC‑style queries.
+- **Score threshold vs TOC**: TOC/structure queries can return chunks with lower similarity scores. If you see missing sections or "not found" responses, set **Score threshold = 0** (no filtering) before running TOC‑style queries.
 - **Top K and Max context**: higher Top K increases recall, but you may need a higher Max context to avoid truncation.
 - **Hybrid mode**: BM25 improves exact‑term matches. For paraphrases, keep some weight on dense vectors.
+- **MMR vs Top K**: MMR is most effective with larger Top K (20+). With small Top K (5-10), diversity impact is limited.
 
 When you first enable hybrid search on an existing KB, use **Reindex for BM25** to populate the lexical index.
 

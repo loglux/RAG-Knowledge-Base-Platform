@@ -18,6 +18,8 @@ from qdrant_client.models import (
     FieldCondition,
     MatchValue,
     SearchRequest,
+    NearestQuery,
+    Mmr,
 )
 from qdrant_client.http import models as rest
 
@@ -304,6 +306,9 @@ class QdrantVectorStore:
         limit: int = 10,
         score_threshold: Optional[float] = None,
         filter_conditions: Optional[Dict[str, Any]] = None,
+        use_mmr: bool = False,
+        mmr_diversity: float = 0.5,
+        mmr_candidates_limit: Optional[int] = None,
     ) -> List[SearchResult]:
         """
         Search for similar vectors in a collection.
@@ -314,6 +319,9 @@ class QdrantVectorStore:
             limit: Maximum number of results to return
             score_threshold: Minimum similarity score (optional)
             filter_conditions: Optional metadata filters
+            use_mmr: Enable MMR (Maximal Marginal Relevance) for diversity-aware search
+            mmr_diversity: MMR diversity parameter (0.0=pure relevance, 1.0=pure diversity)
+            mmr_candidates_limit: Number of candidates to pre-select for MMR (defaults to limit * 10)
 
         Returns:
             List of SearchResult objects
@@ -334,10 +342,29 @@ class QdrantVectorStore:
             if filter_conditions:
                 query_filter = self._build_filter(filter_conditions)
 
+            # Build query (with MMR if enabled)
+            if use_mmr:
+                # MMR-enabled query for diversity-aware search
+                candidates = mmr_candidates_limit or (limit * 10)
+                query = NearestQuery(
+                    nearest=query_vector,
+                    mmr=Mmr(
+                        diversity=mmr_diversity,
+                        candidates_limit=candidates,
+                    ),
+                )
+                logger.debug(
+                    f"Using MMR search (diversity={mmr_diversity}, "
+                    f"candidates={candidates})"
+                )
+            else:
+                # Standard vector search
+                query = query_vector
+
             # Perform search
             query_response = await self.client.query_points(
                 collection_name=collection_name,
-                query=query_vector,
+                query=query,
                 limit=limit,
                 score_threshold=score_threshold,
                 query_filter=query_filter,

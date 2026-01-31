@@ -99,6 +99,8 @@ export interface ChatMessage {
   sources?: SourceChunk[]
   timestamp: string
   model?: string
+  use_mmr?: boolean
+  mmr_diversity?: number
 }
 
 export interface SourceChunk {
@@ -135,6 +137,8 @@ export interface ChatRequest {
   llm_model?: string
   llm_provider?: string
   use_structure?: boolean
+  use_mmr?: boolean
+  mmr_diversity?: number
 }
 
 export interface ChatResponse {
@@ -145,6 +149,8 @@ export interface ChatResponse {
   model: string
   knowledge_base_id: string
   conversation_id?: string
+  use_mmr?: boolean
+  mmr_diversity?: number
 }
 
 export interface ConversationSummary {
@@ -171,6 +177,8 @@ export interface ConversationSettings {
   bm25_min_should_match?: number | null
   bm25_use_phrase?: boolean | null
   bm25_analyzer?: string | null
+  use_mmr?: boolean
+  mmr_diversity?: number
 }
 
 export interface ConversationDetail {

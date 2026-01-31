@@ -20,6 +20,8 @@ interface ChatSettingsProps {
   llmModel: string
   llmProvider: string
   useStructure: boolean
+  useMmr: boolean
+  mmrDiversity: number
   onTopKChange: (value: number) => void
   onTemperatureChange: (value: number) => void
   onMaxContextCharsChange: (value: number) => void
@@ -34,6 +36,8 @@ interface ChatSettingsProps {
   onBm25AnalyzerChange: (value: string) => void
   onLLMChange: (model: string, provider: string) => void
   onUseStructureChange: (value: boolean) => void
+  onUseMmrChange: (value: boolean) => void
+  onMmrDiversityChange: (value: number) => void
   onResetDefaults: () => void
   onClose: () => void
 }
@@ -57,6 +61,8 @@ export function ChatSettings({
   llmModel,
   llmProvider,
   useStructure,
+  useMmr,
+  mmrDiversity,
   onTopKChange,
   onTemperatureChange,
   onMaxContextCharsChange,
@@ -71,6 +77,8 @@ export function ChatSettings({
   onBm25AnalyzerChange,
   onLLMChange,
   onUseStructureChange,
+  onUseMmrChange,
+  onMmrDiversityChange,
   onResetDefaults,
   onClose,
 }: ChatSettingsProps) {
@@ -135,6 +143,60 @@ export function ChatSettings({
               </p>
             </div>
           </label>
+        </div>
+
+        {/* MMR (Diversity-Aware Search) */}
+        <div className="mb-6 p-4 bg-gray-900 rounded-lg border border-gray-700">
+          <label className="flex items-center space-x-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={useMmr}
+              onChange={(e) => onUseMmrChange(e.target.checked)}
+              className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
+            />
+            <div className="flex-1">
+              <span className="text-sm font-medium text-white">
+                Enable MMR (Diversity-Aware Search)
+              </span>
+              <p className="text-xs text-gray-400 mt-1">
+                Balances relevance and diversity to avoid too many similar chunks from the same section.
+              </p>
+              <div className="mt-2 p-2 bg-gray-800 rounded text-xs text-gray-400 space-y-1">
+                <p className="font-medium text-gray-300">💡 When to use:</p>
+                <p>• <span className="text-blue-400">0.3-0.4</span> — Precision focus (legal docs, technical specs)</p>
+                <p>• <span className="text-green-400">0.5-0.6</span> — Balanced (recommended default) ⭐</p>
+                <p>• <span className="text-purple-400">0.7-0.8</span> — Broad exploration (research, brainstorming)</p>
+                <p className="mt-1 pt-1 border-t border-gray-700 text-gray-500">
+                  Higher diversity = more varied sources, lower avg relevance score
+                </p>
+              </div>
+            </div>
+          </label>
+
+          {useMmr && (
+            <div className="mt-4 pl-8">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Diversity: {mmrDiversity.toFixed(2)}
+                <span className="ml-2 text-xs text-gray-500">
+                  ({mmrDiversity < 0.4 ? 'Focus' : mmrDiversity < 0.7 ? 'Balanced' : 'Explore'})
+                </span>
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.1"
+                value={mmrDiversity}
+                onChange={(e) => onMmrDiversityChange(Number(e.target.value))}
+                className="slider w-full"
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>0.0 - Pure relevance</span>
+                <span>0.5 - Balanced</span>
+                <span>1.0 - Max diversity</span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
