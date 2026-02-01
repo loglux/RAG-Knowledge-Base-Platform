@@ -1,8 +1,12 @@
 """Health check endpoints."""
 import logging
 from datetime import datetime
+from typing import Optional
 
+import httpx
 from fastapi import APIRouter, Depends, status
+from openai import AsyncOpenAI
+from anthropic import AsyncAnthropic
 from sqlalchemy import text, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,10 +16,107 @@ from app.models.database import AppSettings as AppSettingsModel
 from app.config import settings
 from app.core.vector_store import get_vector_store
 from app.core.lexical_store import get_lexical_store
+from app.core.embeddings_base import EMBEDDING_MODELS
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# Health check helper functions
+
+async def check_openai_health(api_key: Optional[str] = None) -> bool:
+    """Check OpenAI API availability."""
+    try:
+        key = api_key or settings.OPENAI_API_KEY
+        if not key:
+            return False
+
+        client = AsyncOpenAI(api_key=key)
+        # List models - free, fast, validates API key
+        await client.models.list()
+        await client.close()
+        return True
+    except Exception as e:
+        logger.error(f"OpenAI health check failed: {e}")
+        return False
+
+
+async def check_anthropic_health(api_key: Optional[str] = None) -> bool:
+    """Check Anthropic API availability."""
+    try:
+        key = api_key or settings.ANTHROPIC_API_KEY
+        if not key:
+            return False
+
+        client = AsyncAnthropic(api_key=key)
+        # Minimal message to validate key (1 token on cheapest model)
+        await client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=1,
+            messages=[{"role": "user", "content": "test"}]
+        )
+        await client.close()
+        return True
+    except Exception as e:
+        logger.error(f"Anthropic health check failed: {e}")
+        return False
+
+
+async def check_voyage_health(api_key: Optional[str] = None) -> bool:
+    """Check Voyage AI API availability."""
+    try:
+        key = api_key or settings.VOYAGE_API_KEY
+        if not key:
+            return False
+
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                "https://api.voyageai.com/v1/embeddings",
+                headers={"Authorization": f"Bearer {key}"},
+                json={
+                    "input": ["test"],
+                    "model": "voyage-4-lite"
+                }
+            )
+            return response.status_code == 200
+    except Exception as e:
+        logger.error(f"Voyage health check failed: {e}")
+        return False
+
+
+async def check_ollama_health(base_url: Optional[str] = None) -> bool:
+    """Check Ollama server availability."""
+    try:
+        url = base_url or settings.OLLAMA_BASE_URL
+        if not url:
+            return False
+
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            # /api/tags is a free endpoint that lists available models
+            response = await client.get(f"{url}/api/tags")
+            return response.status_code == 200
+    except Exception as e:
+        logger.error(f"Ollama health check failed: {e}")
+        return False
+
+
+def get_provider_for_model(model_name: str) -> Optional[str]:
+    """Determine the provider for a given model name."""
+    # Check embedding models
+    if model_name in EMBEDDING_MODELS:
+        return EMBEDDING_MODELS[model_name].provider.value
+
+    # Check LLM models by naming convention
+    if model_name.startswith("gpt-") or model_name.startswith("text-embedding-"):
+        return "openai"
+    elif model_name.startswith("claude-"):
+        return "anthropic"
+    elif model_name.startswith("voyage-"):
+        return "voyage"
+    else:
+        # Assume Ollama for other models
+        return "ollama"
 
 
 @router.get("/health", response_model=HealthCheck, status_code=status.HTTP_200_OK)
@@ -36,16 +137,20 @@ async def readiness_check(db: AsyncSession = Depends(get_db)):
     """
     Readiness check - verifies all dependencies are available.
 
-    Checks:
+    Dynamically checks only the LLM providers that are actually configured and in use
+    based on the default models in app settings.
+
+    Always checks:
     - Database connectivity
-    - Qdrant connectivity (TODO)
-    - OpenAI API (TODO)
+    - Qdrant vector store
+
+    Conditionally checks:
+    - OpenSearch (if retrieval_mode is "hybrid")
+    - LLM providers (based on configured default models)
     """
     checks = {
         "database": False,
         "qdrant": False,
-        "opensearch": False,
-        "openai": False,  # TODO: Implement in Phase 2
     }
 
     # Check database
@@ -60,34 +165,62 @@ async def readiness_check(db: AsyncSession = Depends(get_db)):
     try:
         vector_store = get_vector_store()
         checks["qdrant"] = await vector_store.health_check()
-    except Exception:
+    except Exception as e:
+        logger.error(f"Qdrant health check failed: {e}")
         checks["qdrant"] = False
 
-    # Check OpenSearch
-    try:
-        lexical_store = get_lexical_store()
-        checks["opensearch"] = await lexical_store.client.ping()
-    except Exception:
-        checks["opensearch"] = False
-
-    # TODO: Check OpenAI
-    # try:
-    #     openai_client = get_openai_client()
-    #     # Simple API call to verify
-    #     checks["openai"] = True
-    # except Exception:
-    #     pass
-
+    # Get app settings to determine which providers to check
     requires_opensearch = False
+    default_llm_model = settings.OPENAI_CHAT_MODEL
+    default_embedding_model = "text-embedding-3-small"  # Default fallback
+
     try:
         result = await db.execute(select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1))
         row = result.scalar_one_or_none()
-        if row and row.retrieval_mode == "hybrid":
-            requires_opensearch = True
-    except Exception:
-        requires_opensearch = False
+        if row:
+            requires_opensearch = (row.retrieval_mode == "hybrid")
+            if row.default_llm_model:
+                default_llm_model = row.default_llm_model
+            # Use first KB's embedding model as proxy for default embedding
+            # (in real system, this would be in app settings)
+    except Exception as e:
+        logger.error(f"Failed to fetch app settings: {e}")
 
-    all_ready = checks["database"] and checks["qdrant"] and (checks["opensearch"] or not requires_opensearch)
+    # Check OpenSearch if needed
+    if requires_opensearch:
+        try:
+            lexical_store = get_lexical_store()
+            checks["opensearch"] = await lexical_store.client.ping()
+        except Exception as e:
+            logger.error(f"OpenSearch health check failed: {e}")
+            checks["opensearch"] = False
+
+    # Determine which LLM providers are in use
+    providers_to_check = set()
+
+    # Add provider for chat model
+    chat_provider = get_provider_for_model(default_llm_model)
+    if chat_provider:
+        providers_to_check.add(chat_provider)
+
+    # Add provider for embedding model
+    embedding_provider = get_provider_for_model(default_embedding_model)
+    if embedding_provider:
+        providers_to_check.add(embedding_provider)
+
+    # Check each required provider
+    for provider in providers_to_check:
+        if provider == "openai":
+            checks["openai"] = await check_openai_health()
+        elif provider == "anthropic":
+            checks["anthropic"] = await check_anthropic_health()
+        elif provider == "voyage":
+            checks["voyage"] = await check_voyage_health()
+        elif provider == "ollama":
+            checks["ollama"] = await check_ollama_health()
+
+    # System is ready if all checked services are healthy
+    all_ready = all(checks.values())
     status_code = status.HTTP_200_OK if all_ready else status.HTTP_503_SERVICE_UNAVAILABLE
 
     return ReadinessCheck(
