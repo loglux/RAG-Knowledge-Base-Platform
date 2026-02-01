@@ -61,6 +61,8 @@ export interface Document {
   knowledge_base_id: string
   user_id: string | null
   error_message: string | null
+  processing_stage?: string | null
+  progress_percentage?: number
   created_at: string
   updated_at: string
   processed_at: string | null
@@ -76,6 +78,8 @@ export interface DocumentStatusResponse {
   bm25_status?: DocumentStatus
   chunk_count: number
   error_message: string | null
+  processing_stage?: string | null
+  progress_percentage?: number
 }
 
 export interface PaginatedResponse<T> {

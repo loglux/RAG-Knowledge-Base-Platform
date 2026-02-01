@@ -626,13 +626,22 @@ export function KBDetailsPage() {
                 <select
                   id="kb-chunking-strategy"
                   value={settingsData.chunking_strategy}
-                  onChange={(e) => setSettingsData({ ...settingsData, chunking_strategy: e.target.value as 'simple' | 'smart' | 'semantic' })}
+                  onChange={(e) => {
+                    const newStrategy = e.target.value as 'simple' | 'smart' | 'semantic'
+                    // Auto-adjust chunk size for semantic chunking
+                    const newChunkSize = newStrategy === 'semantic' ? 800 : settingsData.chunk_size
+                    setSettingsData({
+                      ...settingsData,
+                      chunking_strategy: newStrategy,
+                      chunk_size: newChunkSize
+                    })
+                  }}
                   className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100"
                   disabled={settingsSaving}
                 >
                   <option value="simple">⚡ Simple (Fixed-Size)</option>
                   <option value="smart">🧠 Smart (Recursive) - Recommended</option>
-                  <option value="semantic" disabled>🎯 Semantic (Coming Soon)</option>
+                  <option value="semantic">🎯 Semantic (Embeddings) ✓</option>
                 </select>
                 <p className="mt-2 text-xs text-yellow-500">
                   ⚠️ Changing this affects only NEW documents. To apply to existing documents, save settings and use "Reprocess All Documents" button below.
@@ -661,30 +670,43 @@ export function KBDetailsPage() {
                 {settingsErrors.chunk_size && <p className="mt-1 text-sm text-red-500">{settingsErrors.chunk_size}</p>}
               </div>
 
-              <div>
-                <label htmlFor="kb-chunk-overlap" className="block text-gray-400 mb-2">
-                  Chunk Overlap: <span className="text-white font-medium">{settingsData.chunk_overlap}</span> characters
-                  <span className="text-gray-500">
-                    {' '}({settingsData.chunk_size > 0 ? Math.round((settingsData.chunk_overlap / settingsData.chunk_size) * 100) : 0}%)
-                  </span>
-                </label>
-                <input
-                  id="kb-chunk-overlap"
-                  type="range"
-                  min="0"
-                  max="500"
-                  step="50"
-                  value={settingsData.chunk_overlap}
-                  onChange={(e) => setSettingsData({ ...settingsData, chunk_overlap: parseInt(e.target.value) })}
-                  className="w-full"
-                  disabled={settingsSaving}
-                />
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>0</span>
-                  <span>500</span>
+              {/* Chunk Overlap - not used in semantic chunking */}
+              {settingsData.chunking_strategy !== 'semantic' && (
+                <div>
+                  <label htmlFor="kb-chunk-overlap" className="block text-gray-400 mb-2">
+                    Chunk Overlap: <span className="text-white font-medium">{settingsData.chunk_overlap}</span> characters
+                    <span className="text-gray-500">
+                      {' '}({settingsData.chunk_size > 0 ? Math.round((settingsData.chunk_overlap / settingsData.chunk_size) * 100) : 0}%)
+                    </span>
+                  </label>
+                  <input
+                    id="kb-chunk-overlap"
+                    type="range"
+                    min="0"
+                    max="500"
+                    step="50"
+                    value={settingsData.chunk_overlap}
+                    onChange={(e) => setSettingsData({ ...settingsData, chunk_overlap: parseInt(e.target.value) })}
+                    className="w-full"
+                    disabled={settingsSaving}
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>0</span>
+                    <span>500</span>
+                  </div>
+                  {settingsErrors.chunk_overlap && <p className="mt-1 text-sm text-red-500">{settingsErrors.chunk_overlap}</p>}
                 </div>
-                {settingsErrors.chunk_overlap && <p className="mt-1 text-sm text-red-500">{settingsErrors.chunk_overlap}</p>}
-              </div>
+              )}
+
+              {/* Info message for semantic chunking */}
+              {settingsData.chunking_strategy === 'semantic' && (
+                <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                  <p className="text-xs text-blue-400">
+                    ℹ️ <strong>Semantic chunking</strong> finds natural topic boundaries using embeddings.
+                    Chunk overlap is not used - boundaries are determined by semantic similarity.
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label htmlFor="kb-upsert-batch-size" className="block text-gray-400 mb-2">

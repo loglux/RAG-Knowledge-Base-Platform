@@ -8,6 +8,7 @@
 ![Anthropic](https://img.shields.io/badge/Anthropic-191919?logo=anthropic&logoColor=white)
 ![Voyage](https://img.shields.io/badge/Voyage-1B1F23?logo=voyage&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-000000?logo=ollama&logoColor=white)
+![LangChain](https://img.shields.io/badge/🦜_LangChain-1C3C3C?logoColor=white)
 ![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=111111)
 ![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
@@ -26,10 +27,10 @@ It can be used as a standalone service or integrated into other products via its
 
 ## Key features
 
-- **Document ingestion with smart chunking** (txt, md):
-  - Simple: fast fixed-size chunking
-  - Smart: recursive chunking respecting semantic boundaries (recommended)
-  - Semantic: planned - embedding-based boundary detection
+- **Document ingestion with intelligent chunking** (txt, md):
+  - **Simple**: Fast fixed-size chunking with overlap
+  - **Smart**: Recursive chunking respecting sentence/paragraph boundaries (recommended for most cases)
+  - **Semantic**: Advanced embedding-based boundary detection using cosine similarity to find natural topic changes
 - Embedding-based semantic search over unstructured documents
 - Qdrant-backed vector index for fast similarity search
 - **MMR (Maximal Marginal Relevance)** for diversity-aware search
@@ -67,7 +68,46 @@ Vectorization turns unstructured text into numeric vectors that capture meaning,
 
 The system performs **semantic retrieval**: it embeds the user query, finds the closest chunk vectors, and assembles them into a context window for the LLM. You can also enable **hybrid retrieval** (BM25 + vectors), which boosts exact keyword matches while preserving semantic recall. Because the answer is grounded in retrieved chunks, we can return **citations** (source snippets) alongside the response.
 
-For structured documents, an optional **Structure‑Aware Retrieval** step builds a TOC and section metadata. This enables section‑targeted queries (e.g., “show Question 2”), returning full, verbatim excerpts rather than a generic summary.
+For structured documents, an optional **Structure‑Aware Retrieval** step builds a TOC and section metadata. This enables section‑targeted queries (e.g., "show Question 2"), returning full, verbatim excerpts rather than a generic summary.
+
+## Chunking strategies
+
+The platform supports three chunking strategies with different trade-offs:
+
+### Simple (Fixed-Size)
+- **How it works**: Splits text at fixed character positions with configurable overlap
+- **Pros**: Fastest, predictable chunk sizes
+- **Cons**: May split mid-sentence or mid-word
+- **Use when**: Speed is critical, document structure doesn't matter
+- **Overlap**: Required (15-20% recommended)
+
+### Smart (Recursive) - Recommended
+- **How it works**: Uses LangChain's RecursiveCharacterTextSplitter to split at natural boundaries (paragraphs → sentences → words)
+- **Pros**: Respects document structure, maintains coherent chunks
+- **Cons**: Slightly slower than simple
+- **Use when**: General-purpose chunking for most documents
+- **Overlap**: Required (15-20% recommended)
+
+### Semantic (Embeddings-Based)
+- **How it works**:
+  1. Splits text into sentences (NLTK)
+  2. Generates embeddings for each sentence
+  3. Calculates cosine similarity between consecutive sentences
+  4. Detects boundaries where similarity drops (topic changes)
+  5. Groups semantically related sentences into chunks
+- **Pros**: Chunks align with natural topic boundaries, better retrieval quality
+- **Cons**: Slowest (requires embedding each sentence), GPU recommended
+- **Use when**: Documents have clear topic changes, retrieval quality is critical
+- **Overlap**: Not used (boundaries are semantic, not positional)
+- **Parameters**:
+  - `chunk_size`: Maximum chunk size (acts as soft limit, default 800)
+  - `min_chunk_size`: Minimum size before merging (default 100)
+  - `boundary_method`: "adaptive" (mean - k*std) or "fixed" (constant threshold)
+
+**Dependencies**:
+- Simple: None
+- Smart: LangChain
+- Semantic: NLTK, NumPy, scikit-learn
 
 ## Quick start (Docker)
 
@@ -109,6 +149,31 @@ docker compose -f docker-compose.dev.yml up -d db qdrant opensearch
 alembic upgrade head
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+## 📚 Documentation
+
+Comprehensive API documentation is available in multiple formats:
+
+### 📖 GitHub Wiki (Recommended)
+Complete documentation with navigation, examples, and visual diagrams:
+
+- **[📚 Documentation Home](https://github.com/loglux/RAG-Knowledge-Base-Platform/wiki)** - Start here
+- **[📖 API Documentation](https://github.com/loglux/RAG-Knowledge-Base-Platform/wiki/API-Documentation)** - Complete API reference with request/response examples, data models, and error handling
+- **[⚡ Quick Reference](https://github.com/loglux/RAG-Knowledge-Base-Platform/wiki/Quick-Reference)** - Endpoint tables, common patterns, and bash snippets for rapid development
+- **[🗺️ API Map](https://github.com/loglux/RAG-Knowledge-Base-Platform/wiki/API-Map)** - Visual API structure, data flow diagrams, and integration examples
+
+### 🔧 Interactive API Docs (When Running)
+Explore and test endpoints directly in your browser:
+
+- **[Swagger UI](http://localhost:8004/docs)** - Interactive API documentation with "Try it out" functionality
+- **[ReDoc](http://localhost:8004/redoc)** - Clean, responsive API documentation
+- **[OpenAPI JSON](http://localhost:8004/openapi.json)** - Machine-readable API specification
+
+### 📁 Local Documentation
+Documentation source files are available in the [`docs/`](docs/) directory:
+- `API_DOCUMENTATION.md` - Full API reference
+- `ENDPOINTS_QUICK_REFERENCE.md` - Quick lookup tables
+- `API_MAP.md` - Architecture and diagrams
 
 ## Minimal API usage
 

@@ -17,7 +17,7 @@ from uuid import UUID
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.database import Document, KnowledgeBase
+from app.models.database import Document, KnowledgeBase, AppSettings
 from app.models.enums import DocumentStatus
 from app.core.embeddings_factory import create_embedding_service
 from app.core.embeddings_base import BaseEmbeddingService
@@ -90,6 +90,7 @@ class DocumentProcessor:
         try:
             # 1. Load document from database
             document = await self._load_document(document_id, db)
+            await self._update_progress(document, "Loading document...", 5, db)
 
             # 2. Get knowledge base info
             kb = await self._load_knowledge_base(document.knowledge_base_id, db)
@@ -110,15 +111,25 @@ class DocumentProcessor:
             # 5. Ensure collection exists
             await self._ensure_collection_exists(kb)
 
-            # 6. Create chunking service with KB-specific settings
+            # 6. Get global settings for LLM model (used by semantic chunking)
+            settings_result = await db.execute(
+                select(AppSettings).order_by(AppSettings.id).limit(1)
+            )
+            app_settings = settings_result.scalar_one_or_none()
+
+            # 7. Create chunking service with KB-specific settings
             from app.services.chunking import get_chunking_service
+            await self._update_progress(document, "Preparing to chunk...", 15, db)
+
             chunking_service = get_chunking_service(
                 chunk_size=kb.chunk_size,
                 chunk_overlap=kb.chunk_overlap,
                 strategy_name=kb.chunking_strategy.value if hasattr(kb.chunking_strategy, 'value') else str(kb.chunking_strategy),
+                llm_model=app_settings.llm_model if app_settings else None,
+                llm_provider=app_settings.llm_provider if app_settings else None,
             )
 
-            # 7. Split document into chunks
+            # 8. Split document into chunks
             logger.info(
                 f"Chunking document content ({len(document.content)} chars) "
                 f"with chunk_size={kb.chunk_size}, overlap={kb.chunk_overlap}"
@@ -143,26 +154,53 @@ class DocumentProcessor:
                 max(chunk_sizes),
                 sum(chunk_sizes) / len(chunk_sizes),
             )
+            await self._update_progress(document, f"Chunking completed ({len(chunks)} chunks)", 30, db)
 
-            # 8. Generate embeddings for all chunks
+            # 8. Generate embeddings for all chunks with progress updates
             logger.info(
                 "Generating embeddings for %s chunks using %s",
                 len(chunks),
                 kb.embedding_model,
             )
             chunk_texts = [chunk.content for chunk in chunks]
-            embedding_results = await embeddings_service.generate_embeddings(
-                texts=chunk_texts,
-                batch_size=100,
-            )
+            total_chunks = len(chunks)
+            batch_size = 100
+            embedding_results = []
+
+            # Process embeddings in batches with progress updates
+            for i in range(0, len(chunk_texts), batch_size):
+                batch = chunk_texts[i:i + batch_size]
+                batch_num = i // batch_size + 1
+                total_batches = (total_chunks + batch_size - 1) // batch_size
+
+                # Update progress for this batch
+                processed_so_far = i
+                progress_in_embedding = int(35 + (40 * processed_so_far / total_chunks))  # 35% to 75%
+                await self._update_progress(
+                    document,
+                    f"Generating embeddings ({processed_so_far}/{total_chunks})",
+                    progress_in_embedding,
+                    db
+                )
+
+                # Generate embeddings for this batch
+                logger.debug(f"Processing embedding batch {batch_num}/{total_batches}")
+                batch_results = await embeddings_service.generate_embeddings(
+                    texts=batch,
+                    batch_size=len(batch),  # Process entire batch at once
+                )
+                embedding_results.extend(batch_results)
 
             logger.info(f"Generated {len(embedding_results)} embeddings")
+            await self._update_progress(document, f"Embeddings created ({len(embedding_results)})", 75, db)
 
             # 9. Prepare vectors and payloads for Qdrant
             vectors = [result.embedding for result in embedding_results]
             payloads = self._build_payloads(chunks, document, kb)
 
             # 10. Store vectors in Qdrant
+            await self._update_progress(document, "Indexing in Qdrant...", 80, db)
+
             logger.info(f"Storing {len(vectors)} vectors in collection '{kb.collection_name}'")
             vector_ids = await self.vector_store.insert_vectors(
                 collection_name=kb.collection_name,
@@ -172,6 +210,7 @@ class DocumentProcessor:
             )
 
             # Mark embeddings as completed once Qdrant insert succeeds
+            await self._update_progress(document, "Qdrant indexing completed", 85, db)
             await self._update_index_statuses(
                 document,
                 db,
@@ -185,6 +224,8 @@ class DocumentProcessor:
                     db,
                     bm25_status=DocumentStatus.PROCESSING,
                 )
+                await self._update_progress(document, "Indexing BM25...", 90, db)
+
                 lexical_chunks = self._build_lexical_chunks(chunks)
                 await self.lexical_store.index_chunks(
                     knowledge_base_id=str(kb.id),
@@ -199,6 +240,7 @@ class DocumentProcessor:
                     db,
                     bm25_status=DocumentStatus.COMPLETED,
                 )
+                await self._update_progress(document, "BM25 indexing completed", 95, db)
             except Exception as e:
                 logger.warning(f"OpenSearch indexing failed: {e}")
                 await self._update_index_statuses(
@@ -210,6 +252,8 @@ class DocumentProcessor:
             # 12. Update document status to completed
             document.chunk_count = len(chunks)
             document.processed_at = datetime.utcnow()
+            document.processing_stage = "Completed"
+            document.progress_percentage = 100
             await self._update_document_status(
                 document, DocumentStatus.COMPLETED, db
             )
@@ -383,6 +427,21 @@ class DocumentProcessor:
         await db.refresh(document)
 
         logger.info(f"Updated document {document.id} status to {status.value}")
+
+    async def _update_progress(
+        self,
+        document: Document,
+        stage: str,
+        percentage: int,
+        db: AsyncSession,
+    ):
+        """Update document processing progress."""
+        document.processing_stage = stage
+        document.progress_percentage = min(100, max(0, percentage))  # Clamp to 0-100
+        db.add(document)
+        await db.commit()
+        await db.refresh(document)
+        logger.info(f"Document {document.id}: {stage} ({percentage}%)")
 
     async def _update_index_statuses(
         self,

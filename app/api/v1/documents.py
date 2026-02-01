@@ -61,14 +61,18 @@ async def _process_document_background(document_id: UUID):
     Note: Always updates document status to FAILED if processing fails,
     even if the main error handler couldn't commit the status change.
     """
+    logger.info(f"[BACKGROUND] Starting background processing for document {document_id}")
     try:
         # Create a new DB session for background task
         from app.db.session import AsyncSessionLocal
 
+        logger.info(f"[BACKGROUND] Creating DB session...")
         async with AsyncSessionLocal() as db:
+            logger.info(f"[BACKGROUND] Getting document processor...")
             processor = get_document_processor()
+            logger.info(f"[BACKGROUND] Calling process_document()...")
             result = await processor.process_document(document_id, db)
-            logger.info(f"Background processing completed: {result}")
+            logger.info(f"[BACKGROUND] Background processing completed: {result}")
 
     except Exception as e:
         logger.error(f"Background processing failed for document {document_id}: {e}")
@@ -208,10 +212,12 @@ async def create_document(
     await db.refresh(doc_model)
 
     # Process document in background
+    logger.info(f"[UPLOAD] Adding background task for document {doc_model.id}")
     background_tasks.add_task(
         _process_document_background,
         document_id=doc_model.id,
     )
+    logger.info(f"[UPLOAD] Background task added successfully for document {doc_model.id}")
 
     logger.info(f"Document {doc_model.id} ({filename}) uploaded and queued for processing")
 
@@ -509,6 +515,8 @@ async def get_document_status(
             "bm25_status": (doc.bm25_status.value if hasattr(doc.bm25_status, 'value') else str(doc.bm25_status)) if doc.bm25_status else None,
             "chunk_count": doc.chunk_count or 0,
             "error_message": doc.error_message,
+            "processing_stage": doc.processing_stage,
+            "progress_percentage": doc.progress_percentage or 0,
         }
 
     except HTTPException:

@@ -336,3 +336,73 @@ async def reprocess_knowledge_base(
     logger.info(f"Queued {queued} documents for reprocessing (kb={kb_id})")
 
     return {"queued": queued, "knowledge_base_id": str(kb_id)}
+
+
+@router.post("/{kb_id}/cleanup-orphaned-chunks", response_model=dict)
+async def cleanup_orphaned_chunks(
+    kb_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """
+    Clean up orphaned chunks in Qdrant for deleted documents.
+
+    Removes vector embeddings from Qdrant for documents that are marked
+    as deleted (is_deleted=true) in PostgreSQL.
+    """
+    from app.core.vector_store import QdrantVectorStore
+
+    # Get KB
+    query = select(KnowledgeBaseModel).where(
+        KnowledgeBaseModel.id == kb_id,
+        KnowledgeBaseModel.is_deleted == False,
+    )
+    result = await db.execute(query)
+    kb = result.scalar_one_or_none()
+
+    if not kb:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Knowledge base {kb_id} not found",
+        )
+
+    # Get deleted document IDs
+    deleted_query = select(DocumentModel.id).where(
+        DocumentModel.knowledge_base_id == kb_id,
+        DocumentModel.is_deleted == True,
+    )
+    deleted_result = await db.execute(deleted_query)
+    deleted_doc_ids = [str(doc_id) for doc_id in deleted_result.scalars().all()]
+
+    if not deleted_doc_ids:
+        return {
+            "deleted_chunks": 0,
+            "deleted_documents": 0,
+            "message": "No deleted documents found"
+        }
+
+    # Delete chunks from Qdrant for each deleted document
+    vector_store = QdrantVectorStore()
+    total_deleted = 0
+
+    for doc_id in deleted_doc_ids:
+        try:
+            count = await vector_store.delete_by_document_id(
+                collection_name=kb.collection_name,
+                document_id=doc_id,
+            )
+            total_deleted += count
+            logger.info(f"Deleted {count} chunks for document {doc_id}")
+        except Exception as e:
+            logger.error(f"Failed to delete chunks for document {doc_id}: {e}")
+
+    logger.info(
+        f"Cleanup completed for KB {kb_id}: "
+        f"deleted {total_deleted} chunks from {len(deleted_doc_ids)} documents"
+    )
+
+    return {
+        "deleted_chunks": total_deleted,
+        "deleted_documents": len(deleted_doc_ids),
+        "knowledge_base_id": str(kb_id),
+    }

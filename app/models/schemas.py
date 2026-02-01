@@ -185,6 +185,8 @@ class DocumentResponse(DocumentBase):
     embeddings_status: DocumentStatus
     bm25_status: DocumentStatus
     error_message: Optional[str] = None
+    processing_stage: Optional[str] = None
+    progress_percentage: int = 0
     chunk_count: int
     user_id: Optional[UUID] = None
     created_at: datetime

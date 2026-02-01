@@ -224,10 +224,20 @@ export function DocumentItem({ document, onReprocess, onDelete, onAnalyze }: Doc
 
             {document.status === 'processing' && (
               <div className="mt-2">
-                <div className="h-1 bg-gray-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-primary-500 rounded-full animate-pulse w-2/3"></div>
+                <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary-500 rounded-full transition-all duration-300"
+                    style={{ width: `${document.progress_percentage || 0}%` }}
+                  ></div>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Processing...</p>
+                <div className="flex justify-between items-center mt-1">
+                  <p className="text-xs text-gray-400">
+                    {document.processing_stage || 'Processing...'}
+                  </p>
+                  <p className="text-xs text-gray-500 font-medium">
+                    {document.progress_percentage || 0}%
+                  </p>
+                </div>
               </div>
             )}
           </div>

@@ -88,12 +88,15 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
       newErrors.chunk_size = 'Chunk size must be between 100 and 2000'
     }
 
-    if (formData.chunk_overlap < 0 || formData.chunk_overlap > 500) {
-      newErrors.chunk_overlap = 'Chunk overlap must be between 0 and 500'
-    }
+    // Chunk overlap validation - not used in semantic chunking
+    if (formData.chunking_strategy !== 'semantic') {
+      if (formData.chunk_overlap < 0 || formData.chunk_overlap > 500) {
+        newErrors.chunk_overlap = 'Chunk overlap must be between 0 and 500'
+      }
 
-    if (formData.chunk_overlap >= formData.chunk_size) {
-      newErrors.chunk_overlap = 'Chunk overlap must be less than chunk size'
+      if (formData.chunk_overlap >= formData.chunk_size) {
+        newErrors.chunk_overlap = 'Chunk overlap must be less than chunk size'
+      }
     }
 
     if (formData.upsert_batch_size < 64 || formData.upsert_batch_size > 1024) {
@@ -181,13 +184,13 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
     },
     {
       value: 'semantic',
-      label: 'Semantic (Coming Soon)',
-      description: 'Advanced chunking using embeddings to identify semantic boundaries.',
+      label: 'Semantic (Embeddings) ✓',
+      description: 'Advanced chunking using embeddings to find semantic boundaries. Includes contextual descriptions for better RAG retrieval. Best for documents with clear topic changes.',
       icon: '🎯',
       recommended: false,
-      disabled: true,
-      recommendedChunkSize: 'TBD',
-      recommendedOverlap: 'TBD',
+      disabled: false,
+      recommendedChunkSize: '500-800 (max)',
+      recommendedOverlap: 'N/A (not used)',
     },
   ]
 
@@ -284,7 +287,16 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
           <select
             id="chunking-strategy"
             value={formData.chunking_strategy}
-            onChange={(e) => setFormData({ ...formData, chunking_strategy: e.target.value })}
+            onChange={(e) => {
+              const newStrategy = e.target.value
+              // Auto-adjust chunk size for semantic chunking
+              const newChunkSize = newStrategy === 'semantic' ? 800 : formData.chunk_size
+              setFormData({
+                ...formData,
+                chunking_strategy: newStrategy,
+                chunk_size: newChunkSize,
+              })
+            }}
             className="input w-full"
             disabled={isSubmitting}
           >
@@ -359,31 +371,43 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
             {errors.chunk_size && <p className="mt-1 text-sm text-red-500">{errors.chunk_size}</p>}
           </div>
 
-          {/* Chunk Overlap */}
-          <div>
-            <label htmlFor="chunk-overlap" className="block text-sm text-gray-400 mb-2">
-              Chunk Overlap: <span className="text-white font-medium">{formData.chunk_overlap}</span> characters
-              <span className="text-gray-500">
-                {' '}({formData.chunk_size > 0 ? Math.round((formData.chunk_overlap / formData.chunk_size) * 100) : 0}%)
-              </span>
-            </label>
-            <input
-              id="chunk-overlap"
-              type="range"
-              min="0"
-              max="500"
-              step="50"
-              value={formData.chunk_overlap}
-              onChange={(e) => setFormData({ ...formData, chunk_overlap: parseInt(e.target.value) })}
-              className="w-full"
-              disabled={isSubmitting}
-            />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>0</span>
-              <span>500</span>
+          {/* Chunk Overlap - not used in semantic chunking */}
+          {formData.chunking_strategy !== 'semantic' && (
+            <div>
+              <label htmlFor="chunk-overlap" className="block text-sm text-gray-400 mb-2">
+                Chunk Overlap: <span className="text-white font-medium">{formData.chunk_overlap}</span> characters
+                <span className="text-gray-500">
+                  {' '}({formData.chunk_size > 0 ? Math.round((formData.chunk_overlap / formData.chunk_size) * 100) : 0}%)
+                </span>
+              </label>
+              <input
+                id="chunk-overlap"
+                type="range"
+                min="0"
+                max="500"
+                step="50"
+                value={formData.chunk_overlap}
+                onChange={(e) => setFormData({ ...formData, chunk_overlap: parseInt(e.target.value) })}
+                className="w-full"
+                disabled={isSubmitting}
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>0</span>
+                <span>500</span>
+              </div>
+              {errors.chunk_overlap && <p className="mt-1 text-sm text-red-500">{errors.chunk_overlap}</p>}
             </div>
-            {errors.chunk_overlap && <p className="mt-1 text-sm text-red-500">{errors.chunk_overlap}</p>}
-          </div>
+          )}
+
+          {/* Info message for semantic chunking */}
+          {formData.chunking_strategy === 'semantic' && (
+            <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+              <p className="text-xs text-blue-400">
+                ℹ️ <strong>Semantic chunking</strong> finds natural topic boundaries using embeddings.
+                Chunk overlap is not used - boundaries are determined by semantic similarity.
+              </p>
+            </div>
+          )}
 
           {/* Upsert Batch Size */}
           <div className="mt-4">

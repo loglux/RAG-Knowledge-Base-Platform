@@ -5,7 +5,7 @@ import type { Document } from '../types/index'
 export function useDocumentPolling(
   documents: Document[],
   onStatusUpdate: (id: string, status: any) => void,
-  interval = 3000
+  interval = 1000
 ) {
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -26,8 +26,13 @@ export function useDocumentPolling(
       for (const doc of processingDocs) {
         try {
           const status = await apiClient.getDocumentStatus(doc.id)
-          // Only update if status changed
-          if (status.status !== doc.status || status.chunk_count !== doc.chunk_count) {
+          // Update if status, chunk_count, or progress changed
+          if (
+            status.status !== doc.status ||
+            status.chunk_count !== doc.chunk_count ||
+            status.progress_percentage !== doc.progress_percentage ||
+            status.processing_stage !== doc.processing_stage
+          ) {
             onStatusUpdate(doc.id, status)
           }
         } catch (error) {

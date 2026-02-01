@@ -194,6 +194,19 @@ class Document(Base):
     )
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # Processing progress tracking
+    processing_stage: Mapped[Optional[str]] = mapped_column(
+        String(100),
+        nullable=True,
+        comment="Current processing stage (e.g., 'Chunking', 'Embedding 50/100')"
+    )
+    progress_percentage: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+        comment="Processing progress 0-100%"
+    )
+
     # Chunking results
     chunk_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
