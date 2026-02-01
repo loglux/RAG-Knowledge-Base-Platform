@@ -150,6 +150,8 @@ logs/
 docs/
 examples/
 scripts/
+!scripts/backup.sh
+!scripts/restore.sh
 tests/
 frontend/_local/
 screenshots/

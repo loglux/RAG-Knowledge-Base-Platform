@@ -58,3 +58,10 @@ Thumbs.db
 data/
 temp/
 tmp/
+uploads/
+frontend/
+scripts/
+
+# Test files
+test_*.py
+check_*.py
