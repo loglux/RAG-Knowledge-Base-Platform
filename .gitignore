@@ -176,3 +176,4 @@ test_document_ai_history.txt
 test_semantic_chunking.py
 test_semantic_chunking_integration.py
 test_texts.py
+check_documents.py
