@@ -160,6 +160,8 @@ chat*.png
 /*.md
 !/README.md
 !/RUNBOOK.md
+!/PROJECT_ROADMAP.md
+!/DEVELOPMENT_LOG.md
 /RUNBOOK_LOCAL.md
 /antropic_key.txt
 /voyageai_key.txt
