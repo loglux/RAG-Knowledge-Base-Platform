@@ -18,6 +18,7 @@ from app.models.schemas import (
 )
 from app.dependencies import get_current_user_id
 from app.core.embeddings_base import EMBEDDING_MODELS
+from app.core.vector_store import get_vector_store
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,34 @@ async def create_knowledge_base(
     await db.commit()
     await db.refresh(kb_model)
 
-    # TODO: Create Qdrant collection (Phase 3)
+    # Create Qdrant collection
+    try:
+        vector_store = get_vector_store()
+        logger.info(
+            f"Creating Qdrant collection '{collection_name}' "
+            f"for KB '{kb.name}' (dimension={model_config.dimension})"
+        )
+
+        await vector_store.create_collection(
+            collection_name=collection_name,
+            vector_size=model_config.dimension,
+        )
+
+        logger.info(f"Successfully created Qdrant collection '{collection_name}'")
+
+    except Exception as e:
+        # Rollback: delete KB from database if Qdrant collection creation fails
+        logger.error(
+            f"Failed to create Qdrant collection '{collection_name}': {e}. "
+            f"Rolling back KB creation."
+        )
+        await db.delete(kb_model)
+        await db.commit()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create vector store collection: {str(e)}"
+        )
 
     return kb_model
 
