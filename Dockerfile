@@ -15,9 +15,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy requirements
 COPY requirements.txt ./
 
-# Install Python dependencies to a local directory
+# Install Python dependencies system-wide
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir --user -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt
 
 # Stage 2: Runtime - Minimal image with only necessary files
 FROM python:3.12-slim
@@ -30,16 +30,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Python dependencies from builder
-COPY --from=builder /root/.local /root/.local
-
-# Make sure scripts in .local are usable
-ENV PATH=/root/.local/bin:$PATH
+# Copy Python dependencies from builder (system-wide installation)
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
 COPY app ./app
 COPY alembic.ini ./
-COPY alembic ./alembic
 
 # Create necessary directories
 RUN mkdir -p /app/logs /app/uploads && \
