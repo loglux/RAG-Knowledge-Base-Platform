@@ -1,4 +1,5 @@
 """FastAPI application entry point."""
+import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -10,6 +11,8 @@ from app.config import settings
 from app.db.session import close_db
 from app.api.v1 import api_router
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator:
@@ -19,15 +22,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     Handles startup and shutdown events.
     """
     # Startup
-    print(f"🚀 Starting Knowledge Base Platform in {settings.ENVIRONMENT} mode")
-    print(f"📊 Database: {settings.DATABASE_URL.split('@')[1] if '@' in settings.DATABASE_URL else 'configured'}")
-    print(f"🔍 Qdrant: {settings.QDRANT_URL}")
-    print(f"🤖 OpenAI Model: {settings.OPENAI_CHAT_MODEL}")
+    logger.info(f"Starting Knowledge Base Platform in {settings.ENVIRONMENT} mode")
+    logger.info(f"Database: {settings.DATABASE_URL.split('@')[1] if '@' in settings.DATABASE_URL else 'configured'}")
+    logger.info(f"Qdrant: {settings.QDRANT_URL}")
+    logger.info(f"OpenAI Model: {settings.OPENAI_CHAT_MODEL}")
 
     yield
 
     # Shutdown
-    print("👋 Shutting down Knowledge Base Platform")
+    logger.info("Shutting down Knowledge Base Platform")
     await close_db()
 
 

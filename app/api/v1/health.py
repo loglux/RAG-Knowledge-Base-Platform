@@ -1,4 +1,5 @@
 """Health check endpoints."""
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, status
@@ -11,6 +12,8 @@ from app.models.database import AppSettings as AppSettingsModel
 from app.config import settings
 from app.core.vector_store import get_vector_store
 from app.core.lexical_store import get_lexical_store
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -51,7 +54,7 @@ async def readiness_check(db: AsyncSession = Depends(get_db)):
         if result.scalar() == 1:
             checks["database"] = True
     except Exception as e:
-        print(f"Database check failed: {e}")
+        logger.error(f"Database check failed: {e}")
 
     # Check Qdrant
     try:
