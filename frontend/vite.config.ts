@@ -1,11 +1,45 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import os from 'os'
+
+/**
+ * Get the host machine's LAN IP address automatically.
+ * Looks for non-internal IPv4 addresses (e.g., 192.168.x.x).
+ *
+ * Note: In Docker containers, this will return container's internal IP.
+ * For Docker deployment, override with VITE_BACKEND_URL env variable.
+ * TODO: Add automatic Docker environment detection.
+ */
+function getHostIP(): string {
+  const interfaces = os.networkInterfaces()
+
+  for (const name of Object.keys(interfaces)) {
+    const iface = interfaces[name]
+    if (!iface) continue
+
+    for (const alias of iface) {
+      // Skip internal (loopback) and IPv6 addresses
+      if (alias.family === 'IPv4' && !alias.internal) {
+        return alias.address
+      }
+    }
+  }
+
+  // Fallback to localhost if no external IP found
+  return 'localhost'
+}
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory.
   // process.cwd() is already 'frontend/' when vite runs
   const env = loadEnv(mode, process.cwd(), 'VITE_')
+
+  // Auto-detect host IP for LAN access, or use env override
+  const hostIP = env.VITE_BACKEND_URL || `http://${getHostIP()}:8004`
+
+  // Log detected backend URL for debugging
+  console.log(`[Vite] Backend proxy: ${hostIP}`)
 
   return {
     plugins: [react()],
@@ -24,7 +58,7 @@ export default defineConfig(({ mode }) => {
       } : undefined,
       proxy: {
         '/api': {
-          target: 'http://192.168.10.32:8004',
+          target: hostIP,
           changeOrigin: true,
           rewrite: (path) => path, // Keep /api prefix
         }

@@ -215,6 +215,23 @@ frontend/
 └── DEPLOYMENT_LOCAL.md    # Local deployment with actual config (gitignored)
 ```
 
+## Docker Deployment
+
+### Important: Auto IP Detection in Docker
+
+When running frontend in a Docker container, the auto-detection will return the container's internal IP (e.g., `172.17.0.x`), not the host's LAN IP.
+
+**Solution:** Override with environment variable in `docker-compose.yml`:
+
+```yaml
+services:
+  frontend:
+    environment:
+      - VITE_BACKEND_URL=http://backend:8004  # Docker service name
+```
+
+**TODO:** Consider adding automatic Docker environment detection in `vite.config.ts` to handle this transparently.
+
 ## Security Notes
 
 - **Never commit** `.env.local` or `.env.development.local` to version control
