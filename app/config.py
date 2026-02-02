@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     )
 
     # OpenAI
-    OPENAI_API_KEY: str = Field(..., description="OpenAI API key (required)")
+    OPENAI_API_KEY: Optional[str] = Field(default=None, description="OpenAI API key (configured via Setup Wizard)")
     OPENAI_EMBEDDING_MODEL: str = Field(
         default="text-embedding-3-large",
         description="OpenAI embedding model"
