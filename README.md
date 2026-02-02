@@ -35,6 +35,7 @@ It can be used as a standalone service or integrated into other products via its
 - Qdrant-backed vector index for fast similarity search
 - **MMR (Maximal Marginal Relevance)** for diversity-aware search
 - Optional BM25 lexical index (OpenSearch) for hybrid retrieval
+- **Self-Check Validation** (optional): Two-stage answer generation with validation for improved accuracy
 - Structured document analysis and TOC metadata
 - RAG answers with citations
 - FastAPI backend + React frontend

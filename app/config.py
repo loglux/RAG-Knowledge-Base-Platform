@@ -81,7 +81,7 @@ class Settings(BaseSettings):
         description="OpenAI embedding model"
     )
     OPENAI_CHAT_MODEL: str = Field(
-        default="gpt-4-turbo-preview",
+        default="gpt-4o",
         description="OpenAI chat model"
     )
     OPENAI_MAX_TOKENS: int = Field(default=16000, description="Max tokens for OpenAI responses")

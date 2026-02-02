@@ -102,7 +102,8 @@ export function useChat(kbId: string) {
       llmProvider?: string,
       useStructure = false,
       useMmr = false,
-      mmrDiversity = 0.5
+      mmrDiversity = 0.5,
+      useSelfCheck = true
     ) => {
       if (!question.trim()) return
 
@@ -138,6 +139,7 @@ export function useChat(kbId: string) {
           use_structure: useStructure,
           use_mmr: useMmr,
           mmr_diversity: mmrDiversity,
+          use_self_check: useSelfCheck,
         }
 
         const response = await apiClient.chat(request)

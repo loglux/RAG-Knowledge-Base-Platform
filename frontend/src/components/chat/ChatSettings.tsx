@@ -22,6 +22,7 @@ interface ChatSettingsProps {
   useStructure: boolean
   useMmr: boolean
   mmrDiversity: number
+  useSelfCheck: boolean
   onTopKChange: (value: number) => void
   onTemperatureChange: (value: number) => void
   onMaxContextCharsChange: (value: number) => void
@@ -38,6 +39,7 @@ interface ChatSettingsProps {
   onUseStructureChange: (value: boolean) => void
   onUseMmrChange: (value: boolean) => void
   onMmrDiversityChange: (value: number) => void
+  onUseSelfCheckChange: (value: boolean) => void
   onResetDefaults: () => void
   onClose: () => void
 }
@@ -63,6 +65,7 @@ export function ChatSettings({
   useStructure,
   useMmr,
   mmrDiversity,
+  useSelfCheck,
   onTopKChange,
   onTemperatureChange,
   onMaxContextCharsChange,
@@ -79,6 +82,7 @@ export function ChatSettings({
   onUseStructureChange,
   onUseMmrChange,
   onMmrDiversityChange,
+  onUseSelfCheckChange,
   onResetDefaults,
   onClose,
 }: ChatSettingsProps) {
@@ -197,6 +201,27 @@ export function ChatSettings({
               </div>
             </div>
           )}
+        </div>
+
+        {/* Self-Check Validation Toggle */}
+        <div className="mb-6 p-4 bg-gray-900 rounded-lg border border-gray-700">
+          <label className="flex items-center space-x-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={useSelfCheck}
+              onChange={(e) => onUseSelfCheckChange(e.target.checked)}
+              className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
+            />
+            <div className="flex-1">
+              <span className="text-sm font-medium text-white">
+                Enable Self-Check Validation
+              </span>
+              <p className="text-xs text-gray-400 mt-1">
+                Validates generated answers against retrieved context to ensure accuracy and prevent hallucinations.
+                The system generates a draft answer, then validates it for factual grounding before returning.
+              </p>
+            </div>
+          </label>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

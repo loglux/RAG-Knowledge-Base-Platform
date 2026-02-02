@@ -143,6 +143,7 @@ export interface ChatRequest {
   use_structure?: boolean
   use_mmr?: boolean
   mmr_diversity?: number
+  use_self_check?: boolean
 }
 
 export interface ChatResponse {
@@ -183,6 +184,7 @@ export interface ConversationSettings {
   bm25_analyzer?: string | null
   use_mmr?: boolean
   mmr_diversity?: number
+  use_self_check?: boolean
 }
 
 export interface ConversationDetail {

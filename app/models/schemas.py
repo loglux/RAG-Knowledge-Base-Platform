@@ -323,6 +323,9 @@ class ConversationSettings(BaseModel):
     bm25_min_should_match: Optional[int] = Field(default=None, ge=0, le=100)
     bm25_use_phrase: Optional[bool] = Field(default=None)
     bm25_analyzer: Optional[str] = Field(default=None)
+    use_mmr: Optional[bool] = Field(default=None)
+    mmr_diversity: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    use_self_check: Optional[bool] = Field(default=None)
 
 
 class AppSettingsBase(BaseModel):
@@ -478,6 +481,10 @@ class ChatRequest(BaseModel):
         ge=0.0,
         le=1.0,
         description="MMR diversity parameter (0.0=pure relevance, 1.0=pure diversity)"
+    )
+    use_self_check: bool = Field(
+        default=True,
+        description="Enable self-check validation of generated answers"
     )
 
 

@@ -210,6 +210,7 @@ async def chat_query(
             use_structure=request.use_structure,
             use_mmr=request.use_mmr,
             mmr_diversity=request.mmr_diversity,
+            use_self_check=request.use_self_check,
             db=db,
             kb_id=request.knowledge_base_id,
         )
@@ -235,6 +236,7 @@ async def chat_query(
                 "bm25_analyzer": bm25_analyzer,
                 "use_mmr": request.use_mmr,
                 "mmr_diversity": request.mmr_diversity,
+                "use_self_check": request.use_self_check,
             }
             conversation = ConversationModel(
                 knowledge_base_id=request.knowledge_base_id,
@@ -269,6 +271,7 @@ async def chat_query(
                 "bm25_analyzer": bm25_analyzer,
                 "use_mmr": request.use_mmr,
                 "mmr_diversity": request.mmr_diversity,
+                "use_self_check": request.use_self_check,
             })
             conversation.settings_json = json.dumps(existing_settings)
 
