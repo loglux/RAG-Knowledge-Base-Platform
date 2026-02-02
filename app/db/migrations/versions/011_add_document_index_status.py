@@ -16,15 +16,15 @@ depends_on = None
 
 def upgrade() -> None:
     """Add embeddings_status and bm25_status columns."""
-    status_enum = sa.Enum('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', name='documentstatus')
+    status_enum = sa.Enum('pending', 'processing', 'completed', 'failed', name='documentstatus')
 
     op.add_column(
         'documents',
-        sa.Column('embeddings_status', status_enum, nullable=False, server_default='PENDING')
+        sa.Column('embeddings_status', status_enum, nullable=False, server_default='pending')
     )
     op.add_column(
         'documents',
-        sa.Column('bm25_status', status_enum, nullable=False, server_default='PENDING')
+        sa.Column('bm25_status', status_enum, nullable=False, server_default='pending')
     )
 
     # Backfill embeddings_status from existing document status
@@ -32,7 +32,7 @@ def upgrade() -> None:
 
     # For BM25, treat completed docs as pending (reindex needed), otherwise mirror status
     op.execute(
-        "UPDATE documents SET bm25_status = CASE WHEN status = 'COMPLETED' THEN 'PENDING' ELSE status END "
+        "UPDATE documents SET bm25_status = CASE WHEN status = 'completed' THEN 'pending' ELSE status END "
         "WHERE status IS NOT NULL"
     )
 

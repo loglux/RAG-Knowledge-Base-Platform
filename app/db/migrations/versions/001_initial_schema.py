@@ -60,7 +60,7 @@ def upgrade() -> None:
         sa.Column('filename', sa.String(length=255), nullable=False),
         sa.Column(
             'file_type',
-            sa.Enum('TXT', 'MD', name='filetype'),
+            sa.Enum('txt', 'md', name='filetype'),
             nullable=False
         ),
         sa.Column('file_size', sa.Integer(), nullable=False, comment='File size in bytes'),
@@ -73,9 +73,9 @@ def upgrade() -> None:
         ),
         sa.Column(
             'status',
-            sa.Enum('PENDING', 'PROCESSING', 'COMPLETED', 'FAILED', name='documentstatus'),
+            sa.Enum('pending', 'processing', 'completed', 'failed', name='documentstatus'),
             nullable=False,
-            server_default='PENDING'
+            server_default='pending'
         ),
         sa.Column('error_message', sa.Text(), nullable=True),
         sa.Column('chunk_count', sa.Integer(), nullable=False, server_default='0'),
