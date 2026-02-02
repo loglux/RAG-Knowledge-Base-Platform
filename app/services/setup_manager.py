@@ -192,7 +192,7 @@ class SetupManager:
             logger.info("Saved API keys to system settings")
 
         except Exception as e:
-            logger.error(f"Failed to save API keys: {e}")
+            logger.exception(f"Failed to save API keys: {e}")  # Changed to .exception to include traceback
             raise SetupError(f"Failed to save API keys: {e}") from e
 
     @staticmethod
