@@ -185,18 +185,30 @@ class QdrantVectorStore:
 
     async def collection_exists(self, collection_name: str) -> bool:
         """
-        Check if a collection exists.
+        Check if a collection exists (including aliases).
 
         Args:
-            collection_name: Name of collection to check
+            collection_name: Name of collection or alias to check
 
         Returns:
-            True if collection exists
+            True if collection or alias exists
         """
         try:
+            # Check actual collections
             collections = await self.client.get_collections()
             existing = [c.name for c in collections.collections]
-            return collection_name in existing
+            if collection_name in existing:
+                return True
+
+            # Check aliases
+            try:
+                aliases_response = await self.client.get_collection_aliases(collection_name)
+                # If we get here without exception, the alias exists
+                return True
+            except Exception:
+                # Alias doesn't exist, which is fine
+                return False
+
         except Exception as e:
             logger.error(f"Failed to check collection existence: {e}")
             return False

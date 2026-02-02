@@ -472,17 +472,17 @@ class ChatRequest(BaseModel):
         default=False,
         description="Use document structure for search (experimental, default: OFF)"
     )
-    use_mmr: bool = Field(
+    use_mmr: Optional[bool] = Field(
         default=False,
         description="Enable MMR (Maximal Marginal Relevance) for diversity-aware search"
     )
-    mmr_diversity: float = Field(
+    mmr_diversity: Optional[float] = Field(
         default=0.5,
         ge=0.0,
         le=1.0,
         description="MMR diversity parameter (0.0=pure relevance, 1.0=pure diversity)"
     )
-    use_self_check: bool = Field(
+    use_self_check: Optional[bool] = Field(
         default=False,
         description="Enable self-check validation of generated answers"
     )
