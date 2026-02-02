@@ -154,6 +154,9 @@ examples/
 scripts/
 !scripts/backup.sh
 !scripts/restore.sh
+!scripts/migrate_dev_to_prod.sh
+!scripts/fix_enum_case.sh
+!scripts/README.md
 tests/
 frontend/_local/
 screenshots/
