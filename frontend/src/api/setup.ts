@@ -2,7 +2,9 @@
  * Setup API client
  */
 
-import { API_BASE_URL } from './config';
+const BASE_URL = import.meta.env.VITE_BASE_URL || '';
+const API_PREFIX = import.meta.env.VITE_API_PREFIX || '/api/v1';
+const BASE_URL = BASE_URL + API_PREFIX;
 
 export interface SetupStatus {
   is_complete: boolean;
@@ -46,7 +48,7 @@ export interface SetupCompleteRequest {
  * Get setup status
  */
 export async function getSetupStatus(): Promise<SetupStatus> {
-  const response = await fetch(`${API_BASE_URL}/setup/status`);
+  const response = await fetch(`${BASE_URL}/setup/status`);
 
   if (!response.ok) {
     throw new Error('Failed to get setup status');
@@ -60,7 +62,7 @@ export async function getSetupStatus(): Promise<SetupStatus> {
  * Create admin user
  */
 export async function createAdminUser(data: AdminCreateRequest): Promise<any> {
-  const response = await fetch(`${API_BASE_URL}/setup/admin`, {
+  const response = await fetch(`${BASE_URL}/setup/admin`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -78,7 +80,7 @@ export async function createAdminUser(data: AdminCreateRequest): Promise<any> {
  * Save API keys
  */
 export async function saveAPIKeys(data: APIKeysRequest): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/setup/api-keys`, {
+  const response = await fetch(`${BASE_URL}/setup/api-keys`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -94,7 +96,7 @@ export async function saveAPIKeys(data: APIKeysRequest): Promise<void> {
  * Save database settings
  */
 export async function saveDatabaseSettings(data: DatabaseSettingsRequest): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/setup/database`, {
+  const response = await fetch(`${BASE_URL}/setup/database`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -110,7 +112,7 @@ export async function saveDatabaseSettings(data: DatabaseSettingsRequest): Promi
  * Save system settings
  */
 export async function saveSystemSettings(data: SystemSettingsRequest): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/setup/system`, {
+  const response = await fetch(`${BASE_URL}/setup/system`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -126,7 +128,7 @@ export async function saveSystemSettings(data: SystemSettingsRequest): Promise<v
  * Complete setup
  */
 export async function completeSetup(data: SetupCompleteRequest = {}): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/setup/complete`, {
+  const response = await fetch(`${BASE_URL}/setup/complete`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
