@@ -1,6 +1,27 @@
 version: '3.8'
 
 services:
+  # Frontend - React + Vite (Production Build)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.production
+    container_name: kb-platform-frontend
+    restart: unless-stopped
+    ports:
+      - "5174:80"
+    networks:
+      - kb-network
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
   # PostgreSQL Database (required for application bootstrap)
   # Credentials MUST be available before first run
   # Override with environment variables: POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
