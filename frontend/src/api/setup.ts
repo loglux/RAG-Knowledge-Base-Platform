@@ -44,6 +44,19 @@ export interface SetupCompleteRequest {
   admin_id?: number;
 }
 
+export interface PostgresPasswordRequest {
+  username: string;
+  new_password?: string;
+  generate_password?: boolean;
+}
+
+export interface PostgresPasswordResponse {
+  username: string;
+  password: string;
+  database_url: string;
+  message: string;
+}
+
 /**
  * Get setup status
  */
@@ -138,4 +151,36 @@ export async function completeSetup(data: SetupCompleteRequest = {}): Promise<vo
     const error = await response.json();
     throw new Error(error.detail || 'Failed to complete setup');
   }
+}
+
+/**
+ * Generate secure password (preview only)
+ */
+export async function generatePasswordPreview(): Promise<string> {
+  const response = await fetch(`${BASE_URL}/setup/generate-password`);
+
+  if (!response.ok) {
+    throw new Error('Failed to generate password');
+  }
+
+  const result = await response.json();
+  return result.data.password;
+}
+
+/**
+ * Change PostgreSQL password
+ */
+export async function changePostgresPassword(data: PostgresPasswordRequest): Promise<PostgresPasswordResponse> {
+  const response = await fetch(`${BASE_URL}/setup/postgres-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to change PostgreSQL password');
+  }
+
+  return response.json();
 }

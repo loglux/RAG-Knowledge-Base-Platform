@@ -1,10 +1,12 @@
 """Setup wizard business logic."""
 import logging
+import secrets
+import string
 from typing import Optional, Dict, Any
 from datetime import datetime
 
 import bcrypt
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.database import AdminUser, SystemSettings
@@ -420,3 +422,109 @@ class SetupManager:
                 "needs_setup": True,
                 "error": str(e),
             }
+
+    @staticmethod
+    def generate_secure_password(length: int = 24) -> str:
+        """
+        Generate cryptographically secure random password.
+
+        Args:
+            length: Password length (default 24)
+
+        Returns:
+            Random password string with mixed characters
+        """
+        # Character sets
+        lowercase = string.ascii_lowercase
+        uppercase = string.ascii_uppercase
+        digits = string.digits
+        special = "!@#$%^&*()-_=+[]{}|;:,.<>?"
+
+        # Ensure at least one character from each set
+        password = [
+            secrets.choice(lowercase),
+            secrets.choice(uppercase),
+            secrets.choice(digits),
+            secrets.choice(special),
+        ]
+
+        # Fill the rest with random characters from all sets
+        all_chars = lowercase + uppercase + digits + special
+        password.extend(secrets.choice(all_chars) for _ in range(length - 4))
+
+        # Shuffle to avoid predictable pattern
+        secrets.SystemRandom().shuffle(password)
+
+        return ''.join(password)
+
+    @staticmethod
+    async def change_postgres_password(
+        db: AsyncSession,
+        username: str,
+        new_password: str,
+        updated_by: Optional[int] = None,
+    ) -> Dict[str, str]:
+        """
+        Change PostgreSQL user password.
+
+        Args:
+            db: Database session
+            username: PostgreSQL username
+            new_password: New password
+            updated_by: Admin user ID
+
+        Returns:
+            Dictionary with new DATABASE_URL
+
+        Raises:
+            SetupError: If password change fails
+        """
+        try:
+            # Execute ALTER USER command
+            alter_query = text(f"ALTER USER {username} WITH PASSWORD :password")
+            await db.execute(alter_query, {"password": new_password})
+            await db.commit()
+
+            # Get current DATABASE_URL from config
+            from app.config import settings
+            current_url = settings.DATABASE_URL
+
+            # Parse current URL to replace password
+            # Format: postgresql+asyncpg://user:pass@host:port/db
+            if "@" in current_url:
+                protocol_and_auth, host_and_db = current_url.split("@", 1)
+                protocol, auth = protocol_and_auth.rsplit("//", 1)
+
+                if ":" in auth:
+                    db_username, _ = auth.split(":", 1)
+                else:
+                    db_username = auth
+
+                # Construct new URL
+                new_url = f"{protocol}//{db_username}:{new_password}@{host_and_db}"
+            else:
+                raise SetupError("Invalid DATABASE_URL format")
+
+            # Save new DATABASE_URL to system settings
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="database_url",
+                value=new_url,
+                category="database",
+                description="PostgreSQL connection URL",
+                is_encrypted=False,
+                updated_by=updated_by,
+            )
+
+            logger.info(f"Changed PostgreSQL password for user: {username}")
+
+            return {
+                "database_url": new_url,
+                "username": username,
+                "password": new_password,
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to change PostgreSQL password: {e}")
+            await db.rollback()
+            raise SetupError(f"Failed to change PostgreSQL password: {e}") from e

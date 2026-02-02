@@ -1,0 +1,141 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database (required for application bootstrap)
+  # Credentials MUST be available before first run
+  # Override with environment variables: POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
+  db:
+    image: postgres:16-alpine
+    container_name: kb-platform-db
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+    environment:
+      # Default credentials for quick start (CHANGE IN PRODUCTION!)
+      # Override by setting environment variables before docker-compose up
+      - POSTGRES_USER=${POSTGRES_USER:-kb_user}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-kb_pass_change_me}
+      - POSTGRES_DB=${POSTGRES_DB:-knowledge_base}
+    volumes:
+      - kb_postgres_data:/var/lib/postgresql/data
+    networks:
+      - kb-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kb_user} -d ${POSTGRES_DB:-knowledge_base}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Qdrant Vector Database (configurable via Setup Wizard)
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: kb-platform-qdrant
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_HTTP_PORT:-6334}:6333"  # HTTP API
+      - "${QDRANT_GRPC_PORT:-6335}:6334"  # gRPC
+    volumes:
+      - kb_qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      # Optional API key (can be set via Setup Wizard)
+      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY:-}
+    networks:
+      - kb-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # OpenSearch (BM25 lexical search, configurable via Setup Wizard)
+  opensearch:
+    image: opensearchproject/opensearch:2
+    container_name: kb-platform-opensearch
+    restart: unless-stopped
+    ports:
+      - "${OPENSEARCH_PORT:-9201}:9200"
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      # Security disabled by default (can be enabled via Setup Wizard)
+      - DISABLE_SECURITY_PLUGIN=true
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_PASSWORD:-}
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - kb_opensearch_data:/usr/share/opensearch/data
+    networks:
+      - kb-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # FastAPI Application
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: kb-platform-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8004}:8000"
+    environment:
+      # Application settings
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DEBUG=${DEBUG:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - API_PREFIX=${API_PREFIX:-/api/v1}
+
+      # Database connection (uses db service defaults)
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-kb_user}:${POSTGRES_PASSWORD:-kb_pass_change_me}@db:5432/${POSTGRES_DB:-knowledge_base}
+
+      # Vector databases (defaults, can be overridden via Setup Wizard)
+      - QDRANT_URL=${QDRANT_URL:-http://qdrant:6333}
+      - QDRANT_GRPC_URL=${QDRANT_GRPC_URL:-qdrant:6334}
+      - OPENSEARCH_URL=${OPENSEARCH_URL:-http://opensearch:9200}
+
+      # API keys (will be configured via Setup Wizard on first run)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+
+      # CORS (adjust for your domain)
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173,http://localhost:5174}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+    depends_on:
+      db:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+    networks:
+      - kb-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  kb_postgres_data:
+    driver: local
+  kb_qdrant_data:
+    driver: local
+  kb_opensearch_data:
+    driver: local
+
+networks:
+  kb-network:
+    driver: bridge

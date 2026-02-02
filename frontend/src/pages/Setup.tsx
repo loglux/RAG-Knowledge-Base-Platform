@@ -14,13 +14,16 @@ import {
   saveDatabaseSettings,
   saveSystemSettings,
   completeSetup,
+  generatePasswordPreview,
+  changePostgresPassword,
   type AdminCreateRequest,
   type APIKeysRequest,
   type DatabaseSettingsRequest,
   type SystemSettingsRequest,
+  type PostgresPasswordRequest,
 } from '../api/setup';
 
-type Step = 'welcome' | 'admin' | 'api-keys' | 'database' | 'system' | 'complete';
+type Step = 'welcome' | 'admin' | 'db-security' | 'api-keys' | 'database' | 'system' | 'complete';
 
 const Setup: React.FC = () => {
   const navigate = useNavigate();
@@ -60,6 +63,16 @@ const Setup: React.FC = () => {
     chunk_overlap: 200,
   });
 
+  const [dbSecurityData, setDbSecurityData] = useState<PostgresPasswordRequest>({
+    username: 'kb_user',
+    new_password: '',
+    generate_password: false,
+  });
+
+  const [generatedPassword, setGeneratedPassword] = useState<string>('');
+  const [newDatabaseUrl, setNewDatabaseUrl] = useState<string>('');
+  const [passwordChanged, setPasswordChanged] = useState<boolean>(false);
+
   // Check if setup is already complete on mount
   useEffect(() => {
     checkSetupStatus();
@@ -92,7 +105,7 @@ const Setup: React.FC = () => {
       }
 
       await createAdminUser(adminData);
-      setCurrentStep('api-keys');
+      setCurrentStep('db-security');
     } catch (err: any) {
       setError(err.message || 'Failed to create admin user');
     } finally {
@@ -100,7 +113,49 @@ const Setup: React.FC = () => {
     }
   };
 
-  // Step 2: Save API Keys
+  // Step 2: Generate Password
+  const handleGeneratePassword = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const password = await generatePasswordPreview();
+      setGeneratedPassword(password);
+      setDbSecurityData({ ...dbSecurityData, new_password: password, generate_password: false });
+    } catch (err: any) {
+      setError(err.message || 'Failed to generate password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 2: Change Database Password
+  const handleChangeDbPassword = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const result = await changePostgresPassword(dbSecurityData);
+      setNewDatabaseUrl(result.database_url);
+      setPasswordChanged(true);
+
+      // Show success message for a moment
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      setCurrentStep('api-keys');
+    } catch (err: any) {
+      setError(err.message || 'Failed to change database password');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 2: Skip Database Security
+  const handleSkipDbSecurity = () => {
+    setCurrentStep('api-keys');
+  };
+
+  // Step 3: Save API Keys
   const handleSaveAPIKeys = async () => {
     setLoading(true);
     setError(null);
@@ -198,6 +253,7 @@ const Setup: React.FC = () => {
               <h3>What we'll configure:</h3>
               <ul>
                 <li>✓ Admin account for system management</li>
+                <li>✓ Database security (optional)</li>
                 <li>✓ API keys for AI services (OpenAI, Voyage, Anthropic)</li>
                 <li>✓ Database connections (optional)</li>
                 <li>✓ System settings (optional)</li>
@@ -283,10 +339,108 @@ const Setup: React.FC = () => {
           </div>
         );
 
+      case 'db-security':
+        return (
+          <div className="setup-step">
+            <h2>Step 2: Database Security (Optional)</h2>
+            <p className="setup-description">
+              Enhance security by changing the default PostgreSQL password.
+              You can generate a secure password or provide your own.
+            </p>
+
+            <div className="setup-info">
+              <h3>⚠️ Important Notes:</h3>
+              <ul>
+                <li>Current default password: <code>kb_pass_change_me</code></li>
+                <li>Changing password will update DATABASE_URL in settings</li>
+                <li>Save the new password - you'll need it for container restarts</li>
+                <li>This step is optional but recommended for production</li>
+              </ul>
+            </div>
+
+            <div className="form-group">
+              <label>PostgreSQL Username</label>
+              <input
+                type="text"
+                className="form-control"
+                value={dbSecurityData.username}
+                onChange={(e) => setDbSecurityData({ ...dbSecurityData, username: e.target.value })}
+                disabled
+              />
+              <small className="form-text">Database username (read-only)</small>
+            </div>
+
+            <div className="form-group">
+              <label>New Password</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Enter password or generate one"
+                  value={dbSecurityData.new_password}
+                  onChange={(e) => setDbSecurityData({ ...dbSecurityData, new_password: e.target.value })}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleGeneratePassword}
+                  disabled={loading}
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  {loading ? 'Generating...' : '🎲 Generate'}
+                </button>
+              </div>
+              <small className="form-text">Minimum 8 characters recommended</small>
+            </div>
+
+            {generatedPassword && (
+              <div className="alert" style={{ background: '#e7f5ff', border: '1px solid #339af0', color: '#1864ab' }}>
+                <strong>Generated Password:</strong> {generatedPassword}
+                <br />
+                <small>Copy this password and save it securely!</small>
+              </div>
+            )}
+
+            {passwordChanged && newDatabaseUrl && (
+              <div className="alert" style={{ background: '#d3f9d8', border: '1px solid #51cf66', color: '#2b8a3e' }}>
+                <strong>✓ Password Changed Successfully!</strong>
+                <br />
+                <small>New DATABASE_URL has been saved to system settings.</small>
+              </div>
+            )}
+
+            {error && <div className="alert alert-error">{error}</div>}
+
+            <div className="setup-actions">
+              <button
+                className="btn btn-secondary"
+                onClick={() => setCurrentStep('admin')}
+                disabled={loading}
+              >
+                ← Back
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={handleSkipDbSecurity}
+                disabled={loading}
+              >
+                Skip (Use Default)
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleChangeDbPassword}
+                disabled={loading || !dbSecurityData.new_password}
+              >
+                {loading ? 'Changing...' : 'Change Password →'}
+              </button>
+            </div>
+          </div>
+        );
+
       case 'api-keys':
         return (
           <div className="setup-step">
-            <h2>Step 2: API Keys</h2>
+            <h2>Step 3: API Keys</h2>
             <p className="setup-description">
               Configure API keys for AI services. At least one key is required.
             </p>
@@ -351,7 +505,7 @@ const Setup: React.FC = () => {
       case 'database':
         return (
           <div className="setup-step">
-            <h2>Step 3: Database Settings (Optional)</h2>
+            <h2>Step 4: Database Settings (Optional)</h2>
             <p className="setup-description">
               Configure database connections. Default values work for Docker deployments.
             </p>
@@ -448,7 +602,7 @@ const Setup: React.FC = () => {
       case 'system':
         return (
           <div className="setup-step">
-            <h2>Step 4: System Settings (Optional)</h2>
+            <h2>Step 5: System Settings (Optional)</h2>
             <p className="setup-description">
               Configure general system settings. Defaults are recommended for most users.
             </p>
@@ -571,7 +725,7 @@ const Setup: React.FC = () => {
   };
 
   // Progress indicator
-  const steps = ['welcome', 'admin', 'api-keys', 'database', 'system', 'complete'];
+  const steps = ['welcome', 'admin', 'db-security', 'api-keys', 'database', 'system', 'complete'];
   const currentStepIndex = steps.indexOf(currentStep);
   const progress = ((currentStepIndex + 1) / steps.length) * 100;
 

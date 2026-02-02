@@ -52,6 +52,21 @@ class SetupCompleteRequest(BaseModel):
     admin_id: Optional[int] = Field(None, description="Admin user ID who completed setup")
 
 
+class PostgresPasswordRequest(BaseModel):
+    """Request to change PostgreSQL password."""
+    username: str = Field(..., description="PostgreSQL username (usually kb_user)")
+    new_password: Optional[str] = Field(None, description="New password (leave empty to generate)")
+    generate_password: bool = Field(default=False, description="Generate secure random password")
+
+
+class PostgresPasswordResponse(BaseModel):
+    """Response with new PostgreSQL credentials."""
+    username: str
+    password: str
+    database_url: str
+    message: str
+
+
 # API Endpoints
 
 @router.get("/status")
@@ -125,6 +140,87 @@ async def create_admin_user(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create admin user: {str(e)}"
+        )
+
+
+@router.get("/generate-password")
+async def generate_password_preview():
+    """
+    Generate a secure random password (preview only, doesn't change anything).
+
+    Use this to see what a generated password would look like before applying it.
+    """
+    try:
+        password = SetupManager.generate_secure_password(length=24)
+        return {
+            "success": True,
+            "data": {
+                "password": password,
+                "length": len(password),
+            },
+            "message": "Generated secure password. This is just a preview - not applied yet."
+        }
+    except Exception as e:
+        logger.error(f"Failed to generate password: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate password: {str(e)}"
+        )
+
+
+@router.post("/postgres-password", response_model=PostgresPasswordResponse)
+async def change_postgres_password(
+    request: PostgresPasswordRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Change PostgreSQL password or generate a new secure password.
+
+    This is an optional security step. You can:
+    - Generate a random secure password (recommended)
+    - Provide your own password
+
+    **IMPORTANT**: Save the new password! You'll need it if you restart containers.
+    """
+    try:
+        # Determine password to use
+        if request.generate_password:
+            new_password = SetupManager.generate_secure_password(length=24)
+        elif request.new_password:
+            new_password = request.new_password
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Either provide new_password or set generate_password=true"
+            )
+
+        # Change password
+        result = await SetupManager.change_postgres_password(
+            db=db,
+            username=request.username,
+            new_password=new_password,
+        )
+
+        return PostgresPasswordResponse(
+            username=result["username"],
+            password=result["password"],
+            database_url=result["database_url"],
+            message="PostgreSQL password changed successfully. IMPORTANT: Save these credentials!"
+        )
+
+    except SetupError as e:
+        logger.error(f"Setup error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to change PostgreSQL password: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to change PostgreSQL password: {str(e)}"
         )
 
 
