@@ -6,19 +6,9 @@ set -e
 echo "🚀 Knowledge Base Platform - Quick Install"
 echo "=========================================="
 echo ""
-
-# Check if .env exists
-if [ ! -f .env ]; then
-    echo "📝 Creating .env file from template..."
-    cp .env.production.example .env
-    echo "✓ .env created"
-    echo ""
-    echo "⚠️  IMPORTANT: Default PostgreSQL password is 'kb_pass_change_me'"
-    echo "   You can change it now in .env or later via Setup Wizard"
-    echo ""
-else
-    echo "✓ .env already exists"
-fi
+echo "✨ No .env file needed! All defaults are in docker-compose.yml"
+echo "   Change database password later via Setup Wizard"
+echo ""
 
 # Stop any running containers
 if [ "$(docker ps -q)" ]; then
