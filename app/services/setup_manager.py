@@ -123,6 +123,7 @@ class SetupManager:
         openai_api_key: Optional[str] = None,
         voyage_api_key: Optional[str] = None,
         anthropic_api_key: Optional[str] = None,
+        ollama_base_url: Optional[str] = None,
         updated_by: Optional[int] = None,
     ) -> None:
         """
@@ -133,6 +134,7 @@ class SetupManager:
             openai_api_key: OpenAI API key (optional)
             voyage_api_key: VoyageAI API key (optional)
             anthropic_api_key: Anthropic API key (optional)
+            ollama_base_url: Ollama API base URL (optional)
             updated_by: Admin user ID
 
         Raises:
@@ -171,6 +173,18 @@ class SetupManager:
                     value=anthropic_api_key,
                     category="api",
                     description="Anthropic API key for Claude models",
+                    is_encrypted=False,
+                    updated_by=updated_by,
+                )
+
+            # Save Ollama base URL
+            if ollama_base_url:
+                await SystemSettingsManager.save_setting(
+                    db=db,
+                    key="ollama_base_url",
+                    value=ollama_base_url,
+                    category="api",
+                    description="Ollama API base URL for local LLM",
                     is_encrypted=False,
                     updated_by=updated_by,
                 )
@@ -520,6 +534,13 @@ class SetupManager:
             )
 
             logger.info(f"Changed PostgreSQL password for user: {username}")
+
+            # CRITICAL: Recreate connection pool with new credentials
+            # Without this, all new connections will fail with authentication error
+            # because the pool still uses old password from environment variable
+            from app.db.session import recreate_engine
+            logger.info("Recreating database connection pool with new credentials...")
+            await recreate_engine(new_url)
 
             return {
                 "database_url": new_url,

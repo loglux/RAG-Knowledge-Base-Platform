@@ -23,6 +23,7 @@ export interface APIKeysRequest {
   openai_api_key?: string;
   voyage_api_key?: string;
   anthropic_api_key?: string;
+  ollama_base_url?: string;
 }
 
 export interface DatabaseSettingsRequest {

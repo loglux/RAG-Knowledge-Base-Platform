@@ -28,6 +28,7 @@ class APIKeysRequest(BaseModel):
     openai_api_key: Optional[str] = Field(None, description="OpenAI API key")
     voyage_api_key: Optional[str] = Field(None, description="VoyageAI API key")
     anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key")
+    ollama_base_url: Optional[str] = Field(None, description="Ollama API base URL (e.g., http://localhost:11434)")
 
 
 class DatabaseSettingsRequest(BaseModel):
@@ -235,11 +236,11 @@ async def save_api_keys(
     At least one API key should be provided (OpenAI is recommended).
     """
     try:
-        # Validate at least one key is provided
-        if not any([request.openai_api_key, request.voyage_api_key, request.anthropic_api_key]):
+        # Validate at least one provider is configured
+        if not any([request.openai_api_key, request.voyage_api_key, request.anthropic_api_key, request.ollama_base_url]):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="At least one API key must be provided"
+                detail="At least one AI provider (API key or Ollama URL) must be configured"
             )
 
         # Save keys
@@ -248,6 +249,7 @@ async def save_api_keys(
             openai_api_key=request.openai_api_key,
             voyage_api_key=request.voyage_api_key,
             anthropic_api_key=request.anthropic_api_key,
+            ollama_base_url=request.ollama_base_url,
         )
 
         return {

@@ -21,6 +21,7 @@ class SystemSettingsManager:
         "openai_api_key": "OPENAI_API_KEY",
         "voyage_api_key": "VOYAGE_API_KEY",
         "anthropic_api_key": "ANTHROPIC_API_KEY",
+        "ollama_base_url": "OLLAMA_BASE_URL",
 
         # Database URLs
         "qdrant_url": "QDRANT_URL",
@@ -79,11 +80,14 @@ class SystemSettingsManager:
             True if setup is complete
         """
         try:
-            # Check if at least one API key is configured
+            # Check if at least one AI provider is configured
             result = await db.execute(
                 select(SystemSettings).where(
                     SystemSettings.key.in_([
                         "openai_api_key",
+                        "voyage_api_key",
+                        "anthropic_api_key",
+                        "ollama_base_url",
                         "setup_completed"  # Explicit flag
                     ])
                 )

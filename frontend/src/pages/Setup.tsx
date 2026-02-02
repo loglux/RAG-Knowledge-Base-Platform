@@ -46,6 +46,7 @@ const Setup: React.FC = () => {
     openai_api_key: '',
     voyage_api_key: '',
     anthropic_api_key: '',
+    ollama_base_url: '',
   });
 
   const [databaseData, setDatabaseData] = useState<DatabaseSettingsRequest>({
@@ -254,7 +255,7 @@ const Setup: React.FC = () => {
               <ul>
                 <li>✓ Admin account for system management</li>
                 <li>✓ Database security (optional)</li>
-                <li>✓ API keys for AI services (OpenAI, Voyage, Anthropic)</li>
+                <li>✓ AI providers (OpenAI, Voyage, Anthropic, Ollama)</li>
                 <li>✓ Database connections (optional)</li>
                 <li>✓ System settings (optional)</li>
               </ul>
@@ -440,9 +441,9 @@ const Setup: React.FC = () => {
       case 'api-keys':
         return (
           <div className="setup-step">
-            <h2>Step 3: API Keys</h2>
+            <h2>Step 3: AI Providers</h2>
             <p className="setup-description">
-              Configure API keys for AI services. At least one key is required.
+              Configure API keys for cloud AI services or Ollama URL for local LLM. At least one provider is required.
             </p>
 
             <div className="form-group">
@@ -479,6 +480,18 @@ const Setup: React.FC = () => {
                 onChange={(e) => setAPIKeysData({ ...apiKeysData, anthropic_api_key: e.target.value })}
               />
               <small className="form-text">Used for Claude models</small>
+            </div>
+
+            <div className="form-group">
+              <label>Ollama API URL (Optional)</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="http://localhost:11434"
+                value={apiKeysData.ollama_base_url}
+                onChange={(e) => setAPIKeysData({ ...apiKeysData, ollama_base_url: e.target.value })}
+              />
+              <small className="form-text">Local LLM server (self-hosted)</small>
             </div>
 
             {error && <div className="alert alert-error">{error}</div>}

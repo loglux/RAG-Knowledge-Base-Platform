@@ -210,6 +210,25 @@ class APIClient {
     return response.data
   }
 
+  // System Settings (API keys, database URLs, etc.)
+  async getSystemSettings(): Promise<any> {
+    const response = await this.client.get('/system-settings')
+    return response.data
+  }
+
+  async updateSystemSettings(payload: any): Promise<any> {
+    const response = await this.client.put('/system-settings', payload)
+    return response.data
+  }
+
+  async changePostgresPassword(username: string, newPassword: string): Promise<any> {
+    const response = await this.client.post('/system-settings/postgres-password', {
+      username,
+      new_password: newPassword
+    })
+    return response.data
+  }
+
   async resetAppSettings(): Promise<AppSettings> {
     const response = await this.client.post<AppSettings>('/settings/reset')
     return response.data
