@@ -1,0 +1,422 @@
+"""Setup wizard business logic."""
+import logging
+from typing import Optional, Dict, Any
+from datetime import datetime
+
+import bcrypt
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.database import AdminUser, SystemSettings
+from app.core.system_settings import SystemSettingsManager
+
+logger = logging.getLogger(__name__)
+
+
+class SetupError(Exception):
+    """Base exception for setup errors."""
+    pass
+
+
+class SetupAlreadyCompleteError(SetupError):
+    """Raised when trying to run setup but it's already complete."""
+    pass
+
+
+class SetupManager:
+    """Manager for system setup wizard."""
+
+    @staticmethod
+    def hash_password(password: str) -> str:
+        """
+        Hash password using bcrypt.
+
+        Args:
+            password: Plain text password
+
+        Returns:
+            Bcrypt password hash
+        """
+        salt = bcrypt.gensalt()
+        hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+        return hashed.decode('utf-8')
+
+    @staticmethod
+    def verify_password(password: str, password_hash: str) -> bool:
+        """
+        Verify password against hash.
+
+        Args:
+            password: Plain text password
+            password_hash: Bcrypt hash
+
+        Returns:
+            True if password matches
+        """
+        return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
+
+    @staticmethod
+    async def create_admin_user(
+        db: AsyncSession,
+        username: str,
+        password: str,
+        email: Optional[str] = None,
+    ) -> AdminUser:
+        """
+        Create initial admin user.
+
+        Args:
+            db: Database session
+            username: Admin username
+            password: Plain text password
+            email: Optional email
+
+        Returns:
+            Created AdminUser instance
+
+        Raises:
+            SetupError: If admin already exists or creation fails
+        """
+        try:
+            # Check if admin already exists
+            result = await db.execute(
+                select(AdminUser).where(AdminUser.username == username)
+            )
+            existing = result.scalar_one_or_none()
+
+            if existing:
+                raise SetupError(f"Admin user '{username}' already exists")
+
+            # Hash password
+            password_hash = SetupManager.hash_password(password)
+
+            # Create admin
+            admin = AdminUser(
+                username=username,
+                password_hash=password_hash,
+                email=email,
+                role="admin",
+                is_active=True,
+                created_at=datetime.utcnow(),
+            )
+
+            db.add(admin)
+            await db.commit()
+            await db.refresh(admin)
+
+            logger.info(f"Created admin user: {username}")
+            return admin
+
+        except SetupError:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to create admin user: {e}")
+            await db.rollback()
+            raise SetupError(f"Failed to create admin user: {e}") from e
+
+    @staticmethod
+    async def save_api_keys(
+        db: AsyncSession,
+        openai_api_key: Optional[str] = None,
+        voyage_api_key: Optional[str] = None,
+        anthropic_api_key: Optional[str] = None,
+        updated_by: Optional[int] = None,
+    ) -> None:
+        """
+        Save API keys to system settings.
+
+        Args:
+            db: Database session
+            openai_api_key: OpenAI API key (optional)
+            voyage_api_key: VoyageAI API key (optional)
+            anthropic_api_key: Anthropic API key (optional)
+            updated_by: Admin user ID
+
+        Raises:
+            SetupError: If save fails
+        """
+        try:
+            # Save OpenAI key
+            if openai_api_key:
+                await SystemSettingsManager.save_setting(
+                    db=db,
+                    key="openai_api_key",
+                    value=openai_api_key,
+                    category="api",
+                    description="OpenAI API key for embeddings and chat",
+                    is_encrypted=False,  # No encryption in MVP
+                    updated_by=updated_by,
+                )
+
+            # Save Voyage key
+            if voyage_api_key:
+                await SystemSettingsManager.save_setting(
+                    db=db,
+                    key="voyage_api_key",
+                    value=voyage_api_key,
+                    category="api",
+                    description="VoyageAI API key for embeddings",
+                    is_encrypted=False,
+                    updated_by=updated_by,
+                )
+
+            # Save Anthropic key
+            if anthropic_api_key:
+                await SystemSettingsManager.save_setting(
+                    db=db,
+                    key="anthropic_api_key",
+                    value=anthropic_api_key,
+                    category="api",
+                    description="Anthropic API key for Claude models",
+                    is_encrypted=False,
+                    updated_by=updated_by,
+                )
+
+            logger.info("Saved API keys to system settings")
+
+        except Exception as e:
+            logger.error(f"Failed to save API keys: {e}")
+            raise SetupError(f"Failed to save API keys: {e}") from e
+
+    @staticmethod
+    async def save_database_settings(
+        db: AsyncSession,
+        qdrant_url: Optional[str] = None,
+        qdrant_api_key: Optional[str] = None,
+        opensearch_url: Optional[str] = None,
+        opensearch_username: Optional[str] = None,
+        opensearch_password: Optional[str] = None,
+        updated_by: Optional[int] = None,
+    ) -> None:
+        """
+        Save database connection settings.
+
+        Args:
+            db: Database session
+            qdrant_url: Qdrant HTTP URL
+            qdrant_api_key: Qdrant API key (optional)
+            opensearch_url: OpenSearch HTTP URL
+            opensearch_username: OpenSearch username (optional)
+            opensearch_password: OpenSearch password (optional)
+            updated_by: Admin user ID
+
+        Raises:
+            SetupError: If save fails
+        """
+        try:
+            if qdrant_url:
+                await SystemSettingsManager.save_setting(
+                    db=db,
+                    key="qdrant_url",
+                    value=qdrant_url,
+                    category="database",
+                    description="Qdrant vector database HTTP URL",
+                    is_encrypted=False,
+                    updated_by=updated_by,
+                )
+
+            if qdrant_api_key:
+                await SystemSettingsManager.save_setting(
+                    db=db,
+                    key="qdrant_api_key",
+                    value=qdrant_api_key,
+                    category="database",
+                    description="Qdrant API key",
+                    is_encrypted=False,
+                    updated_by=updated_by,
+                )
+
+            if opensearch_url:
+                await SystemSettingsManager.save_setting(
+                    db=db,
+                    key="opensearch_url",
+                    value=opensearch_url,
+                    category="database",
+                    description="OpenSearch HTTP URL",
+                    is_encrypted=False,
+                    updated_by=updated_by,
+                )
+
+            if opensearch_username:
+                await SystemSettingsManager.save_setting(
+                    db=db,
+                    key="opensearch_username",
+                    value=opensearch_username,
+                    category="database",
+                    description="OpenSearch username",
+                    is_encrypted=False,
+                    updated_by=updated_by,
+                )
+
+            if opensearch_password:
+                await SystemSettingsManager.save_setting(
+                    db=db,
+                    key="opensearch_password",
+                    value=opensearch_password,
+                    category="database",
+                    description="OpenSearch password",
+                    is_encrypted=False,
+                    updated_by=updated_by,
+                )
+
+            logger.info("Saved database settings")
+
+        except Exception as e:
+            logger.error(f"Failed to save database settings: {e}")
+            raise SetupError(f"Failed to save database settings: {e}") from e
+
+    @staticmethod
+    async def save_system_settings(
+        db: AsyncSession,
+        system_name: Optional[str] = None,
+        max_file_size_mb: Optional[int] = None,
+        max_chunk_size: Optional[int] = None,
+        chunk_overlap: Optional[int] = None,
+        updated_by: Optional[int] = None,
+    ) -> None:
+        """
+        Save general system settings.
+
+        Args:
+            db: Database session
+            system_name: System name displayed in UI
+            max_file_size_mb: Maximum file size in MB
+            max_chunk_size: Maximum chunk size
+            chunk_overlap: Chunk overlap size
+            updated_by: Admin user ID
+
+        Raises:
+            SetupError: If save fails
+        """
+        try:
+            if system_name:
+                await SystemSettingsManager.save_setting(
+                    db=db,
+                    key="system_name",
+                    value=system_name,
+                    category="system",
+                    description="System name displayed in UI",
+                    is_encrypted=False,
+                    updated_by=updated_by,
+                )
+
+            if max_file_size_mb is not None:
+                await SystemSettingsManager.save_setting(
+                    db=db,
+                    key="max_file_size_mb",
+                    value=str(max_file_size_mb),
+                    category="limits",
+                    description="Maximum file size in MB",
+                    is_encrypted=False,
+                    updated_by=updated_by,
+                )
+
+            if max_chunk_size is not None:
+                await SystemSettingsManager.save_setting(
+                    db=db,
+                    key="max_chunk_size",
+                    value=str(max_chunk_size),
+                    category="system",
+                    description="Maximum chunk size in characters",
+                    is_encrypted=False,
+                    updated_by=updated_by,
+                )
+
+            if chunk_overlap is not None:
+                await SystemSettingsManager.save_setting(
+                    db=db,
+                    key="chunk_overlap",
+                    value=str(chunk_overlap),
+                    category="system",
+                    description="Chunk overlap in characters",
+                    is_encrypted=False,
+                    updated_by=updated_by,
+                )
+
+            logger.info("Saved system settings")
+
+        except Exception as e:
+            logger.error(f"Failed to save system settings: {e}")
+            raise SetupError(f"Failed to save system settings: {e}") from e
+
+    @staticmethod
+    async def mark_setup_complete(
+        db: AsyncSession,
+        updated_by: Optional[int] = None,
+    ) -> None:
+        """
+        Mark setup as complete.
+
+        Args:
+            db: Database session
+            updated_by: Admin user ID
+
+        Raises:
+            SetupError: If marking fails
+        """
+        try:
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="setup_completed",
+                value="true",
+                category="system",
+                description="Setup wizard completion flag",
+                is_encrypted=False,
+                updated_by=updated_by,
+            )
+
+            # Also save completion timestamp
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="setup_completed_at",
+                value=datetime.utcnow().isoformat(),
+                category="system",
+                description="Setup wizard completion timestamp",
+                is_encrypted=False,
+                updated_by=updated_by,
+            )
+
+            logger.info("Marked setup as complete")
+
+        except Exception as e:
+            logger.error(f"Failed to mark setup complete: {e}")
+            raise SetupError(f"Failed to mark setup complete: {e}") from e
+
+    @staticmethod
+    async def get_setup_status(db: AsyncSession) -> Dict[str, Any]:
+        """
+        Get current setup status.
+
+        Args:
+            db: Database session
+
+        Returns:
+            Dictionary with setup status information
+        """
+        try:
+            is_complete = await SystemSettingsManager.is_setup_complete(db)
+
+            # Get admin users count
+            result = await db.execute(select(AdminUser))
+            admin_count = len(result.scalars().all())
+
+            # Get settings count
+            result = await db.execute(select(SystemSettings))
+            settings_count = len(result.scalars().all())
+
+            return {
+                "is_complete": is_complete,
+                "admin_users_count": admin_count,
+                "settings_count": settings_count,
+                "needs_setup": not is_complete,
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to get setup status: {e}")
+            return {
+                "is_complete": False,
+                "admin_users_count": 0,
+                "settings_count": 0,
+                "needs_setup": True,
+                "error": str(e),
+            }

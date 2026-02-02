@@ -54,6 +54,21 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             await session.close()
 
 
+def get_db_session() -> AsyncSession:
+    """
+    Get a database session for standalone use (not FastAPI dependency).
+
+    Usage:
+        async with get_db_session() as db:
+            result = await db.execute(select(Item))
+            items = result.scalars().all()
+
+    Returns:
+        AsyncSession context manager
+    """
+    return AsyncSessionLocal()
+
+
 async def init_db() -> None:
     """
     Initialize database - create all tables.

@@ -456,3 +456,106 @@ class AppSettings(Base):
 
     def __repr__(self) -> str:
         return f"<AppSettings(id={self.id})>"
+
+
+class AdminUser(Base):
+    """Admin user model - for system administration access."""
+
+    __tablename__ = "admin_users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(
+        String(100),
+        unique=True,
+        nullable=False,
+        index=True
+    )
+    password_hash: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        comment="Bcrypt password hash"
+    )
+    email: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        nullable=True,
+        index=True
+    )
+    role: Mapped[str] = mapped_column(
+        String(50),
+        default="admin",
+        nullable=False,
+        comment="User role: admin, superadmin"
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    def __repr__(self) -> str:
+        return f"<AdminUser(id={self.id}, username='{self.username}', role={self.role})>"
+
+
+class SystemSettings(Base):
+    """System configuration settings - stores API keys, database URLs, etc."""
+
+    __tablename__ = "system_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    key: Mapped[str] = mapped_column(
+        String(255),
+        unique=True,
+        nullable=False,
+        index=True,
+        comment="Setting key (e.g., 'openai_api_key', 'qdrant_url')"
+    )
+    value: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Setting value (encrypted if is_encrypted=True)"
+    )
+    is_encrypted: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+        comment="Whether value is encrypted (for API keys, passwords)"
+    )
+    category: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+        index=True,
+        comment="Setting category: api, database, system, limits"
+    )
+    description: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Human-readable description of the setting"
+    )
+
+    # Audit fields
+    updated_by: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("admin_users.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="Admin user who last updated this setting"
+    )
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return f"<SystemSettings(key='{self.key}', category={self.category}, encrypted={self.is_encrypted})>"

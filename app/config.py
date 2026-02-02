@@ -195,6 +195,12 @@ class Settings(BaseSettings):
         description="Comma-separated list of allowed CORS origins"
     )
 
+    # System Settings (can be overridden from database)
+    SYSTEM_NAME: str = Field(
+        default="Knowledge Base Platform",
+        description="System name displayed in UI"
+    )
+
     # Feature Flags
     ENABLE_ASYNC_PROCESSING: bool = Field(default=True, description="Enable async document processing")
     ENABLE_CACHE: bool = Field(default=False, description="Enable caching (Redis required)")
@@ -243,6 +249,28 @@ class Settings(BaseSettings):
         """Check if running in development."""
         return self.ENVIRONMENT == "development"
 
+    def update_from_dict(self, updates: dict) -> None:
+        """
+        Update settings from dictionary.
+
+        Used to override settings from database.
+
+        Args:
+            updates: Dictionary of setting_name -> value
+        """
+        for key, value in updates.items():
+            if hasattr(self, key):
+                # Convert to appropriate type
+                field_type = self.model_fields[key].annotation
+                if field_type == int:
+                    value = int(value)
+                elif field_type == float:
+                    value = float(value)
+                elif field_type == bool:
+                    value = value.lower() in ("true", "1", "yes") if isinstance(value, str) else bool(value)
+
+                setattr(self, key, value)
+
 
 @lru_cache()
 def get_settings() -> Settings:
@@ -252,3 +280,65 @@ def get_settings() -> Settings:
 
 # Convenience: import settings directly
 settings = get_settings()
+
+
+async def load_settings_from_db() -> None:
+    """
+    Load settings from database and override current settings.
+
+    This should be called during application startup.
+    """
+    try:
+        from app.db.session import get_db_session
+        from app.core.system_settings import SystemSettingsManager
+
+        async with get_db_session() as db:
+            # Load settings from database
+            db_settings = await SystemSettingsManager.load_from_db(db)
+
+            if db_settings:
+                # Merge with current settings (DB overrides ENV)
+                env_settings = {
+                    key: getattr(settings, key)
+                    for key in dir(settings)
+                    if key.isupper() and not key.startswith("_")
+                }
+
+                merged = SystemSettingsManager.merge_with_env_settings(
+                    db_settings, env_settings
+                )
+
+                # Update global settings instance
+                settings.update_from_dict(merged)
+
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info("Settings loaded from database and applied")
+
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Could not load settings from database: {e}")
+        logger.info("Using settings from environment variables")
+
+
+async def is_setup_complete() -> bool:
+    """
+    Check if initial system setup has been completed.
+
+    Returns:
+        True if setup is complete, False if setup wizard should be shown
+    """
+    try:
+        from app.db.session import get_db_session
+        from app.core.system_settings import SystemSettingsManager
+
+        async with get_db_session() as db:
+            return await SystemSettingsManager.is_setup_complete(db)
+
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Could not check setup completion: {e}")
+        # If can't check, assume setup needed
+        return False

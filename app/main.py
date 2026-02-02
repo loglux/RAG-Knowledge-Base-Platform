@@ -36,6 +36,24 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     logger.info(f"Qdrant: {settings.QDRANT_URL}")
     logger.info(f"OpenAI Model: {settings.OPENAI_CHAT_MODEL}")
 
+    # Load settings from database (overrides .env)
+    try:
+        from app.config import load_settings_from_db, is_setup_complete
+
+        logger.info("Loading settings from database...")
+        await load_settings_from_db()
+
+        # Check if setup is complete
+        setup_complete = await is_setup_complete()
+        if setup_complete:
+            logger.info("✓ Setup is complete - system ready")
+        else:
+            logger.warning("⚠ Setup not complete - please visit /api/v1/setup/status")
+
+    except Exception as e:
+        logger.warning(f"Could not load settings from database: {e}")
+        logger.info("Using settings from environment variables")
+
     yield
 
     # Shutdown
