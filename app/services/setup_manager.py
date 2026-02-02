@@ -110,6 +110,7 @@ class SetupManager:
             return admin
 
         except SetupError:
+            await db.rollback()
             raise
         except Exception as e:
             logger.error(f"Failed to create admin user: {e}")
