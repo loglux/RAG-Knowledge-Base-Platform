@@ -1,0 +1,243 @@
+# Production Deployment Guide
+
+## 🚀 Quick Start (Recommended)
+
+**Используйте готовые скрипты для безопасного деплоя:**
+
+```bash
+# Backend deployment (Python code changes)
+./scripts/deploy_backend.sh
+
+# Frontend deployment (React/TypeScript changes)
+./scripts/deploy_frontend.sh
+```
+
+Эти скрипты автоматически:
+- ✅ Пересобирают без кеша (избегают проблем с устаревшим кодом)
+- ✅ Правильно останавливают и запускают контейнеры с --env-file
+- ✅ Проверяют health status
+- ✅ Верифицируют, что новый код попал в контейнер
+
+---
+
+## Container Management
+
+### ВАЖНО: Всегда используйте --env-file флаг!
+
+При любых операциях с production контейнерами **ОБЯЗАТЕЛЬНО** указывайте `--env-file .env.production`, иначе контейнеры не подхватят правильные переменные окружения и будут ошибки аутентификации базы данных.
+
+---
+
+## Правильные команды
+
+### 1. Пересборка отдельного сервиса (например, frontend)
+
+```bash
+# Шаг 1: Собрать новый образ
+docker-compose -f docker-compose.production.yml build frontend
+
+# Шаг 2: Остановить ВСЕ контейнеры
+docker-compose -f docker-compose.production.yml down
+
+# Шаг 3: Запустить с env файлом
+docker-compose -f docker-compose.production.yml --env-file .env.production up -d
+```
+
+**НИКОГДА НЕ ДЕЛАЙТЕ:**
+```bash
+# ❌ НЕПРАВИЛЬНО - пересоздаст контейнеры без env файла
+docker-compose -f docker-compose.production.yml up -d frontend
+```
+
+### 2. Пересборка backend
+
+```bash
+# Шаг 1: Собрать новый образ
+docker-compose -f docker-compose.production.yml build backend
+
+# Шаг 2: Остановить ВСЕ контейнеры
+docker-compose -f docker-compose.production.yml down
+
+# Шаг 3: Запустить с env файлом
+docker-compose -f docker-compose.production.yml --env-file .env.production up -d
+```
+
+### 3. Пересборка всех сервисов
+
+```bash
+# Шаг 1: Собрать все образы
+docker-compose -f docker-compose.production.yml build
+
+# Шаг 2: Остановить ВСЕ контейнеры
+docker-compose -f docker-compose.production.yml down
+
+# Шаг 3: Запустить с env файлом
+docker-compose -f docker-compose.production.yml --env-file .env.production up -d
+```
+
+### 4. Просто перезапуск (без пересборки)
+
+```bash
+# Если нужно просто перезапустить без изменений кода
+docker-compose -f docker-compose.production.yml restart
+```
+
+**Но если были изменения env файла:**
+```bash
+docker-compose -f docker-compose.production.yml down
+docker-compose -f docker-compose.production.yml --env-file .env.production up -d
+```
+
+---
+
+## Проверка статуса
+
+```bash
+# Статус всех контейнеров
+docker-compose -f docker-compose.production.yml ps
+
+# Логи конкретного сервиса
+docker-compose -f docker-compose.production.yml logs -f backend
+docker-compose -f docker-compose.production.yml logs -f frontend
+
+# Последние 50 строк логов
+docker-compose -f docker-compose.production.yml logs --tail 50 backend
+```
+
+---
+
+## Типичные проблемы и решения
+
+### Проблема: "password authentication failed for user kb_user"
+
+**Причина:** Контейнеры запущены без --env-file флага
+
+**Решение:**
+```bash
+docker-compose -f docker-compose.production.yml down
+docker-compose -f docker-compose.production.yml --env-file .env.production up -d
+```
+
+### Проблема: Frontend показывает старый код после изменений
+
+**Причина:** Контейнер не пересобран, используется старый образ
+
+**Решение:**
+```bash
+docker-compose -f docker-compose.production.yml build frontend
+docker-compose -f docker-compose.production.yml down
+docker-compose -f docker-compose.production.yml --env-file .env.production up -d
+```
+
+### Проблема: Backend не видит изменения в коде
+
+**Причина:** То же - контейнер не пересобран
+
+**Решение:**
+```bash
+docker-compose -f docker-compose.production.yml build backend
+docker-compose -f docker-compose.production.yml down
+docker-compose -f docker-compose.production.yml --env-file .env.production up -d
+```
+
+### Проблема: Код изменился, пересобрали, но контейнер всё ещё использует старый код
+
+**Причина:** Docker layer caching - Docker использовал закешированный слой со старым кодом
+
+**Решение:**
+```bash
+# ОБЯЗАТЕЛЬНО используйте --no-cache для изменений в коде
+docker-compose -f docker-compose.production.yml build --no-cache backend
+docker-compose -f docker-compose.production.yml down
+docker-compose -f docker-compose.production.yml --env-file .env.production up -d
+
+# Проверить, что новый код в контейнере:
+docker exec kb-platform-backend-prod grep -n "your_change" /app/path/to/file.py
+```
+
+**Почему это происходит:**
+- Docker кеширует слои образа по timestamp/размеру файлов
+- Если Docker считает, что файлы не изменились, он использует старый слой
+- `--no-cache` принудительно пересобирает все слои заново
+
+**Правило:** При изменениях Python/TypeScript кода **ВСЕГДА** используйте `--no-cache`
+
+---
+
+## Development vs Production
+
+### Development (с hot-reload)
+```bash
+docker-compose -f docker-compose.dev.yml up -d
+```
+
+**Особенность:** Код монтируется как volume, изменения видны мгновенно (uvicorn --reload)
+
+### Production (требует пересборку при изменениях)
+```bash
+docker-compose -f docker-compose.production.yml --env-file .env.production up -d
+```
+
+**Особенность:** Код "запекается" в образ, требует rebuild для любых изменений
+
+---
+
+## 📚 Понимание Docker команд
+
+### Разница между restart, rebuild, и up
+
+| Команда | Что делает | Когда использовать | Подхватывает код? |
+|---------|------------|-------------------|-------------------|
+| `restart backend` | Перезапускает существующий контейнер | Для перезапуска без изменений | ❌ НЕТ |
+| `build backend` | Пересобирает образ | После изменений кода | ⚠️ Может пропустить (кеш) |
+| `build --no-cache backend` | Пересборка без кеша | **Всегда** для изменений кода | ✅ ДА |
+| `up -d backend` | Создает/запускает контейнер | После build | ⚠️ Использует образ |
+| `up -d --force-recreate` | Принудительно пересоздает | Для применения нового образа | ✅ ДА (если rebuild был) |
+
+### Когда нужен rebuild?
+
+| Изменения | Rebuild? | Команда |
+|-----------|----------|---------|
+| Python код (`app/**/*.py`) | ✅ **ДА** | `build --no-cache backend` |
+| TypeScript/React (`frontend/src/**`) | ✅ **ДА** | `build --no-cache frontend` |
+| `requirements.txt` | ✅ **ДА** | `build --no-cache backend` |
+| `package.json` | ✅ **ДА** | `build --no-cache frontend` |
+| Dockerfile | ✅ **ДА** | `build --no-cache <service>` |
+| `.env.production` | ❌ НЕТ | `restart` с `--env-file` |
+| `docker-compose.yml` | ⚠️ ЗАВИСИТ | `up -d` (пересоздает) |
+
+### Почему `--no-cache` критичен?
+
+Docker кеширует слои образа. При сборке Docker проверяет:
+1. Изменился ли Dockerfile?
+2. Изменились ли файлы (по timestamp/размеру)?
+
+**Проблема:** Docker может решить, что файлы не изменились, и использовать старый слой с устаревшим кодом.
+
+**Решение:** `--no-cache` заставляет Docker пересобрать все слои заново, гарантируя свежий код.
+
+### Полный workflow для code changes
+
+```bash
+# 1. Пересобрать БЕЗ кеша (критично!)
+docker-compose -f docker-compose.production.yml build --no-cache backend
+
+# 2. Остановить контейнер
+docker-compose -f docker-compose.production.yml --env-file .env.production stop backend
+
+# 3. Запустить с новым образом
+docker-compose -f docker-compose.production.yml --env-file .env.production up -d backend
+
+# 4. Проверить, что код обновился
+docker exec kb-platform-backend-prod grep -n "your_recent_change" /app/path/to/file.py
+```
+
+**Или используйте готовые скрипты:**
+```bash
+./scripts/deploy_backend.sh   # Для Python кода
+./scripts/deploy_frontend.sh  # Для React кода
+```
+
+---
+
+**Последнее обновление:** 2026-02-02

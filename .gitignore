@@ -157,6 +157,8 @@ scripts/
 !scripts/restore.sh
 !scripts/migrate_dev_to_prod.sh
 !scripts/fix_enum_case.sh
+!scripts/deploy_backend.sh
+!scripts/deploy_frontend.sh
 !scripts/README.md
 tests/
 frontend/_local/
@@ -171,6 +173,7 @@ chat*.png
 !/PROJECT_ROADMAP.md
 !/DEVELOPMENT_LOG.md
 !/MIGRATION_GUIDE.md
+!/DEPLOY.md
 /RUNBOOK_LOCAL.md
 /antropic_key.txt
 /voyageai_key.txt
