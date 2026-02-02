@@ -1,7 +1,8 @@
 """Ollama models endpoints."""
 import logging
 from typing import List, Dict, Any
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Query
+from pydantic import BaseModel
 import httpx
 
 from app.config import settings
@@ -9,6 +10,11 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+class OllamaConnectionTest(BaseModel):
+    """Request to test Ollama connection."""
+    base_url: str
 
 
 async def fetch_ollama_models() -> List[Dict[str, Any]]:
@@ -182,4 +188,70 @@ async def ollama_status():
             "available": False,
             "url": settings.OLLAMA_BASE_URL,
             "error": str(e)
+        }
+
+
+@router.post("/test-connection")
+async def test_ollama_connection(payload: OllamaConnectionTest):
+    """
+    Test connection to Ollama server.
+
+    Used by Setup Wizard to validate Ollama URL before saving.
+
+    Args:
+        payload: Ollama connection test request with base_url
+
+    Returns:
+        Connection status with available models count
+    """
+    base_url = payload.base_url.rstrip('/')
+
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            # Try to fetch tags endpoint
+            response = await client.get(f"{base_url}/api/tags")
+            response.raise_for_status()
+            data = response.json()
+            models = data.get("models", [])
+
+            return {
+                "success": True,
+                "available": True,
+                "url": base_url,
+                "models_count": len(models),
+                "message": f"✅ Connected successfully! Found {len(models)} model(s)"
+            }
+
+    except httpx.TimeoutException:
+        return {
+            "success": False,
+            "available": False,
+            "url": base_url,
+            "error": "Connection timeout (5s). Check if Ollama is running and accessible.",
+            "message": "❌ Connection timeout"
+        }
+    except httpx.ConnectError as e:
+        return {
+            "success": False,
+            "available": False,
+            "url": base_url,
+            "error": f"Cannot connect to {base_url}. Check URL and network.",
+            "message": "❌ Connection failed"
+        }
+    except httpx.HTTPStatusError as e:
+        return {
+            "success": False,
+            "available": False,
+            "url": base_url,
+            "error": f"HTTP {e.response.status_code}: {e.response.text}",
+            "message": f"❌ HTTP {e.response.status_code}"
+        }
+    except Exception as e:
+        logger.error(f"Ollama connection test failed for {base_url}: {e}")
+        return {
+            "success": False,
+            "available": False,
+            "url": base_url,
+            "error": str(e),
+            "message": "❌ Connection failed"
         }

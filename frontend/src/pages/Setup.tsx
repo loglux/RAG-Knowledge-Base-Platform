@@ -74,6 +74,10 @@ const Setup: React.FC = () => {
   const [newDatabaseUrl, setNewDatabaseUrl] = useState<string>('');
   const [passwordChanged, setPasswordChanged] = useState<boolean>(false);
 
+  // Ollama connection test
+  const [ollamaTestStatus, setOllamaTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [ollamaTestMessage, setOllamaTestMessage] = useState<string>('');
+
   // Check if setup is already complete on mount
   useEffect(() => {
     checkSetupStatus();
@@ -154,6 +158,41 @@ const Setup: React.FC = () => {
   // Step 2: Skip Database Security
   const handleSkipDbSecurity = () => {
     setCurrentStep('api-keys');
+  };
+
+  // Test Ollama Connection
+  const handleTestOllamaConnection = async () => {
+    if (!apiKeysData.ollama_base_url) {
+      setOllamaTestMessage('Please enter Ollama URL');
+      setOllamaTestStatus('error');
+      return;
+    }
+
+    setOllamaTestStatus('testing');
+    setOllamaTestMessage('Testing connection...');
+
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+      const API_PREFIX = import.meta.env.VITE_API_PREFIX || '/api/v1';
+      const response = await fetch(`${API_BASE_URL}${API_PREFIX}/ollama/test-connection`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base_url: apiKeysData.ollama_base_url })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setOllamaTestStatus('success');
+        setOllamaTestMessage(data.message || '✅ Connected successfully!');
+      } else {
+        setOllamaTestStatus('error');
+        setOllamaTestMessage(data.message || data.error || '❌ Connection failed');
+      }
+    } catch (err) {
+      setOllamaTestStatus('error');
+      setOllamaTestMessage('❌ Connection test failed');
+    }
   };
 
   // Step 3: Save API Keys
@@ -484,14 +523,43 @@ const Setup: React.FC = () => {
 
             <div className="form-group">
               <label>Ollama API URL (Optional)</label>
-              <input
-                type="text"
-                className="form-control"
-                placeholder="http://localhost:11434"
-                value={apiKeysData.ollama_base_url}
-                onChange={(e) => setAPIKeysData({ ...apiKeysData, ollama_base_url: e.target.value })}
-              />
-              <small className="form-text">Local LLM server (self-hosted)</small>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="http://192.168.1.100:11434"
+                  value={apiKeysData.ollama_base_url}
+                  onChange={(e) => {
+                    setAPIKeysData({ ...apiKeysData, ollama_base_url: e.target.value });
+                    setOllamaTestStatus('idle');
+                    setOllamaTestMessage('');
+                  }}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleTestOllamaConnection}
+                  disabled={!apiKeysData.ollama_base_url || ollamaTestStatus === 'testing'}
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  {ollamaTestStatus === 'testing' ? 'Testing...' : 'Test Connection'}
+                </button>
+              </div>
+              <small className="form-text">Local or cloud Ollama server (include port, e.g., :11434)</small>
+              {ollamaTestMessage && (
+                <div style={{
+                  marginTop: '0.5rem',
+                  padding: '0.5rem',
+                  borderRadius: '4px',
+                  fontSize: '0.875rem',
+                  backgroundColor: ollamaTestStatus === 'success' ? '#d4edda' : ollamaTestStatus === 'error' ? '#f8d7da' : '#d1ecf1',
+                  color: ollamaTestStatus === 'success' ? '#155724' : ollamaTestStatus === 'error' ? '#721c24' : '#0c5460',
+                  border: `1px solid ${ollamaTestStatus === 'success' ? '#c3e6cb' : ollamaTestStatus === 'error' ? '#f5c6cb' : '#bee5eb'}`
+                }}>
+                  {ollamaTestMessage}
+                </div>
+              )}
             </div>
 
             {error && <div className="alert alert-error">{error}</div>}

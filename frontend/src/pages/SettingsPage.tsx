@@ -290,8 +290,17 @@ export function SettingsPage() {
   return (
     <div className="settings-page">
       <div className="settings-header">
-        <h1>Settings</h1>
-        <p>Configure system settings and defaults</p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <h1 style={{ margin: 0 }}>Settings</h1>
+          <button
+            className="btn btn-secondary"
+            onClick={() => navigate('/')}
+            style={{ fontSize: '0.9rem' }}
+          >
+            ← Back to Dashboard
+          </button>
+        </div>
+        <p style={{ margin: 0 }}>Configure system settings and defaults</p>
       </div>
 
       {/* Tab Navigation */}
