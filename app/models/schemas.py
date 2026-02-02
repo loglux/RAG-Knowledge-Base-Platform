@@ -483,7 +483,7 @@ class ChatRequest(BaseModel):
         description="MMR diversity parameter (0.0=pure relevance, 1.0=pure diversity)"
     )
     use_self_check: bool = Field(
-        default=True,
+        default=False,
         description="Enable self-check validation of generated answers"
     )
 

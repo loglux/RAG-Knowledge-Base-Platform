@@ -128,7 +128,7 @@ Context follows below.
         use_structure: bool = False,
         use_mmr: bool = False,
         mmr_diversity: float = 0.5,
-        use_self_check: bool = True,
+        use_self_check: bool = False,
         db: Optional[AsyncSession] = None,
         kb_id: Optional[UUID] = None,
     ) -> RAGResponse:

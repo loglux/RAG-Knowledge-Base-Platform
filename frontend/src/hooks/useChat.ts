@@ -103,7 +103,7 @@ export function useChat(kbId: string) {
       useStructure = false,
       useMmr = false,
       mmrDiversity = 0.5,
-      useSelfCheck = true
+      useSelfCheck = false
     ) => {
       if (!question.trim()) return
 

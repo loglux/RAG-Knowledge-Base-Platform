@@ -25,6 +25,21 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def kb_id_to_collection_name(kb_id: UUID) -> str:
+    """
+    Convert KB ID to Qdrant collection name.
+
+    This ensures deterministic mapping between KB and its Qdrant collection.
+
+    Args:
+        kb_id: Knowledge base UUID
+
+    Returns:
+        Collection name in format: kb_{uuid_without_dashes}
+    """
+    return f"kb_{str(kb_id).replace('-', '')}"
+
+
 @router.post("/", response_model=KnowledgeBaseResponse, status_code=status.HTTP_201_CREATED)
 async def create_knowledge_base(
     kb: KnowledgeBaseCreate,
@@ -35,7 +50,7 @@ async def create_knowledge_base(
     Create a new knowledge base.
 
     Creates a new knowledge base with specified configuration.
-    A unique collection name will be generated for Qdrant.
+    Collection name is derived from KB ID for deterministic mapping.
     """
     # Validate embedding model
     if kb.embedding_model not in EMBEDDING_MODELS:
@@ -48,9 +63,10 @@ async def create_knowledge_base(
     # Get embedding model configuration
     model_config = EMBEDDING_MODELS[kb.embedding_model]
 
-    # Generate unique collection name
+    # Generate KB ID and collection name (deterministic)
     import uuid
-    collection_name = f"kb_{uuid.uuid4().hex[:16]}"
+    kb_id = uuid.uuid4()
+    collection_name = kb_id_to_collection_name(kb_id)
 
     # Resolve KB defaults from app settings if not provided
     default_chunk_size = 1000
@@ -69,6 +85,7 @@ async def create_knowledge_base(
 
     # Create KB
     kb_model = KnowledgeBaseModel(
+        id=kb_id,
         name=kb.name,
         description=kb.description,
         collection_name=collection_name,

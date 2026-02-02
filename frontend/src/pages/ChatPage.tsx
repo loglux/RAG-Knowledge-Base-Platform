@@ -69,7 +69,7 @@ export function ChatPage() {
     return 0.5
   })
   const [useSelfCheck, setUseSelfCheck] = useState(() => {
-    return true
+    return false
   })
   const [opensearchAvailable, setOpensearchAvailable] = useState<boolean | null>(null)
   const [settingsLoaded, setSettingsLoaded] = useState(false)
@@ -391,7 +391,7 @@ export function ChatPage() {
       // Reset toggles to default values
       setUseMmr(false)
       setMmrDiversity(0.5)
-      setUseSelfCheck(true)
+      setUseSelfCheck(false)
 
       if (kb) {
         if (kb.bm25_match_mode !== null && kb.bm25_match_mode !== undefined) setBm25MatchMode(kb.bm25_match_mode)
