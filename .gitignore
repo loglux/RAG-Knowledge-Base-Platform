@@ -150,6 +150,7 @@ tmp/
 logs/
 *.db
 docs/
+!docs/PRODUCTION_DEPLOYMENT.md
 examples/
 scripts/
 !scripts/backup.sh
