@@ -482,8 +482,10 @@ class SetupManager:
         """
         try:
             # Execute ALTER USER command
-            alter_query = text(f"ALTER USER {username} WITH PASSWORD :password")
-            await db.execute(alter_query, {"password": new_password})
+            # Escape single quotes in password by doubling them (SQL standard)
+            escaped_password = new_password.replace("'", "''")
+            alter_query = text(f"ALTER USER {username} WITH PASSWORD '{escaped_password}'")
+            await db.execute(alter_query)
             await db.commit()
 
             # Get current DATABASE_URL from config
