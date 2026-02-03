@@ -914,6 +914,15 @@ export function KBDetailsPage() {
                   const noAnswerAcc = typeof metrics?.no_answer_accuracy === 'number'
                     ? (metrics.no_answer_accuracy as number).toFixed(3)
                     : '—'
+                  const noAnswerAccRaw = typeof metrics?.no_answer_accuracy === 'number'
+                    ? (metrics.no_answer_accuracy as number)
+                    : null
+                  const recallRaw = typeof metrics?.recall_avg === 'number'
+                    ? (metrics.recall_avg as number)
+                    : null
+                  const recommendedScore = (recallRaw !== null && noAnswerAccRaw !== null)
+                    ? ((recallRaw + noAnswerAccRaw) / 2).toFixed(3)
+                    : '—'
                   const configLabel = config
                     ? [
                         config.retrieval_mode ? String(config.retrieval_mode) : null,
@@ -939,7 +948,7 @@ export function KBDetailsPage() {
                           </div>
                         )}
                         <div className="text-gray-500">
-                          EM {exact} • F1 {f1} • Concise {concise} • Recall {recall} • No‑answer {noAnswerAcc} • {run.sample_count} samples
+                          EM {exact} • F1 {f1} • Concise {concise} • Recall {recall} • No‑answer {noAnswerAcc} • Recommended {recommendedScore} • {run.sample_count} samples
                         </div>
                         {run.status === 'running' && (
                           <div className="mt-1 text-[11px] text-gray-500">
@@ -988,6 +997,22 @@ export function KBDetailsPage() {
               </div>
               {qaSelectedRun.run.metrics && (
                 <div className="mb-4 text-xs text-gray-300 bg-gray-900/70 border border-gray-800 rounded px-3 py-2">
+                  {(() => {
+                    const recallRaw = typeof qaSelectedRun.run.metrics?.recall_avg === 'number'
+                      ? (qaSelectedRun.run.metrics.recall_avg as number)
+                      : null
+                    const noAnswerRaw = typeof qaSelectedRun.run.metrics?.no_answer_accuracy === 'number'
+                      ? (qaSelectedRun.run.metrics.no_answer_accuracy as number)
+                      : null
+                    const recommendedScore = (recallRaw !== null && noAnswerRaw !== null)
+                      ? ((recallRaw + noAnswerRaw) / 2).toFixed(3)
+                      : '—'
+                    return (
+                      <div className="mb-1">
+                        Recommended score (Recall + No‑answer)/2: {recommendedScore}
+                      </div>
+                    )
+                  })()}
                   <div>
                     EM: {typeof qaSelectedRun.run.metrics?.exact_match_avg === 'number'
                       ? qaSelectedRun.run.metrics.exact_match_avg.toFixed(3)
