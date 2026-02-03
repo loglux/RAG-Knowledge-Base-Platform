@@ -210,29 +210,4 @@ class OllamaEmbeddingService(BaseEmbeddingService):
         logger.info("OllamaEmbeddingService closed")
 
 
-# Singleton instance
-_ollama_service: Optional[OllamaEmbeddingService] = None
-
-
-def get_ollama_service() -> OllamaEmbeddingService:
-    """
-    Get or create singleton instance of OllamaEmbeddingService.
-
-    Returns:
-        OllamaEmbeddingService instance
-    """
-    global _ollama_service
-
-    if _ollama_service is None:
-        _ollama_service = OllamaEmbeddingService()
-
-    return _ollama_service
-
-
-async def close_ollama_service():
-    """Close the singleton Ollama service."""
-    global _ollama_service
-
-    if _ollama_service is not None:
-        await _ollama_service.close()
-        _ollama_service = None
+# Singleton helpers removed; use app.core.embeddings_factory.get_embedding_service()

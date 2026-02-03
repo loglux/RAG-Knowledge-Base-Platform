@@ -484,8 +484,8 @@ class SemanticChunking(ChunkingStrategy):
         # Lazy import to avoid circular dependencies
         logger.info(f"[SemanticChunking] Initializing embeddings service...")
         if self.embeddings_service is None:
-            from app.core.embeddings_factory import create_embedding_service
-            self.embeddings_service = create_embedding_service()
+            from app.core.embeddings_factory import get_embedding_service
+            self.embeddings_service = get_embedding_service()
             logger.info(f"[SemanticChunking] Embeddings service initialized: {type(self.embeddings_service).__name__}")
         else:
             logger.info(f"[SemanticChunking] Using existing embeddings service")

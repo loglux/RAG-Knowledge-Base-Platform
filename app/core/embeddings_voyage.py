@@ -252,29 +252,4 @@ class VoyageEmbeddingService(BaseEmbeddingService):
         logger.info("VoyageEmbeddingService closed")
 
 
-# Singleton instance
-_voyage_service: Optional[VoyageEmbeddingService] = None
-
-
-def get_voyage_service() -> VoyageEmbeddingService:
-    """
-    Get or create singleton instance of VoyageEmbeddingService.
-
-    Returns:
-        VoyageEmbeddingService instance
-    """
-    global _voyage_service
-
-    if _voyage_service is None:
-        _voyage_service = VoyageEmbeddingService()
-
-    return _voyage_service
-
-
-async def close_voyage_service():
-    """Close the singleton Voyage service."""
-    global _voyage_service
-
-    if _voyage_service is not None:
-        await _voyage_service.close()
-        _voyage_service = None
+# Singleton helpers removed; use app.core.embeddings_factory.get_embedding_service()

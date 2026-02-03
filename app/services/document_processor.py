@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.database import Document, KnowledgeBase, AppSettings
 from app.models.enums import DocumentStatus
-from app.core.embeddings_factory import create_embedding_service
+from app.core.embeddings_factory import get_embedding_service
 from app.core.embeddings_base import BaseEmbeddingService
 from app.core.vector_store import (
     get_vector_store,
@@ -97,7 +97,7 @@ class DocumentProcessor:
 
             # 3. Create embedding service for this KB's model
             logger.info(f"Creating embedding service for model: {kb.embedding_model}")
-            embeddings_service = create_embedding_service(model=kb.embedding_model)
+            embeddings_service = get_embedding_service(model=kb.embedding_model)
 
             # 4. Update status to processing
             await self._update_document_status(

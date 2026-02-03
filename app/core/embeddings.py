@@ -242,29 +242,4 @@ class OpenAIEmbeddingService(BaseEmbeddingService):
         logger.info("EmbeddingsService closed")
 
 
-# Singleton instance for dependency injection
-_embeddings_service: Optional[OpenAIEmbeddingService] = None
-
-
-def get_embeddings_service() -> OpenAIEmbeddingService:
-    """
-    Get or create singleton instance of OpenAIEmbeddingService.
-
-    Returns:
-        OpenAIEmbeddingService instance
-    """
-    global _embeddings_service
-
-    if _embeddings_service is None:
-        _embeddings_service = OpenAIEmbeddingService()
-
-    return _embeddings_service
-
-
-async def close_embeddings_service():
-    """Close the singleton embeddings service."""
-    global _embeddings_service
-
-    if _embeddings_service is not None:
-        await _embeddings_service.close()
-        _embeddings_service = None
+ # Singleton helpers removed; use app.core.embeddings_factory.get_embedding_service()

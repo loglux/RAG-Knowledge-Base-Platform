@@ -9,7 +9,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.core.embeddings_factory import create_embedding_service
+from app.core.embeddings_factory import get_embedding_service
 from app.core.embeddings_base import BaseEmbeddingService
 from app.core.vector_store import get_vector_store, QdrantVectorStore, SearchResult
 from app.core.lexical_store import get_lexical_store, OpenSearchStore
@@ -110,7 +110,7 @@ class RetrievalEngine:
         # Dense search
         dense_results = await self.vector_store.search(
             collection_name=collection_name,
-            query_vector=await create_embedding_service(model=embedding_model).generate_embedding(query),
+            query_vector=await get_embedding_service(model=embedding_model).generate_embedding(query),
             limit=dense_limit,
             score_threshold=score_threshold,
             filter_conditions=filters,
@@ -200,7 +200,7 @@ class RetrievalEngine:
         try:
             # 1. Create embedding service for this KB's model
             logger.debug(f"Creating embedding service for model: {embedding_model}")
-            embeddings_service = create_embedding_service(model=embedding_model)
+            embeddings_service = get_embedding_service(model=embedding_model)
 
             # 2. Generate query embedding
             logger.debug("Generating query embedding")

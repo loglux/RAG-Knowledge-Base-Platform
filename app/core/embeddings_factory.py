@@ -20,16 +20,30 @@ from app.core.embeddings_ollama import OllamaEmbeddingService
 logger = logging.getLogger(__name__)
 
 
-def create_embedding_service(
+_service_cache: dict[tuple, BaseEmbeddingService] = {}
+
+
+def _cache_key(
+    provider: EmbeddingProvider,
+    model: str,
+    api_key: Optional[str],
+    base_url: Optional[str],
+) -> tuple:
+    return (provider.value, model, api_key or "", base_url or "")
+
+
+def get_embedding_service(
     model: Optional[str] = None,
     api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
 ) -> BaseEmbeddingService:
     """
-    Create embedding service based on model name.
+    Get (cached) embedding service based on model name.
 
     Args:
         model: Embedding model name (auto-detects provider from model name)
         api_key: API key for the provider (optional, uses settings if not provided)
+        base_url: Optional base URL for local providers (e.g., Ollama)
 
     Returns:
         Appropriate embedding service instance
@@ -52,7 +66,77 @@ def create_embedding_service(
 
     logger.info(f"Creating {provider.value} embedding service for model: {model}")
 
+    if provider == EmbeddingProvider.OPENAI:
+        api_key = api_key or settings.OPENAI_API_KEY
+        base_url = None
+    elif provider == EmbeddingProvider.VOYAGE:
+        api_key = api_key or getattr(settings, "VOYAGE_API_KEY", None)
+        base_url = None
+        if not api_key:
+            raise ValueError(
+                "VOYAGE_API_KEY not found in settings. "
+                "Please set VOYAGE_API_KEY environment variable."
+            )
+    elif provider == EmbeddingProvider.OLLAMA:
+        base_url = base_url or getattr(settings, "OLLAMA_BASE_URL", None)
+        api_key = api_key or "local"
+        if not base_url:
+            raise ValueError(
+                "OLLAMA_BASE_URL not found in settings. "
+                "Please set OLLAMA_BASE_URL environment variable."
+            )
+    else:
+        raise ValueError(f"Unsupported provider: {provider}")
+
+    key = _cache_key(provider, model, api_key, base_url)
+    cached = _service_cache.get(key)
+    if cached is not None:
+        return cached
+
     # Create appropriate service based on provider
+    if provider == EmbeddingProvider.OPENAI:
+        service: BaseEmbeddingService = OpenAIEmbeddingService(
+            api_key=api_key,
+            model=model,
+        )
+    elif provider == EmbeddingProvider.VOYAGE:
+        service = VoyageEmbeddingService(
+            api_key=api_key,
+            model=model,
+        )
+    else:
+        service = OllamaEmbeddingService(
+            base_url=base_url,
+            model=model,
+        )
+
+    _service_cache[key] = service
+    return service
+
+
+def create_embedding_service(
+    model: Optional[str] = None,
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
+) -> BaseEmbeddingService:
+    """
+    Create a fresh embedding service instance.
+
+    Prefer get_embedding_service() for cached instances.
+    """
+    # Use default model from settings if not provided
+    model = model or settings.OPENAI_EMBEDDING_MODEL
+
+    # Get model configuration
+    if model not in EMBEDDING_MODELS:
+        raise ValueError(
+            f"Unknown embedding model: {model}. "
+            f"Available models: {', '.join(EMBEDDING_MODELS.keys())}"
+        )
+
+    model_config = EMBEDDING_MODELS[model]
+    provider = model_config.provider
+
     if provider == EmbeddingProvider.OPENAI:
         return OpenAIEmbeddingService(
             api_key=api_key or settings.OPENAI_API_KEY,
@@ -70,7 +154,7 @@ def create_embedding_service(
             model=model,
         )
     elif provider == EmbeddingProvider.OLLAMA:
-        ollama_url = getattr(settings, "OLLAMA_BASE_URL", None)
+        ollama_url = base_url or getattr(settings, "OLLAMA_BASE_URL", None)
         if not ollama_url:
             raise ValueError(
                 "OLLAMA_BASE_URL not found in settings. "
