@@ -7,7 +7,7 @@ import asyncio
 from typing import Optional, List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -179,7 +179,6 @@ async def get_gold_sample_count(
 async def run_gold_eval(
     kb_id: UUID,
     payload: QAEvalRunRequest,
-    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
     kb = await db.get(KnowledgeBaseModel, kb_id)
@@ -231,13 +230,7 @@ async def run_gold_eval(
                 run_row.error_message = str(exc)
                 await session.commit()
 
-    def _run_eval_sync(run_id: UUID):
-        try:
-            asyncio.run(_background_eval(run_id))
-        except Exception as exc:
-            logger.error(f"Failed to start gold eval run {run_id}: {exc}")
-
-    background_tasks.add_task(_run_eval_sync, run.id)
+    asyncio.create_task(_background_eval(run.id))
 
     return QAEvalRunResponse(
         id=run.id,
