@@ -67,6 +67,7 @@ services:
     volumes:
       - app_logs:/app/logs:rw
       - uploads:/app/uploads:rw
+      - shared_config:/shared:rw
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 30s

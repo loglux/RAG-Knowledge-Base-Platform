@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     g++ \
     curl \
     postgresql-client \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -33,7 +34,10 @@ RUN mkdir -p /app/uploads /app/logs
 RUN useradd -m -u 1000 appuser && \
     chown -R appuser:appuser /app
 
-USER appuser
+# Create /shared directory
+RUN mkdir -p /shared
+
+# DON'T switch to appuser yet - entrypoint will do it after fixing /shared permissions
 
 # Expose port
 EXPOSE 8000
