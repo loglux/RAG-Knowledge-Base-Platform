@@ -794,7 +794,9 @@ function KBDefaultsTab(props: any) {
               max="500"
               step="10"
             />
-            <span className="min-w-[4rem] text-right text-gray-200">{kbChunkOverlap}</span>
+            <span className="min-w-[7rem] text-right text-gray-200">
+              {kbChunkOverlap} ({kbChunkSize > 0 ? Math.round((kbChunkOverlap / kbChunkSize) * 100) : 0}%)
+            </span>
           </div>
           <p className="text-xs text-gray-400 mt-1">Overlapping characters (recommended: 15-20% of chunk size)</p>
         </div>
