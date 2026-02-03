@@ -336,6 +336,7 @@ async def chat_query(
             conversation_id=conversation.id,
             use_mmr=request.use_mmr if request.use_mmr else None,
             mmr_diversity=request.mmr_diversity if request.use_mmr else None,
+            use_self_check=request.use_self_check if request.use_self_check else None,
         )
 
         logger.info(

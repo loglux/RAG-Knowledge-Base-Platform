@@ -105,6 +105,7 @@ export interface ChatMessage {
   model?: string
   use_mmr?: boolean
   mmr_diversity?: number
+  use_self_check?: boolean
 }
 
 export interface SourceChunk {
@@ -156,6 +157,7 @@ export interface ChatResponse {
   conversation_id?: string
   use_mmr?: boolean
   mmr_diversity?: number
+  use_self_check?: boolean
 }
 
 export interface ConversationSummary {

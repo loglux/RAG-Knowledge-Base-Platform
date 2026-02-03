@@ -70,6 +70,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             {!isUser && message.model && (
               <span className="text-[11px] text-gray-400">{message.model}</span>
             )}
+            {!isUser && message.use_self_check && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                Self-check
+              </span>
+            )}
             <span className="text-xs opacity-50">{timestamp}</span>
           </div>
           <button

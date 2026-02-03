@@ -161,6 +161,7 @@ export function useChat(kbId: string) {
           model: response.model,
           use_mmr: response.use_mmr,
           mmr_diversity: response.mmr_diversity,
+          use_self_check: response.use_self_check,
         }
 
         setMessages((prev) => [...prev, assistantMessage])

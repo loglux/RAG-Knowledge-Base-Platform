@@ -500,6 +500,7 @@ class ChatResponse(BaseModel):
     conversation_id: Optional[UUID] = Field(default=None, description="Conversation ID for persistent chat")
     use_mmr: Optional[bool] = Field(default=None, description="Whether MMR was used")
     mmr_diversity: Optional[float] = Field(default=None, description="MMR diversity parameter (0.0-1.0)")
+    use_self_check: Optional[bool] = Field(default=None, description="Whether self-check was applied")
 
 
 # ============================================================================
