@@ -190,7 +190,7 @@ All configuration lives in `.env`. The sample file is `.env.example`.
 
 Key settings:
 - `OPENAI_API_KEY` (or alternate provider keys)
-- `QDRANT_URL` and `DATABASE_URL`
+- `QDRANT_URL`
 - `OLLAMA_BASE_URL` (optional for local models)
 - `MAX_CONTEXT_CHARS` (0 = unlimited)
 - `STRUCTURE_ANALYSIS_REQUESTS_PER_MINUTE` (TOC analysis throttle; 0 = unlimited)

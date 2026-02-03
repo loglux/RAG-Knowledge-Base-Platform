@@ -15,7 +15,7 @@ class SystemSettingsManager:
     """Manager for system settings stored in database."""
 
     # Settings that can be loaded from database
-    # (DATABASE_URL always comes from .env to avoid circular dependency)
+    # (DATABASE_URL always comes from env/secret to avoid circular dependency)
     DB_OVERRIDABLE_SETTINGS = {
         # API Keys
         "openai_api_key": "OPENAI_API_KEY",

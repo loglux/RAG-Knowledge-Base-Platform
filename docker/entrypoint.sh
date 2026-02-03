@@ -15,7 +15,7 @@ while ! pg_isready -h db -U kb_user -d knowledge_base > /dev/null 2>&1; do
 done
 echo "✅ Database is ready"
 
-# Check and fix DATABASE_URL if password was changed via Setup Wizard
+# Check database credentials
 echo "🔍 Checking database credentials..."
 
 # FIRST: Check for Docker secret password
@@ -33,7 +33,7 @@ if [ -f "$SECRET_PATH" ]; then
 fi
 
 if [ -z "$DATABASE_URL" ]; then
-    echo "ℹ️  No persisted DATABASE_URL found"
+    echo "ℹ️  No Docker secret found"
     echo "   Attempting connection with DATABASE_URL from environment..."
 
     # Extract current password from DATABASE_URL
@@ -41,21 +41,9 @@ if [ -z "$DATABASE_URL" ]; then
 
     # Try to connect
     if ! PGPASSWORD="$CURRENT_PASSWORD" psql -h db -U kb_user -d knowledge_base -c "SELECT 1" > /dev/null 2>&1; then
-        echo "❌ Authentication failed with DATABASE_URL from environment"
-        echo "🔄 Trying default password as fallback..."
-
-        # Try default password
-        DEFAULT_PASSWORD="kb_pass_change_me"
-        if PGPASSWORD="$DEFAULT_PASSWORD" psql -h db -U kb_user -d knowledge_base -c "SELECT 1" > /dev/null 2>&1; then
-            echo "✅ Connected with default password"
-
-            export DATABASE_URL="postgresql+asyncpg://kb_user:$DEFAULT_PASSWORD@db:5432/knowledge_base"
-        else
-            echo "💥 FATAL: Cannot connect to database with any known credentials"
-            echo "   Tried: environment password, default password"
-            echo "   Please check database configuration or re-run Setup Wizard"
-            exit 1
-        fi
+        echo "💥 FATAL: Cannot connect to database with provided credentials"
+        echo "   Please check Docker secret or DATABASE_URL in environment"
+        exit 1
     else
         echo "✅ Connection successful with DATABASE_URL from environment"
     fi

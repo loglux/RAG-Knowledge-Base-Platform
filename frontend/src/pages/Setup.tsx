@@ -148,7 +148,7 @@ const Setup: React.FC = () => {
 
     try {
       const result = await changePostgresPassword(dbSecurityData);
-      setNewDatabaseUrl(result.database_url);
+      setNewDatabaseUrl('');
       setPasswordChanged(true);
 
       // Show success message for a moment
@@ -398,7 +398,6 @@ const Setup: React.FC = () => {
             <div className="setup-info">
               <h3>⚠️ Important Notes:</h3>
               <ul>
-                <li>Current default password: <code>kb_pass_change_me</code></li>
                 <li>Changing password does NOT update Docker secrets or .env</li>
                 <li>Save the new password - you'll need it for container restarts</li>
                 <li>This step is optional but recommended for production</li>
@@ -448,11 +447,11 @@ const Setup: React.FC = () => {
               </div>
             )}
 
-            {passwordChanged && newDatabaseUrl && (
+            {passwordChanged && (
               <div className="alert" style={{ background: '#d3f9d8', border: '1px solid #51cf66', color: '#2b8a3e' }}>
                 <strong>✓ Password Changed Successfully!</strong>
                 <br />
-                <small>New DATABASE_URL has been saved to system settings.</small>
+                <small>Update Docker secret (.env/secret) before restart.</small>
               </div>
             )}
 

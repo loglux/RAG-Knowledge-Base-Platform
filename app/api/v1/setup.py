@@ -64,7 +64,6 @@ class PostgresPasswordResponse(BaseModel):
     """Response with new PostgreSQL credentials."""
     username: str
     password: str
-    database_url: str
     message: str
 
 
@@ -205,7 +204,6 @@ async def change_postgres_password(
         return PostgresPasswordResponse(
             username=result["username"],
             password=result["password"],
-            database_url=result["database_url"],
             message="PostgreSQL password changed successfully. IMPORTANT: Save these credentials!"
         )
 

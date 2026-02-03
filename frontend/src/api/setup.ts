@@ -54,7 +54,6 @@ export interface PostgresPasswordRequest {
 export interface PostgresPasswordResponse {
   username: string;
   password: string;
-  database_url: string;
   message: string;
 }
 

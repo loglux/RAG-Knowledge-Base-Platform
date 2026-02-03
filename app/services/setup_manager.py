@@ -489,7 +489,7 @@ class SetupManager:
             updated_by: Admin user ID
 
         Returns:
-            Dictionary with new DATABASE_URL
+            Dictionary with updated credentials
 
         Raises:
             SetupError: If password change fails
@@ -532,7 +532,6 @@ class SetupManager:
             await recreate_engine(new_url)
 
             return {
-                "database_url": new_url,
                 "username": username,
                 "password": new_password,
             }
