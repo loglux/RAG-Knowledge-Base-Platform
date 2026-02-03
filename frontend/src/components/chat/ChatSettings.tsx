@@ -96,12 +96,32 @@ export function ChatSettings({
   const safeBm25MinShouldMatch = Number.isFinite(bm25MinShouldMatch) ? bm25MinShouldMatch : 0
   const safeBm25UsePhrase = typeof bm25UsePhrase === 'boolean' ? bm25UsePhrase : true
   const [showAdvancedBm25, setShowAdvancedBm25] = useState(false)
+  const [linkHybridWeights, setLinkHybridWeights] = useState(true)
   const matchModeOptions = bm25MatchModes && bm25MatchModes.length > 0 ? bm25MatchModes : []
   const analyzerOptions = bm25Analyzers && bm25Analyzers.length > 0 ? bm25Analyzers : []
   const matchModeValue = bm25MatchMode ?? matchModeOptions[0] ?? ''
   const analyzerValue = bm25Analyzer ?? analyzerOptions[0] ?? ''
   const matchModeDisabled = matchModeOptions.length === 0
   const analyzerDisabled = analyzerOptions.length === 0
+
+  const clamp01 = (value: number) => Math.min(1, Math.max(0, value))
+  const handleDenseWeightChange = (value: number) => {
+    const nextDense = clamp01(value)
+    onHybridDenseWeightChange(nextDense)
+    if (linkHybridWeights) {
+      const nextLexical = Number((1 - nextDense).toFixed(2))
+      onHybridLexicalWeightChange(nextLexical)
+    }
+  }
+
+  const handleLexicalWeightChange = (value: number) => {
+    const nextLexical = clamp01(value)
+    onHybridLexicalWeightChange(nextLexical)
+    if (linkHybridWeights) {
+      const nextDense = Number((1 - nextLexical).toFixed(2))
+      onHybridDenseWeightChange(nextDense)
+    }
+  }
 
   return (
     <div className="bg-gray-800 border-b border-gray-700">
@@ -343,6 +363,21 @@ export function ChatSettings({
               Tune lexical matching and how BM25 blends with vectors. Basic is safe defaults; Advanced changes analyzer
               and usually requires reindex.
             </p>
+            <div className="mt-3 flex items-center gap-2 text-xs text-gray-400">
+              <input
+                id="link-hybrid-weights"
+                type="checkbox"
+                checked={linkHybridWeights}
+                onChange={(e) => setLinkHybridWeights(e.target.checked)}
+                className="rounded border-gray-600 bg-gray-800"
+              />
+              <label htmlFor="link-hybrid-weights">
+                Link weights (lexical = 1 − dense)
+              </label>
+            </div>
+            <p className="mt-1 text-[11px] text-gray-500">
+              Weights are normalized server-side if they don’t sum to 1.0.
+            </p>
 
             {opensearchAvailable === false && (
               <div className="mt-3 rounded border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-200">
@@ -379,7 +414,7 @@ export function ChatSettings({
                   max="1"
                   step="0.01"
                   value={safeHybridDenseWeight}
-                  onChange={(e) => onHybridDenseWeightChange(Number(e.target.value))}
+                  onChange={(e) => handleDenseWeightChange(Number(e.target.value))}
                   className="slider w-full"
                 />
                 <p className="text-xs text-gray-500 mt-1">
@@ -397,7 +432,7 @@ export function ChatSettings({
                   max="1"
                   step="0.01"
                   value={safeHybridLexicalWeight}
-                  onChange={(e) => onHybridLexicalWeightChange(Number(e.target.value))}
+                  onChange={(e) => handleLexicalWeightChange(Number(e.target.value))}
                   className="slider w-full"
                 />
                 <p className="text-xs text-gray-500 mt-1">
