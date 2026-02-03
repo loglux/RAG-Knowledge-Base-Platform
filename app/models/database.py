@@ -505,6 +505,31 @@ class AdminUser(Base):
         return f"<AdminUser(id={self.id}, username='{self.username}', role={self.role})>"
 
 
+class AdminRefreshToken(Base):
+    """Refresh token records for admin users."""
+
+    __tablename__ = "admin_refresh_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        nullable=False
+    )
+    admin_user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("admin_users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    jti: Mapped[str] = mapped_column(String(36), unique=True, nullable=False, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    admin_user: Mapped["AdminUser"] = relationship("AdminUser")
+
+
 class SystemSettings(Base):
     """System configuration settings - stores API keys, database URLs, etc."""
 

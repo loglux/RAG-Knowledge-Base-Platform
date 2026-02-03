@@ -196,6 +196,30 @@ Key settings:
 - `STRUCTURE_ANALYSIS_REQUESTS_PER_MINUTE` (TOC analysis throttle; 0 = unlimited)
 - `OPENSEARCH_URL` (optional; required for BM25/hybrid)
 
+### Authentication (JWT)
+
+After the Setup Wizard creates the admin account, all API routes (except `/health`, `/setup`, and `/auth`) require authentication.
+
+- UI login: `http://<host>:5174/login`
+- API login: `POST /api/v1/auth/login` (username + password)
+- Access token: sent as `Authorization: Bearer <token>`
+- Refresh token: stored as an httpOnly cookie; rotate via `POST /api/v1/auth/refresh`
+- Logout: `POST /api/v1/auth/logout`
+
+### CORS (frontend on another host)
+
+If the frontend and API are on different origins (different host or port), CORS is required.
+
+Common cases:
+- **Vite frontend on 5174 + API on 8004** → CORS required
+- **Nginx proxy** (frontend serves `/api` on same host) → CORS not required
+
+To allow a browser origin, set `CORS_ORIGINS` in `.env` (comma-separated). For example:
+
+```
+http://localhost:5174
+```
+
 ### Database password (Docker secrets)
 
 We now use a Docker‑Compose secret for the database password. This avoids storing the password in `.env` or the database.

@@ -188,10 +188,13 @@ class Settings(BaseSettings):
     )
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, description="Access token expiration in minutes")
     ALGORITHM: str = Field(default="HS256", description="JWT algorithm")
+    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=30, description="Refresh token expiration in days")
+    COOKIE_SECURE: bool = Field(default=False, description="Use secure cookies (HTTPS only)")
+    COOKIE_SAMESITE: str = Field(default="lax", description="Cookie SameSite policy (lax/strict/none)")
 
     # CORS
     CORS_ORIGINS: str = Field(
-        default="http://localhost:3000,http://localhost:8004",
+        default="http://localhost:3000,http://localhost:5174,http://127.0.0.1:5174,http://localhost:8004",
         description="Comma-separated list of allowed CORS origins"
     )
 

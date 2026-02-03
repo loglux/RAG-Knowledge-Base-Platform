@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useNavigate, useLocation, Outlet, Navigate } from 'react-router-dom'
 import { DashboardPage } from './pages/DashboardPage'
 import { KBDetailsPage } from './pages/KBDetailsPage'
 import { ChatPage } from './pages/ChatPage'
 import { SettingsPage } from './pages/SettingsPage'
 import Setup from './pages/Setup'
 import { getSetupStatus } from './api/setup'
+import { AuthProvider, useAuth } from './context/AuthContext'
+import { LoginPage } from './pages/LoginPage'
 
 function SetupRedirect({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
@@ -58,18 +60,49 @@ function SetupRedirect({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <BrowserRouter>
-      <SetupRedirect>
-        <Routes>
-          <Route path="/setup" element={<Setup />} />
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/kb/:id" element={<KBDetailsPage />} />
-          <Route path="/kb/:id/chat" element={<ChatPage />} />
-        </Routes>
-      </SetupRedirect>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <SetupRedirect>
+          <Routes>
+            <Route path="/setup" element={<Setup />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route element={<ProtectedRoute />}>
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/kb/:id" element={<KBDetailsPage />} />
+              <Route path="/kb/:id/chat" element={<ChatPage />} />
+            </Route>
+          </Routes>
+        </SetupRedirect>
+      </BrowserRouter>
+    </AuthProvider>
   )
 }
 
 export default App
+
+function ProtectedRoute() {
+  const { user, loading } = useAuth()
+  const location = useLocation()
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh',
+        fontSize: '18px',
+        color: '#666'
+      }}>
+        Loading...
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
+  return <Outlet />
+}

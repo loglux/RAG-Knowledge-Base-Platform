@@ -18,7 +18,12 @@ import type {
   AppSettingsUpdate,
   ApiInfo,
   SettingsMetadata,
+  LoginRequest,
+  TokenResponse,
+  MeResponse,
 } from '../types/index'
+
+const ACCESS_TOKEN_KEY = 'kb_access_token'
 
 class APIClient {
   private client: AxiosInstance
@@ -29,21 +34,100 @@ class APIClient {
 
     this.client = axios.create({
       baseURL: baseURL + prefix,
+      withCredentials: true,
       headers: {
         'Content-Type': 'application/json',
       },
     })
 
+    this.client.interceptors.request.use((config) => {
+      const token = this.getAccessToken()
+      if (token) {
+        config.headers = config.headers || {}
+        config.headers.Authorization = `Bearer ${token}`
+      }
+      return config
+    })
+
     // Response interceptor for error handling
     this.client.interceptors.response.use(
       (response) => response,
-      (error: AxiosError<APIError>) => {
+      async (error: AxiosError<APIError>) => {
+        const originalRequest = error.config as any
+        const status = error.response?.status
+
+        if (status === 401 && !originalRequest?._retry && !originalRequest?.url?.includes('/auth/')) {
+          originalRequest._retry = true
+          try {
+            const refreshed = await this.refreshToken()
+            if (refreshed) {
+              return this.client(originalRequest)
+            }
+          } catch {
+            this.clearAccessToken()
+          }
+        }
+
         if (error.response?.data) {
           throw new Error(error.response.data.detail || 'An error occurred')
         }
         throw error
       }
     )
+  }
+
+  private getAccessToken(): string | null {
+    try {
+      return localStorage.getItem(ACCESS_TOKEN_KEY)
+    } catch {
+      return null
+    }
+  }
+
+  private setAccessToken(token: string) {
+    try {
+      localStorage.setItem(ACCESS_TOKEN_KEY, token)
+    } catch {
+      // ignore
+    }
+  }
+
+  private clearAccessToken() {
+    try {
+      localStorage.removeItem(ACCESS_TOKEN_KEY)
+    } catch {
+      // ignore
+    }
+  }
+
+  // Auth
+  async login(payload: LoginRequest): Promise<TokenResponse> {
+    const response = await this.client.post<TokenResponse>('/auth/login', payload)
+    this.setAccessToken(response.data.access_token)
+    return response.data
+  }
+
+  async refreshToken(): Promise<boolean> {
+    try {
+      const response = await this.client.post<TokenResponse>('/auth/refresh')
+      this.setAccessToken(response.data.access_token)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  async logout(): Promise<void> {
+    try {
+      await this.client.post('/auth/logout')
+    } finally {
+      this.clearAccessToken()
+    }
+  }
+
+  async me(): Promise<MeResponse> {
+    const response = await this.client.get<MeResponse>('/auth/me')
+    return response.data
   }
 
   // Knowledge Bases

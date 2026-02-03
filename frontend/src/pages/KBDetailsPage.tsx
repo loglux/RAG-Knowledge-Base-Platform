@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import { apiClient } from '../services/api'
 import { useDocuments } from '../hooks/useDocuments'
 import { useDocumentPolling } from '../hooks/useDocumentPolling'
@@ -11,6 +12,7 @@ import type { KnowledgeBase, AppSettings } from '../types/index'
 export function KBDetailsPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { logout } = useAuth()
 
   const getChunkingStrategyDisplay = (strategy: string) => {
     const strategies: Record<string, { icon: string; label: string; description: string }> = {
@@ -405,6 +407,11 @@ export function KBDetailsPage() {
     }
   }
 
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login')
+  }
+
   if (kbLoading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -496,13 +503,21 @@ export function KBDetailsPage() {
                 {kb.description && <p className="text-gray-400 text-sm mt-1">{kb.description}</p>}
               </div>
             </div>
-            <button
-              onClick={handleDelete}
-              className="text-gray-400 hover:text-red-500 transition-colors px-3 py-2"
-              aria-label="Delete knowledge base"
-            >
-              🗑️
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleLogout}
+                className="btn-secondary text-sm px-3 py-1.5"
+              >
+                Logout
+              </button>
+              <button
+                onClick={handleDelete}
+                className="text-gray-400 hover:text-red-500 transition-colors px-3 py-2"
+                aria-label="Delete knowledge base"
+              >
+                🗑️
+              </button>
+            </div>
           </div>
 
           <div className="flex items-center space-x-6 mt-4 text-sm text-gray-400">

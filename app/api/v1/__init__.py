@@ -1,21 +1,40 @@
 """API v1 router configuration."""
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-from app.api.v1 import health, knowledge_bases, documents, chat, embeddings, ollama, llm, settings, setup, system_settings
+from app.api.v1 import (
+    health,
+    knowledge_bases,
+    documents,
+    chat,
+    embeddings,
+    ollama,
+    llm,
+    settings,
+    setup,
+    system_settings,
+    auth,
+)
+from app.dependencies import get_current_user_id
 
 # Create main API router
 api_router = APIRouter()
+protected_router = APIRouter(dependencies=[Depends(get_current_user_id)])
 
-# Include sub-routers
+# Public routers
 api_router.include_router(health.router, tags=["health"])
 api_router.include_router(setup.router, tags=["setup"])  # Setup wizard (no auth required)
-api_router.include_router(knowledge_bases.router, prefix="/knowledge-bases", tags=["knowledge-bases"])
-api_router.include_router(documents.router, prefix="/documents", tags=["documents"])
-api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
-api_router.include_router(settings.router, prefix="/settings", tags=["settings"])
-api_router.include_router(system_settings.router, prefix="/system-settings", tags=["system-settings"])
-api_router.include_router(embeddings.router, prefix="/embeddings", tags=["embeddings"])
-api_router.include_router(ollama.router, prefix="/ollama", tags=["ollama"])
-api_router.include_router(llm.router, prefix="/llm", tags=["llm"])
+api_router.include_router(auth.router)
+
+# Protected routers
+protected_router.include_router(knowledge_bases.router, prefix="/knowledge-bases", tags=["knowledge-bases"])
+protected_router.include_router(documents.router, prefix="/documents", tags=["documents"])
+protected_router.include_router(chat.router, prefix="/chat", tags=["chat"])
+protected_router.include_router(settings.router, prefix="/settings", tags=["settings"])
+protected_router.include_router(system_settings.router, prefix="/system-settings", tags=["system-settings"])
+protected_router.include_router(embeddings.router, prefix="/embeddings", tags=["embeddings"])
+protected_router.include_router(ollama.router, prefix="/ollama", tags=["ollama"])
+protected_router.include_router(llm.router, prefix="/llm", tags=["llm"])
+
+api_router.include_router(protected_router)
 
 __all__ = ["api_router"]

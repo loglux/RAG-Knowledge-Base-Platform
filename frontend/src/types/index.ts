@@ -96,6 +96,27 @@ export interface APIError {
   suggestion?: string
 }
 
+// Auth Types
+export interface LoginRequest {
+  username: string
+  password: string
+}
+
+export interface TokenResponse {
+  access_token: string
+  token_type: string
+  expires_in: number
+  admin_id: number
+  username: string
+  role: string
+}
+
+export interface MeResponse {
+  admin_id: number
+  username: string
+  role: string
+}
+
 // Chat Types
 export interface ChatMessage {
   role: 'user' | 'assistant'

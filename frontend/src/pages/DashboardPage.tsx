@@ -1,11 +1,13 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useKnowledgeBases } from '../hooks/useKnowledgeBases'
+import { useAuth } from '../context/AuthContext'
 import { CreateKBModal } from '../components/kb/CreateKBModal'
 import { KBCard } from '../components/kb/KBCard'
 
 export function DashboardPage() {
   const navigate = useNavigate()
+  const { logout } = useAuth()
   const {
     knowledgeBases,
     loading,
@@ -26,6 +28,11 @@ export function DashboardPage() {
     navigate(`/kb/${id}`)
   }
 
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login')
+  }
+
   return (
     <div className="min-h-screen bg-gray-900">
       {/* Header */}
@@ -43,6 +50,13 @@ export function DashboardPage() {
               >
                 <span aria-hidden="true">⚙️</span>
                 <span>Settings</span>
+              </button>
+              <button
+                onClick={handleLogout}
+                className="btn-secondary text-sm px-3 py-1.5 flex items-center gap-2"
+              >
+                <span aria-hidden="true">⎋</span>
+                <span>Logout</span>
               </button>
               <div className="text-sm text-gray-400">
                 {loading ? 'Loading...' : `${total} knowledge base${total !== 1 ? 's' : ''}`}

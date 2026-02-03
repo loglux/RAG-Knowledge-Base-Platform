@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import { apiClient } from '../services/api'
 import { useChat } from '../hooks/useChat'
 import { MessageBubble } from '../components/chat/MessageBubble'
@@ -11,6 +12,7 @@ import type { KnowledgeBase, ConversationSettings } from '../types/index'
 export function ChatPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { logout } = useAuth()
 
   const [kb, setKb] = useState<KnowledgeBase | null>(null)
   const [kbLoading, setKbLoading] = useState(true)
@@ -80,6 +82,11 @@ export function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const { messages, isLoading, error, sendMessage, clearMessages, conversationId } = useChat(id!)
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login')
+  }
 
   const settingsDraftKey = `chat_settings_draft_${id}`
 
@@ -452,6 +459,12 @@ export function ChatPage() {
               </div>
             </div>
             <div className="flex items-center space-x-3">
+              <button
+                onClick={handleLogout}
+                className="btn-secondary text-sm px-3 py-1.5"
+              >
+                Logout
+              </button>
               <button
                 onClick={() => setShowSettings(!showSettings)}
                 className="text-gray-400 hover:text-white transition-colors px-3 py-2"

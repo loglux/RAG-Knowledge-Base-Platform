@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import { apiClient } from '../services/api'
 import { LLMSelector } from '../components/chat/LLMSelector'
 import type { AppSettings } from '../types/index'
@@ -8,6 +9,7 @@ type TabType = 'query' | 'kb-defaults' | 'ai-providers' | 'databases'
 
 export function SettingsPage() {
   const navigate = useNavigate()
+  const { logout } = useAuth()
   const [activeTab, setActiveTab] = useState<TabType>('query')
 
   // Loading states
@@ -119,6 +121,11 @@ export function SettingsPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login')
   }
 
   const handleSaveQueryDefaults = async () => {
@@ -292,12 +299,20 @@ export function SettingsPage() {
       <div className="mb-8 pb-4 border-b border-gray-700">
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-3xl font-bold text-white">Settings</h1>
-          <button
-            onClick={() => navigate('/')}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm"
-          >
-            ← Back to Dashboard
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/')}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm"
+            >
+              ← Back to Dashboard
+            </button>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm"
+            >
+              Logout
+            </button>
+          </div>
         </div>
         <p className="text-gray-400">Configure system settings and defaults</p>
       </div>

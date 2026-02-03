@@ -541,3 +541,27 @@ class DocumentStructureResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# ============================================================================
+# Auth Schemas
+# ============================================================================
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+    expires_in: int
+    admin_id: int
+    username: str
+    role: str
+
+
+class MeResponse(BaseModel):
+    admin_id: int
+    username: str
+    role: str
