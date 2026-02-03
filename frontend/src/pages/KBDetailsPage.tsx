@@ -100,11 +100,13 @@ export function KBDetailsPage() {
     retrieval_mode: 'dense' as 'dense' | 'hybrid',
   })
   const [qaRunning, setQaRunning] = useState(false)
+  const [qaPresetRunning, setQaPresetRunning] = useState(false)
   const [qaRunError, setQaRunError] = useState<string | null>(null)
   const [qaSelectedRun, setQaSelectedRun] = useState<QAEvalRunDetail | null>(null)
   const [qaFilter, setQaFilter] = useState('')
   const [qaOnlyLow, setQaOnlyLow] = useState(false)
   const [qaDeleting, setQaDeleting] = useState(false)
+  const [qaDetailsSeed, setQaDetailsSeed] = useState(0)
 
   const buildSettingsData = (kbData: KnowledgeBase, defaults?: AppSettings | null) => {
     const bm25Override = kbData.bm25_match_mode !== null
@@ -250,6 +252,30 @@ export function KBDetailsPage() {
       setQaRunError(err instanceof Error ? err.message : 'Failed to run evaluation')
     } finally {
       setQaRunning(false)
+    }
+  }
+
+  const qaPresetConfigs = [
+    { label: 'Dense top_k=5', config: { top_k: 5, retrieval_mode: 'dense' as const } },
+    { label: 'Dense top_k=10', config: { top_k: 10, retrieval_mode: 'dense' as const } },
+    { label: 'Hybrid top_k=5', config: { top_k: 5, retrieval_mode: 'hybrid' as const } },
+    { label: 'Hybrid top_k=10', config: { top_k: 10, retrieval_mode: 'hybrid' as const } },
+  ]
+
+  const handleRunPresetSuite = async () => {
+    if (!id || qaPresetRunning) return
+    setQaPresetRunning(true)
+    setQaRunError(null)
+    try {
+      for (const preset of qaPresetConfigs) {
+        await apiClient.runGoldEval(id, preset.config)
+      }
+      const runs = await apiClient.listAutoTuneRuns(id)
+      setQaRuns(runs)
+    } catch (err) {
+      setQaRunError(err instanceof Error ? err.message : 'Failed to run preset suite')
+    } finally {
+      setQaPresetRunning(false)
     }
   }
 
@@ -832,6 +858,15 @@ export function KBDetailsPage() {
                   {qaRunning ? 'Running…' : 'Run Evaluation'}
                 </button>
               </div>
+              <div>
+                <button
+                  onClick={handleRunPresetSuite}
+                  disabled={qaPresetRunning || qaRunning}
+                  className="btn-secondary text-xs px-3 py-1.5 disabled:opacity-60"
+                >
+                  {qaPresetRunning ? 'Running presets…' : 'Run Preset Suite'}
+                </button>
+              </div>
             </div>
 
             {qaRunError && (
@@ -861,6 +896,7 @@ export function KBDetailsPage() {
               <div className="space-y-2">
                 {qaRuns.map((run) => {
                   const metrics = run.metrics as Record<string, unknown> | null | undefined
+                  const config = run.config as Record<string, unknown> | null | undefined
                   const exact = typeof metrics?.exact_match_avg === 'number'
                     ? metrics.exact_match_avg.toFixed(3)
                     : '—'
@@ -876,6 +912,13 @@ export function KBDetailsPage() {
                   const noAnswerAcc = typeof metrics?.no_answer_accuracy === 'number'
                     ? (metrics.no_answer_accuracy as number).toFixed(3)
                     : '—'
+                  const configLabel = config
+                    ? [
+                        config.retrieval_mode ? String(config.retrieval_mode) : null,
+                        config.top_k ? `top_k=${String(config.top_k)}` : null,
+                        config.use_mmr ? 'mmr' : null,
+                      ].filter(Boolean).join(' ')
+                    : null
                   const processed = run.processed_count ?? 0
                   const total = run.sample_count
                   const progress = total > 0 ? Math.round((processed / total) * 100) : 0
@@ -888,6 +931,11 @@ export function KBDetailsPage() {
                         <div className="font-medium">
                           {run.mode} • {run.status}
                         </div>
+                        {configLabel && (
+                          <div className="text-gray-500">
+                            {configLabel}
+                          </div>
+                        )}
                         <div className="text-gray-500">
                           EM {exact} • F1 {f1} • Concise {concise} • Recall {recall} • No‑answer {noAnswerAcc} • {run.sample_count} samples
                         </div>
@@ -925,9 +973,17 @@ export function KBDetailsPage() {
 
           {qaSelectedRun && (
             <div className="mt-6">
-              <h4 className="text-sm font-semibold text-gray-200 mb-3">
-                Run Details
-              </h4>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-semibold text-gray-200">
+                  Run Details
+                </h4>
+                <button
+                  onClick={() => setQaDetailsSeed((value) => value + 1)}
+                  className="btn-secondary text-[11px] px-2 py-1"
+                >
+                  Collapse All
+                </button>
+              </div>
               {qaSelectedRun.run.metrics && (
                 <div className="mb-4 text-xs text-gray-300 bg-gray-900/70 border border-gray-800 rounded px-3 py-2">
                   <div>
@@ -962,7 +1018,10 @@ export function KBDetailsPage() {
                   <span>Only low F1 (&lt; 0.4)</span>
                 </label>
               </div>
-              <div className="space-y-3 max-h-[420px] overflow-y-auto pr-2">
+              <div
+                key={qaDetailsSeed}
+                className="space-y-3 max-h-[420px] overflow-y-auto pr-2"
+              >
                 {qaSelectedRun.results
                   .filter((result) => {
                     const matches = result.question.toLowerCase().includes(qaFilter.toLowerCase())

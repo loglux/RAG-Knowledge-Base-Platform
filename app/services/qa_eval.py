@@ -1,7 +1,9 @@
 """QA-based evaluation utilities for RAG auto-tuning."""
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 import re
 from dataclasses import dataclass, asdict
 from datetime import datetime
@@ -16,6 +18,9 @@ from app.services.rag import RAGService
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+", re.IGNORECASE)
 NO_ANSWER_SENTINEL = "__NO_ANSWER__"
+EVAL_QUERY_TIMEOUT_S = 90
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_text(text: str) -> str:
@@ -178,28 +183,32 @@ async def run_gold_evaluation_on_run(
 
     for idx, sample in enumerate(samples, 1):
         try:
-            response = await rag.query(
-                question=sample.question,
-                collection_name=kb.collection_name,
-                embedding_model=kb.embedding_model,
-                top_k=config.top_k,
-                retrieval_mode=config.retrieval_mode,
-                lexical_top_k=config.lexical_top_k,
-                dense_weight=config.dense_weight,
-                lexical_weight=config.lexical_weight,
-                bm25_match_mode=config.bm25_match_mode,
-                bm25_min_should_match=config.bm25_min_should_match,
-                bm25_use_phrase=config.bm25_use_phrase,
-                bm25_analyzer=config.bm25_analyzer,
-                max_context_chars=config.max_context_chars,
-                score_threshold=config.score_threshold,
-                llm_model=config.llm_model,
-                llm_provider=config.llm_provider,
-                temperature=config.temperature,
-                use_mmr=config.use_mmr,
-                mmr_diversity=config.mmr_diversity,
-                db=db,
-                kb_id=kb.id,
+            logger.info("Gold eval run %s: processing sample %s/%s (id=%s)", run.id, idx, len(samples), sample.id)
+            response = await asyncio.wait_for(
+                rag.query(
+                    question=sample.question,
+                    collection_name=kb.collection_name,
+                    embedding_model=kb.embedding_model,
+                    top_k=config.top_k,
+                    retrieval_mode=config.retrieval_mode,
+                    lexical_top_k=config.lexical_top_k,
+                    dense_weight=config.dense_weight,
+                    lexical_weight=config.lexical_weight,
+                    bm25_match_mode=config.bm25_match_mode,
+                    bm25_min_should_match=config.bm25_min_should_match,
+                    bm25_use_phrase=config.bm25_use_phrase,
+                    bm25_analyzer=config.bm25_analyzer,
+                    max_context_chars=config.max_context_chars,
+                    score_threshold=config.score_threshold,
+                    llm_model=config.llm_model,
+                    llm_provider=config.llm_provider,
+                    temperature=config.temperature,
+                    use_mmr=config.use_mmr,
+                    mmr_diversity=config.mmr_diversity,
+                    db=db,
+                    kb_id=kb.id,
+                ),
+                timeout=EVAL_QUERY_TIMEOUT_S,
             )
             answer_text = response.answer
             sources = [
@@ -242,6 +251,19 @@ async def run_gold_evaluation_on_run(
                     "concise_f1": concise,
                     "recall": recall,
                 }
+        except asyncio.TimeoutError:
+            errors += 1
+            answer_text = None
+            sources = []
+            metrics = {"error": f"timeout after {EVAL_QUERY_TIMEOUT_S}s"}
+            logger.warning(
+                "Gold eval run %s: sample %s/%s timed out after %ss (id=%s)",
+                run.id,
+                idx,
+                len(samples),
+                EVAL_QUERY_TIMEOUT_S,
+                sample.id,
+            )
         except Exception as exc:
             errors += 1
             answer_text = None
