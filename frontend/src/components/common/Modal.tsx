@@ -43,7 +43,7 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = 'md' }: Mod
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-start justify-center py-6 sm:items-center">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black bg-opacity-50 transition-opacity"
@@ -53,7 +53,7 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = 'md' }: Mod
 
       {/* Modal */}
       <div
-        className={`relative bg-gray-800 rounded-lg shadow-xl w-full mx-4 ${maxWidthClasses[maxWidth]} transform transition-all`}
+        className={`relative bg-gray-800 rounded-lg shadow-xl w-full mx-4 ${maxWidthClasses[maxWidth]} transform transition-all max-h-[90vh] flex flex-col`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
@@ -75,7 +75,7 @@ export function Modal({ isOpen, onClose, title, children, maxWidth = 'md' }: Mod
         </div>
 
         {/* Content */}
-        <div className="px-6 py-4">
+        <div className="px-6 py-4 overflow-y-auto">
           {children}
         </div>
       </div>
