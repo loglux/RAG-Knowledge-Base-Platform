@@ -258,8 +258,10 @@ export function KBDetailsPage() {
   const qaPresetConfigs = [
     { label: 'Dense top_k=5', config: { top_k: 5, retrieval_mode: 'dense' as const } },
     { label: 'Dense top_k=10', config: { top_k: 10, retrieval_mode: 'dense' as const } },
+    { label: 'Hybrid top_k=3', config: { top_k: 3, retrieval_mode: 'hybrid' as const } },
     { label: 'Hybrid top_k=5', config: { top_k: 5, retrieval_mode: 'hybrid' as const } },
     { label: 'Hybrid top_k=10', config: { top_k: 10, retrieval_mode: 'hybrid' as const } },
+    { label: 'Hybrid top_k=15', config: { top_k: 15, retrieval_mode: 'hybrid' as const } },
   ]
 
   const handleRunPresetSuite = async () => {
