@@ -196,6 +196,27 @@ Key settings:
 - `STRUCTURE_ANALYSIS_REQUESTS_PER_MINUTE` (TOC analysis throttle; 0 = unlimited)
 - `OPENSEARCH_URL` (optional; required for BM25/hybrid)
 
+### Database password (Docker secrets)
+
+We now use a Docker‑Compose secret for the database password. This avoids storing the password in `.env` or the database.
+
+1) Create the secret file:
+```
+./scripts/setup_secrets.sh
+```
+2) Rebuild and restart:
+```
+docker compose down
+docker compose up -d --build
+```
+
+If you don't know the current DB password, reset it first:
+```
+docker exec -u postgres -it kb-platform-db psql -U postgres -d postgres \
+  -c "ALTER USER kb_user WITH PASSWORD 'NEW_PASSWORD';"
+```
+Then rerun `./scripts/setup_secrets.sh` with the new password.
+
 ## Global settings (UI)
 
 Global Settings define defaults for new chats and retrieval behavior:
