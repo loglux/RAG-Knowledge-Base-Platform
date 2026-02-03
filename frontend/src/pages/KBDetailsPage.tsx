@@ -582,7 +582,7 @@ export function KBDetailsPage() {
 
           {/* Upload Area */}
           <div className="mb-6">
-            <FileUpload onUpload={handleUpload} accept=".txt,.md" maxSize={50} multiple />
+            <FileUpload onUpload={handleUpload} accept=".txt,.md,.fb2" maxSize={50} multiple />
           </div>
 
           {/* Document List */}

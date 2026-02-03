@@ -119,7 +119,7 @@ async def create_document(
 
     Processing happens in the background. Check document status to monitor progress.
 
-    Supported formats (MVP): txt, md
+    Supported formats (MVP): txt, md, fb2
     """
     # Verify KB exists
     kb_query = select(KnowledgeBaseModel).where(
@@ -143,10 +143,12 @@ async def create_document(
         file_type = FileType.TXT
     elif extension == "md":
         file_type = FileType.MD
+    elif extension == "fb2":
+        file_type = FileType.FB2
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file type: {extension}. Supported: txt, md"
+            detail=f"Unsupported file type: {extension}. Supported: txt, md, fb2"
         )
 
     # Read file content
@@ -154,10 +156,15 @@ async def create_document(
     try:
         content = content_bytes.decode('utf-8')
     except UnicodeDecodeError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File must be UTF-8 encoded text"
-        )
+        import chardet
+        detected = chardet.detect(content_bytes)
+        encoding = detected.get("encoding")
+        if not encoding:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File must be UTF-8 or a detectable text encoding"
+            )
+        content = content_bytes.decode(encoding, errors="replace")
 
     # Validate file size
     from app.config import settings

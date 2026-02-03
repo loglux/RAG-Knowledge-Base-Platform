@@ -27,7 +27,7 @@ It can be used as a standalone service or integrated into other products via its
 
 ## Key features
 
-- **Document ingestion with intelligent chunking** (txt, md):
+- **Document ingestion with intelligent chunking** (txt, md, fb2):
   - **Simple**: Fast fixed-size chunking with overlap
   - **Smart**: Recursive chunking respecting sentence/paragraph boundaries (recommended for most cases)
   - **Semantic**: Advanced embedding-based boundary detection using cosine similarity to find natural topic changes
@@ -205,6 +205,14 @@ After the Setup Wizard creates the admin account, all API routes (except `/healt
 - Access token: sent as `Authorization: Bearer <token>`
 - Refresh token: stored as an httpOnly cookie; rotate via `POST /api/v1/auth/refresh`
 - Logout: `POST /api/v1/auth/logout`
+
+### Reset admin password (Docker)
+
+Use the interactive script to reset an admin password without manual hash copying:
+
+```bash
+./scripts/reset_admin_password.sh
+```
 
 ### CORS (frontend on another host)
 

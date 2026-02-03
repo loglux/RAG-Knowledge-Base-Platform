@@ -29,6 +29,7 @@ class FileType(str, Enum):
 
     TXT = "txt"
     MD = "md"
+    FB2 = "fb2"
     # Future formats (Phase 2+)
     # PDF = "pdf"
     # DOCX = "docx"

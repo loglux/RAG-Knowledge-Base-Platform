@@ -66,12 +66,13 @@ async def get_current_user(
 
 async def get_current_user_id(
     credentials: HTTPAuthorizationCredentials = Depends(_bearer),
-) -> int:
+) -> Optional[UUID]:
     """
-    Get current user ID.
-    Alias for get_current_user for clarity.
+    Validate current user and return None (user_id is not stored yet).
+    Keeps auth enforcement without writing admin int IDs into UUID columns.
     """
-    return await get_current_user(credentials)
+    await get_current_user(credentials)
+    return None
 
 
 # ============================================================================

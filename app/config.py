@@ -132,8 +132,8 @@ class Settings(BaseSettings):
         description="Maximum assembled context length in characters"
     )
     ALLOWED_FILE_TYPES: str = Field(
-        default="txt,md",
-        description="Comma-separated list of allowed file extensions (MVP: txt,md)"
+        default="txt,md,fb2",
+        description="Comma-separated list of allowed file extensions (MVP: txt,md,fb2)"
     )
 
     # Structure Analysis (LLM-based document TOC generation)

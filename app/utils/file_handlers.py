@@ -1,6 +1,7 @@
 """File type handlers for document processing."""
 from typing import Dict, Any
 from pathlib import Path
+from xml.etree import ElementTree
 
 from app.models.enums import FileType
 from app.utils.logger import get_logger
@@ -99,6 +100,72 @@ class MarkdownFileHandler(FileHandler):
         }
 
 
+class FB2FileHandler(FileHandler):
+    """Handler for FB2 (FictionBook 2.0) files."""
+
+    def can_handle(self, file_type: FileType) -> bool:
+        return file_type == FileType.FB2
+
+    def extract_text(self, content: str, metadata: Dict[str, Any]) -> str:
+        logger.debug("Extracting text from .fb2 file")
+        try:
+            root = ElementTree.fromstring(content)
+        except ElementTree.ParseError:
+            # If XML is invalid, fall back to raw text
+            return sanitize_text_content(content)
+
+        # Collect text from body
+        texts = []
+        for node in root.iter():
+            if node.tag.endswith("body"):
+                texts.append(" ".join(node.itertext()))
+
+        if not texts:
+            texts.append(" ".join(root.itertext()))
+
+        return sanitize_text_content("\n\n".join(texts))
+
+    def extract_metadata(self, content: str, filename: str) -> Dict[str, Any]:
+        try:
+            root = ElementTree.fromstring(content)
+        except ElementTree.ParseError:
+            return {
+                "file_type": "fb2",
+                "filename": filename,
+                "char_count": len(content),
+                "word_count": len(content.split()),
+            }
+
+        title = None
+        author = None
+
+        for node in root.iter():
+            if node.tag.endswith("book-title") and node.text:
+                title = node.text.strip()
+                break
+
+        for node in root.iter():
+            if node.tag.endswith("author"):
+                parts = []
+                for child in node:
+                    if child.tag.endswith("first-name") and child.text:
+                        parts.append(child.text.strip())
+                    if child.tag.endswith("last-name") and child.text:
+                        parts.append(child.text.strip())
+                if parts:
+                    author = " ".join(parts)
+                    break
+
+        return {
+            "file_type": "fb2",
+            "filename": filename,
+            "title": title,
+            "author": author,
+            "char_count": len(content),
+            "word_count": len(content.split()),
+        }
+
+
 class FileHandlerFactory:
     """
     Factory for creating appropriate file handlers.
@@ -111,6 +178,7 @@ class FileHandlerFactory:
     _handlers = [
         TextFileHandler(),
         MarkdownFileHandler(),
+        FB2FileHandler(),
     ]
 
     @classmethod
