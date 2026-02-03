@@ -403,7 +403,7 @@ class SemanticChunking(ChunkingStrategy):
             min_chunk_size: Minimum desired chunk size in characters
             use_contextual_embeddings: Add LLM-generated context to chunks
             embeddings_service: Service for generating embeddings
-            llm_client: Anthropic client for contextual embeddings
+            llm_client: LLM client for contextual embeddings (Anthropic or OpenAI)
             llm_model: LLM model for contextual embeddings (from global settings)
             llm_provider: LLM provider (from global settings)
         """
@@ -499,20 +499,30 @@ class SemanticChunking(ChunkingStrategy):
                     "Disabling contextual embeddings for semantic chunking."
                 )
                 self.use_contextual_embeddings = False
-            # Only supports Anthropic provider for contextual embeddings (prompt caching)
-            elif self.llm_provider and self.llm_provider.lower() != "anthropic":
-                logger.warning(
-                    f"Contextual embeddings only supported with Anthropic provider. "
-                    f"Got: {self.llm_provider}. Disabling contextual embeddings."
-                )
-                self.use_contextual_embeddings = False
-            else:
+            elif self.llm_provider and self.llm_provider.lower() == "anthropic":
                 import anthropic
                 import os
                 self.llm_client = anthropic.Anthropic(
                     api_key=os.getenv("ANTHROPIC_API_KEY")
                 )
                 logger.info(f"[SemanticChunking] Anthropic client initialized for model: {self.llm_model}")
+            elif self.llm_provider and self.llm_provider.lower() == "openai":
+                from openai import OpenAI
+                import os
+                self.llm_client = OpenAI(
+                    api_key=os.getenv("OPENAI_API_KEY")
+                )
+                logger.warning(
+                    "[SemanticChunking] OpenAI contextual embeddings enabled without explicit prompt caching control. "
+                    "Ingest may be slower and more expensive."
+                )
+                logger.info(f"[SemanticChunking] OpenAI client initialized for model: {self.llm_model}")
+            else:
+                logger.warning(
+                    f"Contextual embeddings provider not supported: {self.llm_provider}. "
+                    "Disabling contextual embeddings."
+                )
+                self.use_contextual_embeddings = False
 
         logger.info(f"[SemanticChunking] Starting semantic chunking of {len(text)} characters")
 
@@ -922,9 +932,9 @@ class SemanticChunking(ChunkingStrategy):
         self, chunks: List[dict], original_text: str
     ) -> List[dict]:
         """
-        Add contextual descriptions to chunks using Claude.
+        Add contextual descriptions to chunks using the configured LLM client.
 
-        Following Anthropic's Contextual Retrieval approach with prompt caching.
+        Uses Anthropic-style contextual prompts when available; OpenAI uses a single prompt.
         """
         logger.info(f"Adding contextual descriptions to {len(chunks)} chunks...")
 
@@ -940,39 +950,53 @@ class SemanticChunking(ChunkingStrategy):
 Please give a short succinct context to situate this chunk within the overall document for the purposes of improving search retrieval of the chunk.
 Answer only with the succinct context and nothing else."""
 
+        is_anthropic = hasattr(self.llm_client, "messages")
+
         for i, chunk in enumerate(chunks):
             try:
-                response = self.llm_client.messages.create(
-                    model=self.llm_model,
-                    max_tokens=1000,
-                    temperature=0.0,
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": [
-                                {
-                                    "type": "text",
-                                    "text": DOCUMENT_CONTEXT_PROMPT.format(
-                                        doc_content=original_text
-                                    ),
-                                    "cache_control": {"type": "ephemeral"},
-                                },
-                                {
-                                    "type": "text",
-                                    "text": CHUNK_CONTEXT_PROMPT.format(
-                                        chunk_content=chunk["content"]
-                                    ),
-                                },
-                            ],
-                        }
-                    ],
-                )
-
-                context = response.content[0].text
+                if is_anthropic:
+                    response = self.llm_client.messages.create(
+                        model=self.llm_model,
+                        max_tokens=1000,
+                        temperature=0.0,
+                        messages=[
+                            {
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": DOCUMENT_CONTEXT_PROMPT.format(
+                                            doc_content=original_text
+                                        ),
+                                        "cache_control": {"type": "ephemeral"},
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": CHUNK_CONTEXT_PROMPT.format(
+                                            chunk_content=chunk["content"]
+                                        ),
+                                    },
+                                ],
+                            }
+                        ],
+                    )
+                    context = response.content[0].text
+                else:
+                    prompt = (
+                        f"{DOCUMENT_CONTEXT_PROMPT.format(doc_content=original_text)}\n\n"
+                        f"{CHUNK_CONTEXT_PROMPT.format(chunk_content=chunk['content'])}"
+                    )
+                    response = self.llm_client.chat.completions.create(
+                        model=self.llm_model,
+                        messages=[{"role": "user", "content": prompt}],
+                        temperature=0.0,
+                        max_tokens=1000,
+                    )
+                    context = response.choices[0].message.content.strip()
                 chunk["contextual_description"] = context
 
                 # Log cache performance for first and last chunk
-                if i == 0 or i == len(chunks) - 1:
+                if is_anthropic and (i == 0 or i == len(chunks) - 1):
                     logger.debug(
                         f"Chunk {i}: cache_read={response.usage.cache_read_input_tokens}, "
                         f"cache_create={response.usage.cache_creation_input_tokens}"
