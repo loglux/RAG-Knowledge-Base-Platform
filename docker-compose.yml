@@ -122,6 +122,7 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
+      - ./docker/entrypoint.sh:/entrypoint.sh:ro
     depends_on:
       db:
         condition: service_healthy
