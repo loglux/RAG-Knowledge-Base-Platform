@@ -3,11 +3,12 @@ import csv
 import io
 import json
 import logging
+import asyncio
 from typing import Optional, List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, status
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -19,7 +20,13 @@ from app.models.schemas import (
     QAEvalRunDetailResponse,
     QAEvalResultResponse,
 )
-from app.services.qa_eval import GoldEvalConfig, replace_gold_samples, run_gold_evaluation
+from app.services.qa_eval import (
+    GoldEvalConfig,
+    replace_gold_samples,
+    create_gold_run,
+    run_gold_evaluation_on_run,
+)
+from app.db.session import get_db_session
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +145,28 @@ async def upload_gold_samples(
     )
 
 
+@router.get(
+    "/knowledge-bases/{kb_id}/auto-tune/gold/count",
+)
+async def get_gold_sample_count(
+    kb_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    kb = await db.get(KnowledgeBaseModel, kb_id)
+    if not kb:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge base not found")
+
+    count = await db.scalar(
+        select(func.count()).select_from(
+            select(QASample.id).where(
+                QASample.knowledge_base_id == kb_id,
+                QASample.sample_type == "gold",
+            ).subquery()
+        )
+    )
+    return {"knowledge_base_id": kb_id, "count": count}
+
+
 @router.post(
     "/knowledge-bases/{kb_id}/auto-tune/gold/run",
     response_model=QAEvalRunResponse,
@@ -171,9 +200,31 @@ async def run_gold_eval(
     )
 
     try:
-        run = await run_gold_evaluation(db, kb, config)
+        run = await create_gold_run(db, kb, config)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    async def _background_eval(run_id: UUID):
+        async with get_db_session() as session:
+            run_row = await session.get(QAEvalRun, run_id)
+            if not run_row:
+                return
+            kb_row = await session.get(KnowledgeBaseModel, run_row.knowledge_base_id)
+            if not kb_row:
+                run_row.status = "failed"
+                run_row.error_message = "Knowledge base not found"
+                await session.commit()
+                return
+            config_data = json.loads(run_row.config_json) if run_row.config_json else {}
+            config_obj = GoldEvalConfig(**config_data)
+            try:
+                await run_gold_evaluation_on_run(session, kb_row, run_row, config_obj)
+            except Exception as exc:
+                run_row.status = "failed"
+                run_row.error_message = str(exc)
+                await session.commit()
+
+    asyncio.create_task(_background_eval(run.id))
 
     return QAEvalRunResponse(
         id=run.id,
@@ -183,6 +234,7 @@ async def run_gold_eval(
         config=json.loads(run.config_json) if run.config_json else None,
         metrics=json.loads(run.metrics_json) if run.metrics_json else None,
         sample_count=run.sample_count,
+        processed_count=run.processed_count,
         error_message=run.error_message,
         created_at=run.created_at,
         started_at=run.started_at,
@@ -220,6 +272,7 @@ async def list_eval_runs(
             config=json.loads(run.config_json) if run.config_json else None,
             metrics=json.loads(run.metrics_json) if run.metrics_json else None,
             sample_count=run.sample_count,
+            processed_count=run.processed_count,
             error_message=run.error_message,
             created_at=run.created_at,
             started_at=run.started_at,
@@ -277,6 +330,7 @@ async def get_eval_run(
         config=json.loads(run.config_json) if run.config_json else None,
         metrics=json.loads(run.metrics_json) if run.metrics_json else None,
         sample_count=run.sample_count,
+        processed_count=run.processed_count,
         error_message=run.error_message,
         created_at=run.created_at,
         started_at=run.started_at,

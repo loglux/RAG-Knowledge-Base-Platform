@@ -673,6 +673,7 @@ class QAEvalRun(Base):
     config_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     metrics_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     sample_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    processed_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(

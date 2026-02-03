@@ -620,6 +620,7 @@ class QAEvalRunResponse(BaseModel):
     config: Optional[Dict[str, Any]] = None
     metrics: Optional[Dict[str, Any]] = None
     sample_count: int
+    processed_count: int = 0
     error_message: Optional[str] = None
     created_at: datetime
     started_at: Optional[datetime] = None

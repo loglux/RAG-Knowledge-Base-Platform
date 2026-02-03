@@ -51,6 +51,20 @@ def compute_f1(pred: str, gold: str) -> float:
     return 2 * precision * recall / (precision + recall)
 
 
+def _first_sentence(text: str) -> str:
+    if not text:
+        return ""
+    for sep in [". ", "?\n", "!\n", "? ", "! ", ".\n"]:
+        idx = text.find(sep)
+        if idx != -1:
+            return text[:idx].strip()
+    return text.strip()
+
+
+def compute_concise_f1(pred: str, gold: str) -> float:
+    return compute_f1(_first_sentence(pred), _first_sentence(gold))
+
+
 def compute_recall_from_sources(
     sources: List[Dict[str, Any]],
     document_id: Optional[str],
@@ -100,42 +114,44 @@ async def replace_gold_samples(db: AsyncSession, kb_id, samples: List[QASample])
     return len(samples)
 
 
-async def run_gold_evaluation(
+async def _load_gold_samples(
     db: AsyncSession,
-    kb: KnowledgeBaseModel,
-    config: GoldEvalConfig,
-) -> QAEvalRun:
+    kb_id,
+    sample_limit: Optional[int],
+) -> List[QASample]:
     query = select(QASample).where(
-        QASample.knowledge_base_id == kb.id,
+        QASample.knowledge_base_id == kb_id,
         QASample.sample_type == "gold",
     ).order_by(QASample.created_at.asc())
-    if config.sample_limit:
-        query = query.limit(config.sample_limit)
+    if sample_limit:
+        query = query.limit(sample_limit)
     result = await db.execute(query)
-    samples = result.scalars().all()
+    return result.scalars().all()
+
+
+async def run_gold_evaluation_on_run(
+    db: AsyncSession,
+    kb: KnowledgeBaseModel,
+    run: QAEvalRun,
+    config: GoldEvalConfig,
+) -> QAEvalRun:
+    samples = await _load_gold_samples(db, kb.id, config.sample_limit)
     if not samples:
         raise ValueError("No gold QA samples found for this knowledge base.")
 
-    now = datetime.utcnow()
-    run = QAEvalRun(
-        knowledge_base_id=kb.id,
-        mode="gold",
-        status="running",
-        config_json=json.dumps(asdict(config)),
-        sample_count=len(samples),
-        started_at=now,
-    )
-    db.add(run)
+    run.sample_count = len(samples)
+    run.processed_count = 0
     await db.flush()
 
     rag = RAGService()
 
     exact_scores: List[float] = []
     f1_scores: List[float] = []
+    concise_scores: List[float] = []
     recall_scores: List[float] = []
     errors = 0
 
-    for sample in samples:
+    for idx, sample in enumerate(samples, 1):
         try:
             response = await rag.query(
                 question=sample.question,
@@ -175,6 +191,7 @@ async def run_gold_evaluation(
 
             exact = compute_exact_match(answer_text, sample.answer)
             f1 = compute_f1(answer_text, sample.answer)
+            concise = compute_concise_f1(answer_text, sample.answer)
             recall = compute_recall_from_sources(
                 sources,
                 str(sample.document_id) if sample.document_id else None,
@@ -183,12 +200,14 @@ async def run_gold_evaluation(
 
             exact_scores.append(exact)
             f1_scores.append(f1)
+            concise_scores.append(concise)
             if recall is not None:
                 recall_scores.append(recall)
 
             metrics = {
                 "exact_match": exact,
                 "f1": f1,
+                "concise_f1": concise,
                 "recall": recall,
             }
         except Exception as exc:
@@ -206,10 +225,15 @@ async def run_gold_evaluation(
                 metrics_json=json.dumps(metrics),
             )
         )
+        run.processed_count = idx
+        if idx % 5 == 0:
+            await db.flush()
+            await db.commit()
 
     metrics_summary = {
         "exact_match_avg": sum(exact_scores) / len(exact_scores) if exact_scores else 0.0,
         "f1_avg": sum(f1_scores) / len(f1_scores) if f1_scores else 0.0,
+        "concise_f1_avg": sum(concise_scores) / len(concise_scores) if concise_scores else 0.0,
         "recall_avg": sum(recall_scores) / len(recall_scores) if recall_scores else None,
         "errors": errors,
     }
@@ -218,5 +242,35 @@ async def run_gold_evaluation(
     run.completed_at = datetime.utcnow()
     run.metrics_json = json.dumps(metrics_summary)
 
+    await db.flush()
+    await db.commit()
+    return run
+
+
+async def create_gold_run(
+    db: AsyncSession,
+    kb: KnowledgeBaseModel,
+    config: GoldEvalConfig,
+) -> QAEvalRun:
+    count_query = select(QASample.id).where(
+        QASample.knowledge_base_id == kb.id,
+        QASample.sample_type == "gold",
+    )
+    result = await db.execute(count_query)
+    total = len(result.scalars().all())
+    if total == 0:
+        raise ValueError("No gold QA samples found for this knowledge base.")
+    sample_count = min(total, config.sample_limit) if config.sample_limit else total
+
+    run = QAEvalRun(
+        knowledge_base_id=kb.id,
+        mode="gold",
+        status="running",
+        config_json=json.dumps(asdict(config)),
+        sample_count=sample_count,
+        processed_count=0,
+        started_at=datetime.utcnow(),
+    )
+    db.add(run)
     await db.flush()
     return run

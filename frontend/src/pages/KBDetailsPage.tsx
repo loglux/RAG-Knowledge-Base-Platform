@@ -91,6 +91,7 @@ export function KBDetailsPage() {
   const [qaRuns, setQaRuns] = useState<QAEvalRun[]>([])
   const [qaRunsLoading, setQaRunsLoading] = useState(false)
   const [qaRunsError, setQaRunsError] = useState<string | null>(null)
+  const [qaGoldCount, setQaGoldCount] = useState<number | null>(null)
   const [qaFile, setQaFile] = useState<File | null>(null)
   const [qaUploadMessage, setQaUploadMessage] = useState<string | null>(null)
   const [qaUploading, setQaUploading] = useState(false)
@@ -101,6 +102,8 @@ export function KBDetailsPage() {
   const [qaRunning, setQaRunning] = useState(false)
   const [qaRunError, setQaRunError] = useState<string | null>(null)
   const [qaSelectedRun, setQaSelectedRun] = useState<QAEvalRunDetail | null>(null)
+  const [qaFilter, setQaFilter] = useState('')
+  const [qaOnlyLow, setQaOnlyLow] = useState(false)
 
   const buildSettingsData = (kbData: KnowledgeBase, defaults?: AppSettings | null) => {
     const bm25Override = kbData.bm25_match_mode !== null
@@ -166,6 +169,8 @@ export function KBDetailsPage() {
       try {
         const runs = await apiClient.listAutoTuneRuns(id)
         setQaRuns(runs)
+        const count = await apiClient.getGoldQACount(id)
+        setQaGoldCount(count.count)
       } catch (err) {
         setQaRunsError(err instanceof Error ? err.message : 'Failed to load auto-tuning runs')
       } finally {
@@ -175,6 +180,25 @@ export function KBDetailsPage() {
 
     loadRuns()
   }, [id])
+
+  useEffect(() => {
+    if (!id) return
+    const hasRunning = qaRuns.some((run) => run.status === 'running')
+    if (!hasRunning) return
+    const timer = setInterval(async () => {
+      try {
+        const runs = await apiClient.listAutoTuneRuns(id)
+        setQaRuns(runs)
+        if (qaSelectedRun) {
+          const detail = await apiClient.getAutoTuneRun(id, qaSelectedRun.run.id)
+          setQaSelectedRun(detail)
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }, 2000)
+    return () => clearInterval(timer)
+  }, [id, qaRuns, qaSelectedRun])
 
   useEffect(() => {
     const loadAppDefaults = async () => {
@@ -199,6 +223,8 @@ export function KBDetailsPage() {
       setQaUploadMessage(`Uploaded ${result.added_count} questions`)
       const runs = await apiClient.listAutoTuneRuns(id)
       setQaRuns(runs)
+      const count = await apiClient.getGoldQACount(id)
+      setQaGoldCount(count.count)
     } catch (err) {
       setQaUploadMessage(err instanceof Error ? err.message : 'Failed to upload QA file')
     } finally {
@@ -703,6 +729,11 @@ export function KBDetailsPage() {
               <p className="text-xs text-gray-400 mt-1">
                 Upload a QA file and run evaluation to see baseline metrics for this KB.
               </p>
+              {qaGoldCount !== null && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Gold QA samples: {qaGoldCount}
+                </p>
+              )}
             </div>
           </div>
 
@@ -791,9 +822,15 @@ export function KBDetailsPage() {
                   const f1 = typeof metrics?.f1_avg === 'number'
                     ? metrics.f1_avg.toFixed(3)
                     : '—'
+                  const concise = typeof metrics?.concise_f1_avg === 'number'
+                    ? (metrics.concise_f1_avg as number).toFixed(3)
+                    : '—'
                   const recall = typeof metrics?.recall_avg === 'number'
                     ? (metrics.recall_avg as number).toFixed(3)
                     : '—'
+                  const processed = run.processed_count ?? 0
+                  const total = run.sample_count
+                  const progress = total > 0 ? Math.round((processed / total) * 100) : 0
                   return (
                     <div
                       key={run.id}
@@ -804,8 +841,19 @@ export function KBDetailsPage() {
                           {run.mode} • {run.status}
                         </div>
                         <div className="text-gray-500">
-                          EM {exact} • F1 {f1} • Recall {recall} • {run.sample_count} samples
+                          EM {exact} • F1 {f1} • Concise {concise} • Recall {recall} • {run.sample_count} samples
                         </div>
+                        {run.status === 'running' && (
+                          <div className="mt-1 text-[11px] text-gray-500">
+                            Progress: {processed}/{total} ({progress}%)
+                            <div className="mt-1 h-1.5 w-40 bg-gray-800 rounded">
+                              <div
+                                className="h-1.5 bg-primary-500 rounded"
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <button
                         onClick={() => handleSelectRun(run.id)}
@@ -825,8 +873,48 @@ export function KBDetailsPage() {
               <h4 className="text-sm font-semibold text-gray-200 mb-3">
                 Run Details
               </h4>
+              {qaSelectedRun.run.metrics && (
+                <div className="mb-4 text-xs text-gray-300 bg-gray-900/70 border border-gray-800 rounded px-3 py-2">
+                  <div>
+                    EM: {typeof qaSelectedRun.run.metrics?.exact_match_avg === 'number'
+                      ? qaSelectedRun.run.metrics.exact_match_avg.toFixed(3)
+                      : '—'} • F1: {typeof qaSelectedRun.run.metrics?.f1_avg === 'number'
+                      ? qaSelectedRun.run.metrics.f1_avg.toFixed(3)
+                      : '—'} • Concise: {typeof qaSelectedRun.run.metrics?.concise_f1_avg === 'number'
+                      ? (qaSelectedRun.run.metrics.concise_f1_avg as number).toFixed(3)
+                      : '—'} • Recall: {typeof qaSelectedRun.run.metrics?.recall_avg === 'number'
+                      ? (qaSelectedRun.run.metrics.recall_avg as number).toFixed(3)
+                      : '—'}
+                  </div>
+                </div>
+              )}
+              <div className="mb-3 flex flex-col sm:flex-row gap-3 sm:items-center text-xs text-gray-400">
+                <input
+                  value={qaFilter}
+                  onChange={(e) => setQaFilter(e.target.value)}
+                  placeholder="Filter by question text"
+                  className="bg-gray-900 border border-gray-700 rounded px-3 py-1.5 text-gray-100 w-full sm:w-64"
+                />
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={qaOnlyLow}
+                    onChange={(e) => setQaOnlyLow(e.target.checked)}
+                    className="rounded border-gray-600 bg-gray-800"
+                  />
+                  <span>Only low F1 (&lt; 0.4)</span>
+                </label>
+              </div>
               <div className="space-y-3 max-h-[420px] overflow-y-auto pr-2">
-                {qaSelectedRun.results.map((result) => (
+                {qaSelectedRun.results
+                  .filter((result) => {
+                    const matches = result.question.toLowerCase().includes(qaFilter.toLowerCase())
+                    if (!matches) return false
+                    if (!qaOnlyLow) return true
+                    const f1 = typeof result.metrics?.f1 === 'number' ? result.metrics.f1 : 1
+                    return f1 < 0.4
+                  })
+                  .map((result) => (
                   <details key={result.id} className="bg-gray-900/70 border border-gray-800 rounded px-3 py-2">
                     <summary className="cursor-pointer text-xs text-gray-200">
                       {result.question}

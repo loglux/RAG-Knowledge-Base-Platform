@@ -25,6 +25,7 @@ import type {
   QAEvalRun,
   QAEvalRunConfig,
   QAEvalRunDetail,
+  QAGoldCountResponse,
 } from '../types/index'
 
 const ACCESS_TOKEN_KEY = 'kb_access_token'
@@ -200,6 +201,11 @@ class APIClient {
         headers: { 'Content-Type': 'multipart/form-data' },
       }
     )
+    return response.data
+  }
+
+  async getGoldQACount(kbId: string): Promise<QAGoldCountResponse> {
+    const response = await this.client.get<QAGoldCountResponse>(`/knowledge-bases/${kbId}/auto-tune/gold/count`)
     return response.data
   }
 

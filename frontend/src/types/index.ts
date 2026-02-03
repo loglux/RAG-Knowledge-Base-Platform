@@ -124,6 +124,11 @@ export interface QASampleUploadResponse {
   replaced: boolean
 }
 
+export interface QAGoldCountResponse {
+  knowledge_base_id: string
+  count: number
+}
+
 export interface QAEvalRunConfig {
   top_k?: number
   retrieval_mode?: 'dense' | 'hybrid'
@@ -151,6 +156,7 @@ export interface QAEvalRun {
   config?: Record<string, unknown> | null
   metrics?: Record<string, unknown> | null
   sample_count: number
+  processed_count?: number
   error_message?: string | null
   created_at: string
   started_at?: string | null
