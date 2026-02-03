@@ -18,7 +18,7 @@ from app.core.auth import (
 from app.db.session import get_db
 from app.models.database import AdminUser, AdminRefreshToken
 from app.models.schemas import LoginRequest, TokenResponse, MeResponse
-from app.dependencies import get_current_user_id
+from app.dependencies import get_current_admin_id
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -173,7 +173,7 @@ async def logout(
 
 @router.get("/me", response_model=MeResponse)
 async def me(
-    admin_id: int = Depends(get_current_user_id),
+    admin_id: int = Depends(get_current_admin_id),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))

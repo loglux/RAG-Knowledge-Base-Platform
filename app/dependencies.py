@@ -75,6 +75,16 @@ async def get_current_user_id(
     return None
 
 
+async def get_current_admin_id(
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+) -> int:
+    """
+    Return admin ID from JWT (int).
+    Used for auth-only endpoints (e.g., /auth/me).
+    """
+    return await get_current_user(credentials)
+
+
 # ============================================================================
 # Service Dependencies (to be implemented)
 # ============================================================================
