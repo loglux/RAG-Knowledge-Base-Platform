@@ -36,33 +36,68 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     logger.info(f"Qdrant: {settings.QDRANT_URL}")
     logger.info(f"OpenAI Model: {settings.OPENAI_CHAT_MODEL}")
 
-    # CRITICAL: Check if database password was changed via Setup Wizard
-    # If so, recreate connection pool with correct credentials BEFORE loading settings
+    # CRITICAL: Initialize database engine with correct credentials
+    # Try environment DATABASE_URL first, fallback to checking system_settings if authentication fails
+    from app.db.session import init_engine, get_db_session, recreate_engine
+    from app.core.system_settings import SystemSettingsManager
+    from sqlalchemy import text
+    import asyncpg
+
+    logger.info("Initializing database connection...")
+
+    # Try to connect with DATABASE_URL from environment
     try:
-        from app.db.session import get_db_session, recreate_engine
-        from app.core.system_settings import SystemSettingsManager
+        init_engine(settings.DATABASE_URL)
+        logger.info("✓ Engine initialized with DATABASE_URL from environment")
 
-        logger.info("Checking for database credential updates...")
-
+        # Test connection
         async with get_db_session() as db:
-            # Try to get database_url from system_settings
-            saved_db_url = await SystemSettingsManager.get_setting(db, "database_url")
+            await db.execute(text("SELECT 1"))
+            logger.info("✓ Database connection test successful")
 
-            if saved_db_url and saved_db_url != settings.DATABASE_URL:
-                logger.warning("⚠ DATABASE_URL mismatch detected:")
-                logger.warning(f"  ENV:  {settings.DATABASE_URL.split('@')[0]}@...")
-                logger.warning(f"  DB:   {saved_db_url.split('@')[0]}@...")
-                logger.info("🔄 Recreating connection pool with saved credentials...")
+            # Check if there's a different password in system_settings
+            try:
+                saved_db_url = await SystemSettingsManager.get_setting(db, "database_url")
+                if saved_db_url and saved_db_url != settings.DATABASE_URL:
+                    logger.warning("⚠ DATABASE_URL mismatch detected in system_settings")
+                    logger.warning(f"  ENV: {settings.DATABASE_URL.split('@')[0]}@...")
+                    logger.warning(f"  DB:  {saved_db_url.split('@')[0]}@...")
+                    logger.info("🔄 Recreating connection pool with saved credentials...")
+                    await recreate_engine(saved_db_url)
+                    logger.info("✅ Connection pool updated with credentials from system_settings")
+            except Exception as e:
+                logger.debug(f"Could not check system_settings for database_url: {e}")
 
-                # Recreate engine with correct credentials from database
-                await recreate_engine(saved_db_url)
-                logger.info("✅ Connection pool updated successfully")
-            else:
-                logger.info("✓ Database credentials match")
+    except (asyncpg.InvalidPasswordError, asyncpg.PostgresError) as e:
+        logger.error(f"❌ Authentication failed with DATABASE_URL from environment: {e}")
+        logger.info("🔄 Attempting to connect with default credentials to check system_settings...")
 
-    except Exception as e:
-        logger.warning(f"Could not check database credentials: {e}")
-        logger.info("Using DATABASE_URL from environment variables")
+        # Try default credentials as fallback
+        default_url = "postgresql+asyncpg://kb_user:kb_pass_change_me@db:5432/knowledge_base"
+        try:
+            init_engine(default_url)
+            async with get_db_session() as db:
+                await db.execute(text("SELECT 1"))
+                logger.info("✓ Connected with default credentials")
+
+                # Read saved DATABASE_URL from system_settings
+                saved_db_url = await SystemSettingsManager.get_setting(db, "database_url")
+                if saved_db_url:
+                    logger.info(f"✅ Found saved DATABASE_URL in system_settings")
+                    logger.info("🔄 Recreating connection pool with correct credentials...")
+                    await recreate_engine(saved_db_url)
+                    logger.info("✅ Connection successful with credentials from system_settings")
+                else:
+                    logger.warning("⚠ No database_url in system_settings, using default")
+
+        except Exception as fallback_error:
+            logger.error(f"❌ Failed to connect with default credentials: {fallback_error}")
+            logger.error("💥 FATAL: Cannot connect to database with any known credentials")
+            logger.error("    Please check:")
+            logger.error("    1. PostgreSQL container is running: docker ps | grep kb-platform-db")
+            logger.error("    2. DATABASE_URL in environment matches database password")
+            logger.error("    3. Run recovery script: ./scripts/recover_database_url.sh")
+            raise
 
     # Load settings from database (overrides .env)
     try:

@@ -1,5 +1,5 @@
 """Database session management with async SQLAlchemy."""
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -12,25 +12,53 @@ from sqlalchemy.pool import NullPool
 from app.config import settings
 
 
-# Create async engine
-engine: AsyncEngine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.DB_ECHO,
-    pool_pre_ping=True,
-    pool_size=settings.DB_POOL_SIZE,
-    max_overflow=settings.DB_MAX_OVERFLOW,
-    # Use NullPool for testing to avoid connection issues
-    poolclass=NullPool if settings.ENVIRONMENT == "testing" else None,
-)
+# Global engine and session factory (initialized lazily)
+engine: Optional[AsyncEngine] = None
+AsyncSessionLocal: Optional[async_sessionmaker] = None
 
-# Create async session factory
-AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False,
-)
+
+def _create_engine(database_url: str) -> AsyncEngine:
+    """
+    Create async engine with given database URL.
+
+    Args:
+        database_url: PostgreSQL connection URL
+
+    Returns:
+        AsyncEngine instance
+    """
+    return create_async_engine(
+        database_url,
+        echo=settings.DB_ECHO,
+        pool_pre_ping=True,
+        pool_size=settings.DB_POOL_SIZE,
+        max_overflow=settings.DB_MAX_OVERFLOW,
+        poolclass=NullPool if settings.ENVIRONMENT == "testing" else None,
+    )
+
+
+def init_engine(database_url: Optional[str] = None) -> None:
+    """
+    Initialize database engine and session factory.
+
+    Called during application startup in main.py lifespan.
+
+    Args:
+        database_url: Optional database URL override (uses settings.DATABASE_URL if not provided)
+    """
+    global engine, AsyncSessionLocal
+
+    url = database_url or settings.DATABASE_URL
+
+    engine = _create_engine(url)
+
+    AsyncSessionLocal = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autocommit=False,
+        autoflush=False,
+    )
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -43,6 +71,9 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             result = await db.execute(select(Item))
             return result.scalars().all()
     """
+    if AsyncSessionLocal is None:
+        raise RuntimeError("Database not initialized. Call init_engine() first.")
+
     async with AsyncSessionLocal() as session:
         try:
             yield session
@@ -66,6 +97,9 @@ def get_db_session() -> AsyncSession:
     Returns:
         AsyncSession context manager
     """
+    if AsyncSessionLocal is None:
+        raise RuntimeError("Database not initialized. Call init_engine() first.")
+
     return AsyncSessionLocal()
 
 
@@ -76,6 +110,9 @@ async def init_db() -> None:
     Note: In production, use Alembic migrations instead.
     This is mainly for testing purposes.
     """
+    if engine is None:
+        raise RuntimeError("Database not initialized. Call init_engine() first.")
+
     from app.models.database import Base
 
     async with engine.begin() as conn:
@@ -84,7 +121,8 @@ async def init_db() -> None:
 
 async def close_db() -> None:
     """Close database connection pool."""
-    await engine.dispose()
+    if engine is not None:
+        await engine.dispose()
 
 
 async def recreate_engine(new_database_url: str) -> None:
@@ -107,8 +145,9 @@ async def recreate_engine(new_database_url: str) -> None:
 
     try:
         # 1. Dispose old engine (close all connections)
-        logger.info("Disposing old database connection pool...")
-        await engine.dispose()
+        if engine is not None:
+            logger.info("Disposing old database connection pool...")
+            await engine.dispose()
 
         # 2. Update settings with new DATABASE_URL
         logger.info("Updating settings with new DATABASE_URL...")
@@ -116,14 +155,7 @@ async def recreate_engine(new_database_url: str) -> None:
 
         # 3. Create new engine with new credentials
         logger.info("Creating new database engine with updated credentials...")
-        engine = create_async_engine(
-            new_database_url,
-            echo=settings.DB_ECHO,
-            pool_pre_ping=True,
-            pool_size=settings.DB_POOL_SIZE,
-            max_overflow=settings.DB_MAX_OVERFLOW,
-            poolclass=NullPool if settings.ENVIRONMENT == "testing" else None,
-        )
+        engine = _create_engine(new_database_url)
 
         # 4. Create new session factory
         logger.info("Creating new session factory...")
