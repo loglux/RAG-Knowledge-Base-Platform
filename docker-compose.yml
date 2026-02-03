@@ -35,10 +35,12 @@ services:
       # Default credentials for quick start
       # Change via Setup Wizard → Database Security step
       - POSTGRES_USER=kb_user
-      - POSTGRES_PASSWORD=kb_pass_change_me
       - POSTGRES_DB=knowledge_base
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
     volumes:
       - kb_postgres_data:/var/lib/postgresql/data
+    secrets:
+      - db_password
     networks:
       - kb-network
     healthcheck:
@@ -108,9 +110,11 @@ services:
       - API_PREFIX=/api/v1
 
       # Database connection
-      # IMPORTANT: Use .env file to override after Setup Wizard changes password
-      # If .env doesn't exist, this default is used for initial bootstrap
-      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://kb_user:kb_pass_change_me@db:5432/knowledge_base}
+      # Prefer Docker secret for password; entrypoint constructs DATABASE_URL
+      - DB_HOST=db
+      - DB_PORT=5432
+      - POSTGRES_USER=kb_user
+      - POSTGRES_DB=knowledge_base
 
       # Vector databases (defaults, can be overridden via Setup Wizard)
       - QDRANT_URL=http://qdrant:6333
@@ -123,6 +127,8 @@ services:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
       - ./docker/entrypoint.sh:/entrypoint.sh:ro
+    secrets:
+      - db_password
     depends_on:
       db:
         condition: service_healthy
@@ -145,6 +151,10 @@ volumes:
     driver: local
   kb_opensearch_data:
     driver: local
+  # db_password secret file is stored outside the repo
+secrets:
+  db_password:
+    file: ./secrets/db_password
 
 networks:
   kb-network:

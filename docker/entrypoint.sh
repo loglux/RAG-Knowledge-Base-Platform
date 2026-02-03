@@ -18,16 +18,32 @@ echo "✅ Database is ready"
 # Check and fix DATABASE_URL if password was changed via Setup Wizard
 echo "🔍 Checking database credentials..."
 
-# FIRST: Check if Setup Wizard saved DATABASE_URL in logs volume
+# FIRST: Check for Docker secret password
+SECRET_PATH="/run/secrets/db_password"
+if [ -f "$SECRET_PATH" ]; then
+    DB_PASSWORD=$(cat "$SECRET_PATH" 2>/dev/null | xargs)
+    if [ -n "$DB_PASSWORD" ]; then
+        DB_HOST="${DB_HOST:-db}"
+        DB_PORT="${DB_PORT:-5432}"
+        DB_USER="${POSTGRES_USER:-kb_user}"
+        DB_NAME="${POSTGRES_DB:-knowledge_base}"
+        export DATABASE_URL="postgresql+asyncpg://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+        echo "✅ Using DATABASE_URL from Docker secret"
+    fi
+fi
+
+# SECOND: Check if Setup Wizard saved DATABASE_URL in logs volume (legacy fallback)
 PERSIST_PATH="/app/logs/.database_url"
-if [ -f "$PERSIST_PATH" ]; then
+if [ -z "$DATABASE_URL" ] && [ -f "$PERSIST_PATH" ]; then
     SAVED_DB_URL=$(cat "$PERSIST_PATH" 2>/dev/null | xargs)
     if [ -n "$SAVED_DB_URL" ]; then
         echo "✅ Found persisted DATABASE_URL (from Setup Wizard)"
         export DATABASE_URL="$SAVED_DB_URL"
         echo "🔗 Using credentials from Setup Wizard"
     fi
-else
+fi
+
+if [ -z "$DATABASE_URL" ]; then
     echo "ℹ️  No persisted DATABASE_URL found"
     echo "   Attempting connection with DATABASE_URL from environment..."
 
