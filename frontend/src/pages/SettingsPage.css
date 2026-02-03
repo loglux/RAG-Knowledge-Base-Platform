@@ -17,12 +17,12 @@
 
 .settings-header h1 {
   font-size: 2rem;
-  color: rgb(243, 244, 246); /* gray-100 */
+  color: rgb(249, 250, 251); /* gray-50 - ярче! */
   margin: 0 0 0.5rem 0;
 }
 
 .settings-header p {
-  color: rgb(156, 163, 175); /* gray-400 */
+  color: rgb(209, 213, 219); /* gray-300 - светлее! */
   margin: 0;
 }
 
@@ -42,14 +42,14 @@
   cursor: pointer;
   font-size: 1rem;
   font-weight: 500;
-  color: rgb(156, 163, 175); /* gray-400 */
+  color: rgb(209, 213, 219); /* gray-300 - светлее! */
   border-bottom: 3px solid transparent;
   white-space: nowrap;
   transition: all 0.2s ease;
 }
 
 .tab-button:hover {
-  color: rgb(243, 244, 246); /* gray-100 */
+  color: rgb(249, 250, 251); /* gray-50 - ярче! */
   background: rgba(55, 65, 81, 0.5); /* gray-700 with opacity */
 }
 
@@ -85,12 +85,12 @@
 
 .settings-section h2 {
   font-size: 1.5rem;
-  color: rgb(243, 244, 246); /* gray-100 */
+  color: rgb(249, 250, 251); /* gray-50 - ярче! */
   margin: 0 0 0.5rem 0;
 }
 
 .settings-section-description {
-  color: rgb(156, 163, 175); /* gray-400 */
+  color: rgb(209, 213, 219); /* gray-300 - светлее! */
   margin-bottom: 1.5rem;
 }
 
@@ -104,7 +104,7 @@
 
 .settings-group h3 {
   font-size: 1.1rem;
-  color: rgb(243, 244, 246); /* gray-100 */
+  color: rgb(249, 250, 251); /* gray-50 - ярче! */
   margin: 0 0 1rem 0;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid rgb(55, 65, 81); /* gray-700 */
@@ -118,7 +118,7 @@
 .form-group label {
   display: block;
   font-weight: 600;
-  color: rgb(229, 231, 235); /* gray-200 */
+  color: rgb(243, 244, 246); /* gray-100 - светлее! */
   margin-bottom: 0.5rem;
   font-size: 0.95rem;
 }
@@ -155,7 +155,7 @@
   display: block;
   margin-top: 0.5rem;
   font-size: 0.875rem;
-  color: rgb(156, 163, 175); /* gray-400 */
+  color: rgb(209, 213, 219); /* gray-300 - светлее! */
 }
 
 /* Masked Input */
@@ -176,7 +176,7 @@
   border-radius: 6px;
   cursor: pointer;
   font-size: 0.875rem;
-  color: rgb(156, 163, 175); /* gray-400 */
+  color: rgb(209, 213, 219); /* gray-300 - светлее! */
   white-space: nowrap;
   transition: all 0.2s ease;
 }
