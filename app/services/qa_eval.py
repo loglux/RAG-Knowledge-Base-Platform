@@ -15,6 +15,7 @@ from app.services.rag import RAGService
 
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+", re.IGNORECASE)
+NO_ANSWER_SENTINEL = "__NO_ANSWER__"
 
 
 def _normalize_text(text: str) -> str:
@@ -63,6 +64,27 @@ def _first_sentence(text: str) -> str:
 
 def compute_concise_f1(pred: str, gold: str) -> float:
     return compute_f1(_first_sentence(pred), _first_sentence(gold))
+
+
+def is_no_answer_expected(gold: str) -> bool:
+    return gold.strip() == NO_ANSWER_SENTINEL
+
+
+def compute_no_answer_match(pred: str) -> float:
+    if not pred:
+        return 0.0
+    text = pred.lower()
+    phrases = [
+        "i don't know",
+        "i do not know",
+        "not provided in the context",
+        "not in the context",
+        "not mentioned in the context",
+        "the context does not provide",
+        "cannot be answered",
+        "no information",
+    ]
+    return 1.0 if any(p in text for p in phrases) else 0.0
 
 
 def compute_recall_from_sources(
@@ -149,6 +171,9 @@ async def run_gold_evaluation_on_run(
     f1_scores: List[float] = []
     concise_scores: List[float] = []
     recall_scores: List[float] = []
+    no_answer_scores: List[float] = []
+    answerable_count = 0
+    no_answer_count = 0
     errors = 0
 
     for idx, sample in enumerate(samples, 1):
@@ -189,27 +214,34 @@ async def run_gold_evaluation_on_run(
                 for chunk in response.sources
             ]
 
-            exact = compute_exact_match(answer_text, sample.answer)
-            f1 = compute_f1(answer_text, sample.answer)
-            concise = compute_concise_f1(answer_text, sample.answer)
-            recall = compute_recall_from_sources(
-                sources,
-                str(sample.document_id) if sample.document_id else None,
-                sample.chunk_index,
-            )
+            if is_no_answer_expected(sample.answer):
+                no_answer_count += 1
+                no_answer = compute_no_answer_match(answer_text or "")
+                no_answer_scores.append(no_answer)
+                metrics = {"no_answer_match": no_answer}
+            else:
+                answerable_count += 1
+                exact = compute_exact_match(answer_text, sample.answer)
+                f1 = compute_f1(answer_text, sample.answer)
+                concise = compute_concise_f1(answer_text, sample.answer)
+                recall = compute_recall_from_sources(
+                    sources,
+                    str(sample.document_id) if sample.document_id else None,
+                    sample.chunk_index,
+                )
 
-            exact_scores.append(exact)
-            f1_scores.append(f1)
-            concise_scores.append(concise)
-            if recall is not None:
-                recall_scores.append(recall)
+                exact_scores.append(exact)
+                f1_scores.append(f1)
+                concise_scores.append(concise)
+                if recall is not None:
+                    recall_scores.append(recall)
 
-            metrics = {
-                "exact_match": exact,
-                "f1": f1,
-                "concise_f1": concise,
-                "recall": recall,
-            }
+                metrics = {
+                    "exact_match": exact,
+                    "f1": f1,
+                    "concise_f1": concise,
+                    "recall": recall,
+                }
         except Exception as exc:
             errors += 1
             answer_text = None
@@ -231,10 +263,13 @@ async def run_gold_evaluation_on_run(
             await db.commit()
 
     metrics_summary = {
+        "answerable_count": answerable_count,
+        "no_answer_count": no_answer_count,
         "exact_match_avg": sum(exact_scores) / len(exact_scores) if exact_scores else 0.0,
         "f1_avg": sum(f1_scores) / len(f1_scores) if f1_scores else 0.0,
         "concise_f1_avg": sum(concise_scores) / len(concise_scores) if concise_scores else 0.0,
         "recall_avg": sum(recall_scores) / len(recall_scores) if recall_scores else None,
+        "no_answer_accuracy": sum(no_answer_scores) / len(no_answer_scores) if no_answer_scores else None,
         "errors": errors,
     }
 

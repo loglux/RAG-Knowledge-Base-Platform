@@ -7,7 +7,7 @@ import asyncio
 from typing import Optional, List
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, status, BackgroundTasks
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +25,7 @@ from app.services.qa_eval import (
     replace_gold_samples,
     create_gold_run,
     run_gold_evaluation_on_run,
+    NO_ANSWER_SENTINEL,
 )
 from app.db.session import get_db_session
 
@@ -48,8 +49,10 @@ def _parse_csv_samples(content: str, kb_id: UUID) -> List[QASample]:
     for row in reader:
         question = (row.get("question") or "").strip()
         answer = (row.get("answer") or "").strip()
-        if not question or not answer:
+        if not question:
             continue
+        if not answer:
+            answer = NO_ANSWER_SENTINEL
         document_id = _parse_uuid((row.get("document_id") or "").strip())
         chunk_index_raw = (row.get("chunk_index") or "").strip()
         chunk_index = int(chunk_index_raw) if chunk_index_raw.isdigit() else None
@@ -76,8 +79,10 @@ def _parse_json_samples(payload: list, kb_id: UUID) -> List[QASample]:
             continue
         question = str(item.get("question", "")).strip()
         answer = str(item.get("answer", "")).strip()
-        if not question or not answer:
+        if not question:
             continue
+        if not answer:
+            answer = NO_ANSWER_SENTINEL
         document_id = _parse_uuid(item.get("document_id"))
         chunk_index = item.get("chunk_index")
         if isinstance(chunk_index, str) and chunk_index.isdigit():
@@ -174,6 +179,7 @@ async def get_gold_sample_count(
 async def run_gold_eval(
     kb_id: UUID,
     payload: QAEvalRunRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
     kb = await db.get(KnowledgeBaseModel, kb_id)
@@ -217,6 +223,7 @@ async def run_gold_eval(
                 return
             config_data = json.loads(run_row.config_json) if run_row.config_json else {}
             config_obj = GoldEvalConfig(**config_data)
+            logger.info(f"Starting gold eval run {run_id}")
             try:
                 await run_gold_evaluation_on_run(session, kb_row, run_row, config_obj)
             except Exception as exc:
@@ -224,7 +231,13 @@ async def run_gold_eval(
                 run_row.error_message = str(exc)
                 await session.commit()
 
-    asyncio.create_task(_background_eval(run.id))
+    def _run_eval_sync(run_id: UUID):
+        try:
+            asyncio.run(_background_eval(run_id))
+        except Exception as exc:
+            logger.error(f"Failed to start gold eval run {run_id}: {exc}")
+
+    background_tasks.add_task(_run_eval_sync, run.id)
 
     return QAEvalRunResponse(
         id=run.id,

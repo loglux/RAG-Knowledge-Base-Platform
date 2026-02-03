@@ -828,6 +828,9 @@ export function KBDetailsPage() {
                   const recall = typeof metrics?.recall_avg === 'number'
                     ? (metrics.recall_avg as number).toFixed(3)
                     : '—'
+                  const noAnswerAcc = typeof metrics?.no_answer_accuracy === 'number'
+                    ? (metrics.no_answer_accuracy as number).toFixed(3)
+                    : '—'
                   const processed = run.processed_count ?? 0
                   const total = run.sample_count
                   const progress = total > 0 ? Math.round((processed / total) * 100) : 0
@@ -841,7 +844,7 @@ export function KBDetailsPage() {
                           {run.mode} • {run.status}
                         </div>
                         <div className="text-gray-500">
-                          EM {exact} • F1 {f1} • Concise {concise} • Recall {recall} • {run.sample_count} samples
+                          EM {exact} • F1 {f1} • Concise {concise} • Recall {recall} • No‑answer {noAnswerAcc} • {run.sample_count} samples
                         </div>
                         {run.status === 'running' && (
                           <div className="mt-1 text-[11px] text-gray-500">
@@ -884,6 +887,8 @@ export function KBDetailsPage() {
                       ? (qaSelectedRun.run.metrics.concise_f1_avg as number).toFixed(3)
                       : '—'} • Recall: {typeof qaSelectedRun.run.metrics?.recall_avg === 'number'
                       ? (qaSelectedRun.run.metrics.recall_avg as number).toFixed(3)
+                      : '—'} • No‑answer: {typeof qaSelectedRun.run.metrics?.no_answer_accuracy === 'number'
+                      ? (qaSelectedRun.run.metrics.no_answer_accuracy as number).toFixed(3)
                       : '—'}
                   </div>
                 </div>
