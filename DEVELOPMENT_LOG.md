@@ -106,7 +106,7 @@
 2. Create `docs/DEPLOYMENT.md`
 3. Build `frontend/Dockerfile.production`
 4. Optimize `Dockerfile` (multi-stage build)
-5. Create `docker-compose.production.yml`
+5. (Deprecated) `docker-compose.production.yml` removed; use `docker-compose.yml`
 
 **Week 1 Goals:**
 - ✅ Complete Phase 1
@@ -147,7 +147,7 @@
 - Updated `.dockerignore` (exclude frontend, scripts, tests)
 
 **3. Production Docker Compose** ✅
-- Created `docker-compose.production.yml`
+- (Deprecated) `docker-compose.production.yml` removed; use `docker-compose.yml`
   * 5 services: frontend, backend, db, qdrant, opensearch
   * Health checks for all services
   * Service dependencies (condition: service_healthy)

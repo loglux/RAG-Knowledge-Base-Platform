@@ -80,7 +80,7 @@ Before any migration, export, or import:
 
 4. **Stop application** (to prevent writes during migration):
    ```bash
-   docker-compose -f docker-compose.production.yml stop api
+   docker compose stop api
    ```
 
 ## Export Procedures
@@ -222,7 +222,7 @@ EXPORT_DIR=$(basename "$ARCHIVE" .tar.gz)
 echo "Importing from: $EXPORT_DIR"
 
 # CRITICAL: Stop API to prevent conflicts
-docker-compose -f docker-compose.production.yml stop api
+docker compose stop api
 
 # 1. Import PostgreSQL
 echo "1/3 Importing PostgreSQL..."
@@ -264,7 +264,7 @@ echo "  Qdrant collections: $QDRANT_COUNT"
 echo "  OpenSearch docs: $OS_COUNT"
 
 # Restart API
-docker-compose -f docker-compose.production.yml --env-file .env.production start api
+docker compose --env-file .env.production start api
 
 echo "Import complete!"
 ```
@@ -441,7 +441,7 @@ docker exec kb-platform-db psql -U kb_user -d knowledge_base -t -c \
 **Diagnosis**:
 ```bash
 # Check Qdrant logs
-docker-compose -f docker-compose.production.yml logs qdrant | tail -50
+docker compose logs qdrant | tail -50
 
 # Verify snapshot file integrity
 docker exec kb-platform-qdrant ls -lh /qdrant/storage/collections/*/snapshots/
@@ -531,7 +531,7 @@ docker exec kb-platform-qdrant ls -lh /qdrant/storage/collections/*/snapshots/
 
 **Solution**:
 - Created DEPLOY.md with proper procedures
-- Always use: `docker-compose -f docker-compose.production.yml --env-file .env.production up -d`
+- Always use: `docker compose --env-file .env.production up -d`
 
 **Lesson**: Document deployment procedures and enforce them
 

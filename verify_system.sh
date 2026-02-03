@@ -11,7 +11,7 @@
 set -e
 
 # Environment detection
-COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.production.yml}"
+COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
 if [[ "$COMPOSE_FILE" == *"production"* ]]; then
     ENV="production"
     DB_CONTAINER="kb-platform-db-prod"

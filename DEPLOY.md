@@ -34,58 +34,58 @@
 
 ```bash
 # Шаг 1: Собрать новый образ
-docker-compose -f docker-compose.production.yml build frontend
+docker compose build frontend
 
 # Шаг 2: Остановить ВСЕ контейнеры
-docker-compose -f docker-compose.production.yml down
+docker compose down
 
 # Шаг 3: Запустить с env файлом
-docker-compose -f docker-compose.production.yml --env-file .env.production up -d
+docker compose --env-file .env.production up -d
 ```
 
 **НИКОГДА НЕ ДЕЛАЙТЕ:**
 ```bash
 # ❌ НЕПРАВИЛЬНО - пересоздаст контейнеры без env файла
-docker-compose -f docker-compose.production.yml up -d frontend
+docker compose up -d frontend
 ```
 
 ### 2. Пересборка backend
 
 ```bash
 # Шаг 1: Собрать новый образ
-docker-compose -f docker-compose.production.yml build backend
+docker compose build backend
 
 # Шаг 2: Остановить ВСЕ контейнеры
-docker-compose -f docker-compose.production.yml down
+docker compose down
 
 # Шаг 3: Запустить с env файлом
-docker-compose -f docker-compose.production.yml --env-file .env.production up -d
+docker compose --env-file .env.production up -d
 ```
 
 ### 3. Пересборка всех сервисов
 
 ```bash
 # Шаг 1: Собрать все образы
-docker-compose -f docker-compose.production.yml build
+docker compose build
 
 # Шаг 2: Остановить ВСЕ контейнеры
-docker-compose -f docker-compose.production.yml down
+docker compose down
 
 # Шаг 3: Запустить с env файлом
-docker-compose -f docker-compose.production.yml --env-file .env.production up -d
+docker compose --env-file .env.production up -d
 ```
 
 ### 4. Просто перезапуск (без пересборки)
 
 ```bash
 # Если нужно просто перезапустить без изменений кода
-docker-compose -f docker-compose.production.yml restart
+docker compose restart
 ```
 
 **Но если были изменения env файла:**
 ```bash
-docker-compose -f docker-compose.production.yml down
-docker-compose -f docker-compose.production.yml --env-file .env.production up -d
+docker compose down
+docker compose --env-file .env.production up -d
 ```
 
 ---
@@ -94,14 +94,14 @@ docker-compose -f docker-compose.production.yml --env-file .env.production up -d
 
 ```bash
 # Статус всех контейнеров
-docker-compose -f docker-compose.production.yml ps
+docker compose ps
 
 # Логи конкретного сервиса
-docker-compose -f docker-compose.production.yml logs -f backend
-docker-compose -f docker-compose.production.yml logs -f frontend
+docker compose logs -f backend
+docker compose logs -f frontend
 
 # Последние 50 строк логов
-docker-compose -f docker-compose.production.yml logs --tail 50 backend
+docker compose logs --tail 50 backend
 ```
 
 ---
@@ -114,8 +114,8 @@ docker-compose -f docker-compose.production.yml logs --tail 50 backend
 
 **Решение:**
 ```bash
-docker-compose -f docker-compose.production.yml down
-docker-compose -f docker-compose.production.yml --env-file .env.production up -d
+docker compose down
+docker compose --env-file .env.production up -d
 ```
 
 ### Проблема: Frontend показывает старый код после изменений
@@ -124,9 +124,9 @@ docker-compose -f docker-compose.production.yml --env-file .env.production up -d
 
 **Решение:**
 ```bash
-docker-compose -f docker-compose.production.yml build frontend
-docker-compose -f docker-compose.production.yml down
-docker-compose -f docker-compose.production.yml --env-file .env.production up -d
+docker compose build frontend
+docker compose down
+docker compose --env-file .env.production up -d
 ```
 
 ### Проблема: Backend не видит изменения в коде
@@ -135,9 +135,9 @@ docker-compose -f docker-compose.production.yml --env-file .env.production up -d
 
 **Решение:**
 ```bash
-docker-compose -f docker-compose.production.yml build backend
-docker-compose -f docker-compose.production.yml down
-docker-compose -f docker-compose.production.yml --env-file .env.production up -d
+docker compose build backend
+docker compose down
+docker compose --env-file .env.production up -d
 ```
 
 ### Проблема: Код изменился, пересобрали, но контейнер всё ещё использует старый код
@@ -147,9 +147,9 @@ docker-compose -f docker-compose.production.yml --env-file .env.production up -d
 **Решение:**
 ```bash
 # ОБЯЗАТЕЛЬНО используйте --no-cache для изменений в коде
-docker-compose -f docker-compose.production.yml build --no-cache backend
-docker-compose -f docker-compose.production.yml down
-docker-compose -f docker-compose.production.yml --env-file .env.production up -d
+docker compose build --no-cache backend
+docker compose down
+docker compose --env-file .env.production up -d
 
 # Проверить, что новый код в контейнере:
 docker exec kb-platform-backend-prod grep -n "your_change" /app/path/to/file.py
@@ -175,7 +175,7 @@ docker-compose -f docker-compose.dev.yml up -d
 
 ### Production (требует пересборку при изменениях)
 ```bash
-docker-compose -f docker-compose.production.yml --env-file .env.production up -d
+docker compose --env-file .env.production up -d
 ```
 
 **Особенность:** Код "запекается" в образ, требует rebuild для любых изменений
@@ -220,13 +220,13 @@ Docker кеширует слои образа. При сборке Docker про
 
 ```bash
 # 1. Пересобрать БЕЗ кеша (критично!)
-docker-compose -f docker-compose.production.yml build --no-cache backend
+docker compose build --no-cache backend
 
 # 2. Остановить контейнер
-docker-compose -f docker-compose.production.yml --env-file .env.production stop backend
+docker compose --env-file .env.production stop backend
 
 # 3. Запустить с новым образом
-docker-compose -f docker-compose.production.yml --env-file .env.production up -d backend
+docker compose --env-file .env.production up -d backend
 
 # 4. Проверить, что код обновился
 docker exec kb-platform-backend-prod grep -n "your_recent_change" /app/path/to/file.py

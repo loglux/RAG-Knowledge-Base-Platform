@@ -66,7 +66,7 @@ Transform the Knowledge Base Platform from MVP to production-ready, enterprise-g
 - [x] `frontend/.dockerignore`
 - [x] `Dockerfile` (optimized multi-stage)
 - [x] `.dockerignore` (updated)
-- [x] `docker-compose.production.yml`
+- [x] `docker-compose.production.yml` (deprecated/removed; use `docker-compose.yml`)
 - [x] Volume configuration (6 volumes: postgres, qdrant, opensearch, app_logs, frontend_logs, uploads)
 - [x] `scripts/backup.sh`
 - [x] `scripts/restore.sh`
@@ -76,7 +76,7 @@ Transform the Knowledge Base Platform from MVP to production-ready, enterprise-g
 - [x] `docs/PRODUCTION_DEPLOYMENT.md` (production guide)
 
 #### Success Criteria:
-- ✅ Single command deployment: `docker-compose -f docker-compose.production.yml up -d`
+- ✅ Single command deployment: `docker compose up -d`
 - ✅ All data persists across container restarts
 - ✅ Logs accessible outside containers
 - ✅ Health checks pass for all services
