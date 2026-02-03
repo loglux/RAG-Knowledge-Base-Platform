@@ -259,30 +259,36 @@ class RecursiveChunking(ChunkingStrategy):
         if self.chunk_overlap >= self.chunk_size:
             raise ValueError("Chunk overlap must be smaller than chunk size")
 
+        self.splitter = None
+        self.fallback = None
+
         # Import here to avoid circular dependencies
         try:
             from langchain_text_splitters import RecursiveCharacterTextSplitter
-        except ImportError:
-            raise ImportError(
-                "langchain-text-splitters is required for RecursiveChunking. "
-                "Install it with: pip install langchain-text-splitters"
-            )
 
-        # Initialize LangChain splitter with hierarchical separators
-        self.splitter = RecursiveCharacterTextSplitter(
-            chunk_size=self.chunk_size,
-            chunk_overlap=self.chunk_overlap,
-            length_function=len,
-            is_separator_regex=False,
-            # Hierarchical separators: paragraph → line → sentence → word → char
-            separators=[
-                "\n\n",  # Paragraph boundaries
-                "\n",    # Line boundaries
-                ". ",    # Sentence boundaries
-                " ",     # Word boundaries
-                "",      # Character-level (fallback)
-            ],
-        )
+            # Initialize LangChain splitter with hierarchical separators
+            self.splitter = RecursiveCharacterTextSplitter(
+                chunk_size=self.chunk_size,
+                chunk_overlap=self.chunk_overlap,
+                length_function=len,
+                is_separator_regex=False,
+                # Hierarchical separators: paragraph → line → sentence → word → char
+                separators=[
+                    "\n\n",  # Paragraph boundaries
+                    "\n",    # Line boundaries
+                    ". ",    # Sentence boundaries
+                    " ",     # Word boundaries
+                    "",      # Character-level (fallback)
+                ],
+            )
+        except Exception as e:
+            # Fallback to fixed-size chunking if langchain splitter fails (e.g., py3.12 ForwardRef issues)
+            logger.warning(f"RecursiveChunking unavailable, falling back to FixedSizeChunking: {e}")
+            self.fallback = FixedSizeChunking(
+                chunk_size=self.chunk_size,
+                chunk_overlap=self.chunk_overlap,
+                respect_sentence_boundary=True,
+            )
 
         logger.info(
             f"Initialized RecursiveChunking: size={self.chunk_size}, "
@@ -304,8 +310,17 @@ class RecursiveChunking(ChunkingStrategy):
             logger.warning("Empty text provided for chunking")
             return []
 
-        # Use LangChain splitter
-        langchain_chunks = self.splitter.split_text(text)
+        # Use LangChain splitter (fallback to fixed-size if it fails)
+        if self.splitter is None and self.fallback is not None:
+            return self.fallback.split(text, metadata=metadata)
+
+        try:
+            langchain_chunks = self.splitter.split_text(text)  # type: ignore[union-attr]
+        except Exception as e:
+            logger.warning(f"RecursiveChunking failed, falling back to FixedSizeChunking: {e}")
+            if self.fallback is not None:
+                return self.fallback.split(text, metadata=metadata)
+            raise
 
         if not langchain_chunks:
             logger.warning("No chunks created from text")
