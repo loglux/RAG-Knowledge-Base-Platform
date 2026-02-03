@@ -29,6 +29,7 @@ export function SettingsPage() {
   const [lexicalTopK, setLexicalTopK] = useState(20)
   const [hybridDenseWeight, setHybridDenseWeight] = useState(0.6)
   const [hybridLexicalWeight, setHybridLexicalWeight] = useState(0.4)
+  const [linkHybridWeights, setLinkHybridWeights] = useState(true)
   const [bm25MatchMode, setBm25MatchMode] = useState('balanced')
   const [bm25MinShouldMatch, setBm25MinShouldMatch] = useState(50)
   const [bm25UsePhrase, setBm25UsePhrase] = useState(true)
@@ -36,6 +37,22 @@ export function SettingsPage() {
   const [useStructure, setUseStructure] = useState(false)
   const [structureRequestsPerMinute, setStructureRequestsPerMinute] = useState(10)
   const [opensearchAvailable, setOpensearchAvailable] = useState<boolean | null>(null)
+  const clamp01 = (value: number) => Math.min(1, Math.max(0, value))
+  const handleDenseWeightChange = (value: number) => {
+    const nextDense = clamp01(value)
+    setHybridDenseWeight(nextDense)
+    if (linkHybridWeights) {
+      setHybridLexicalWeight(Number((1 - nextDense).toFixed(2)))
+    }
+  }
+
+  const handleLexicalWeightChange = (value: number) => {
+    const nextLexical = clamp01(value)
+    setHybridLexicalWeight(nextLexical)
+    if (linkHybridWeights) {
+      setHybridDenseWeight(Number((1 - nextLexical).toFixed(2)))
+    }
+  }
 
   // KB Defaults
   const [kbChunkSize, setKbChunkSize] = useState(1000)
@@ -614,6 +631,21 @@ function QueryDefaultsTab(props: any) {
 
           {retrievalMode === 'hybrid' && (
             <>
+              <div className="mb-4 flex items-center gap-2 text-xs text-gray-400">
+                <input
+                  id="link-hybrid-weights-settings"
+                  type="checkbox"
+                  checked={linkHybridWeights}
+                  onChange={(e) => setLinkHybridWeights(e.target.checked)}
+                  className="rounded border-gray-600 bg-gray-800"
+                />
+                <label htmlFor="link-hybrid-weights-settings">
+                  Link weights (lexical = 1 − dense)
+                </label>
+              </div>
+              <p className="mb-4 text-[11px] text-gray-500">
+                Weights are normalized server-side if they don’t sum to 1.0.
+              </p>
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-300 mb-2">Lexical Top K: {lexicalTopK}</label>
                 <input
@@ -639,7 +671,7 @@ function QueryDefaultsTab(props: any) {
                   max="1"
                   step="0.1"
                   value={hybridDenseWeight}
-                  onChange={(e) => setHybridDenseWeight(parseFloat(e.target.value))}
+                  onChange={(e) => handleDenseWeightChange(parseFloat(e.target.value))}
                 />
               </div>
 
@@ -654,7 +686,7 @@ function QueryDefaultsTab(props: any) {
                   max="1"
                   step="0.1"
                   value={hybridLexicalWeight}
-                  onChange={(e) => setHybridLexicalWeight(parseFloat(e.target.value))}
+                  onChange={(e) => handleLexicalWeightChange(parseFloat(e.target.value))}
                 />
               </div>
 

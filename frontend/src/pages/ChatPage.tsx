@@ -146,6 +146,14 @@ export function ChatPage() {
     const loadGlobalSettings = async () => {
       if (conversationId) return
       try {
+        const draftRaw = localStorage.getItem(settingsDraftKey)
+        if (draftRaw) {
+          return
+        }
+      } catch (err) {
+        console.error('Failed to read draft chat settings:', err)
+      }
+      try {
         const data = await apiClient.getAppSettings()
         if (data.top_k !== null) setTopK(data.top_k)
         if (data.temperature !== null) setTemperature(data.temperature)
