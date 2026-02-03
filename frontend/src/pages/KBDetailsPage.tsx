@@ -104,6 +104,7 @@ export function KBDetailsPage() {
   const [qaSelectedRun, setQaSelectedRun] = useState<QAEvalRunDetail | null>(null)
   const [qaFilter, setQaFilter] = useState('')
   const [qaOnlyLow, setQaOnlyLow] = useState(false)
+  const [qaDeleting, setQaDeleting] = useState(false)
 
   const buildSettingsData = (kbData: KnowledgeBase, defaults?: AppSettings | null) => {
     const bm25Override = kbData.bm25_match_mode !== null
@@ -259,6 +260,39 @@ export function KBDetailsPage() {
       setQaSelectedRun(detail)
     } catch (err) {
       setQaRunsError(err instanceof Error ? err.message : 'Failed to load run details')
+    }
+  }
+
+  const handleDeleteRun = async (runId: string) => {
+    if (!id) return
+    if (!window.confirm('Delete this run?')) return
+    setQaDeleting(true)
+    try {
+      await apiClient.deleteAutoTuneRun(id, runId)
+      const runs = await apiClient.listAutoTuneRuns(id)
+      setQaRuns(runs)
+      if (qaSelectedRun?.run.id === runId) {
+        setQaSelectedRun(null)
+      }
+    } catch (err) {
+      setQaRunsError(err instanceof Error ? err.message : 'Failed to delete run')
+    } finally {
+      setQaDeleting(false)
+    }
+  }
+
+  const handleDeleteAllRuns = async () => {
+    if (!id) return
+    if (!window.confirm('Delete all runs for this KB?')) return
+    setQaDeleting(true)
+    try {
+      await apiClient.deleteAllAutoTuneRuns(id)
+      setQaRuns([])
+      setQaSelectedRun(null)
+    } catch (err) {
+      setQaRunsError(err instanceof Error ? err.message : 'Failed to delete runs')
+    } finally {
+      setQaDeleting(false)
     }
   }
 
@@ -806,7 +840,18 @@ export function KBDetailsPage() {
           </div>
 
           <div className="mt-6">
-            <h4 className="text-sm font-semibold text-gray-200 mb-2">Runs</h4>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-semibold text-gray-200">Runs</h4>
+              {qaRuns.length > 0 && (
+                <button
+                  onClick={handleDeleteAllRuns}
+                  disabled={qaDeleting}
+                  className="btn-secondary text-[11px] px-2 py-1 disabled:opacity-60"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
             {qaRunsError && <div className="text-xs text-red-400 mb-2">{qaRunsError}</div>}
             {qaRunsLoading ? (
               <div className="text-xs text-gray-400">Loading runs…</div>
@@ -863,6 +908,13 @@ export function KBDetailsPage() {
                         className="btn-secondary text-[11px] px-2 py-1"
                       >
                         View
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRun(run.id)}
+                        disabled={qaDeleting}
+                        className="btn-secondary text-[11px] px-2 py-1"
+                      >
+                        Delete
                       </button>
                     </div>
                   )

@@ -226,6 +226,14 @@ class APIClient {
     return response.data
   }
 
+  async deleteAutoTuneRun(kbId: string, runId: string): Promise<void> {
+    await this.client.delete(`/knowledge-bases/${kbId}/auto-tune/runs/${runId}`)
+  }
+
+  async deleteAllAutoTuneRuns(kbId: string): Promise<void> {
+    await this.client.delete(`/knowledge-bases/${kbId}/auto-tune/runs`)
+  }
+
   // Documents
   async getDocuments(kbId: string, page = 1, pageSize = 20): Promise<PaginatedResponse<Document>> {
     const response = await this.client.get<PaginatedResponse<Document>>('/documents/', {

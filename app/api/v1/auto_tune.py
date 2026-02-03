@@ -344,3 +344,43 @@ async def get_eval_run(
     )
 
     return QAEvalRunDetailResponse(run=run_response, results=results)
+
+
+@router.delete(
+    "/knowledge-bases/{kb_id}/auto-tune/runs/{run_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_eval_run(
+    kb_id: UUID,
+    run_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    run = await db.get(QAEvalRun, run_id)
+    if not run or run.knowledge_base_id != kb_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+
+    await db.delete(run)
+    await db.flush()
+    return None
+
+
+@router.delete(
+    "/knowledge-bases/{kb_id}/auto-tune/runs",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_all_eval_runs(
+    kb_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    kb = await db.get(KnowledgeBaseModel, kb_id)
+    if not kb:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge base not found")
+
+    result = await db.execute(
+        select(QAEvalRun).where(QAEvalRun.knowledge_base_id == kb_id)
+    )
+    runs = result.scalars().all()
+    for run in runs:
+        await db.delete(run)
+    await db.flush()
+    return None
