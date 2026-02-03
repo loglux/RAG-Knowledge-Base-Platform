@@ -399,7 +399,7 @@ const Setup: React.FC = () => {
               <h3>⚠️ Important Notes:</h3>
               <ul>
                 <li>Current default password: <code>kb_pass_change_me</code></li>
-                <li>Changing password will update DATABASE_URL in settings</li>
+                <li>Changing password does NOT update Docker secrets or .env</li>
                 <li>Save the new password - you'll need it for container restarts</li>
                 <li>This step is optional but recommended for production</li>
               </ul>

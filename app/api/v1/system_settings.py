@@ -274,8 +274,7 @@ async def change_postgres_password(
 
     This will:
     1. Change password in PostgreSQL
-    2. Update DATABASE_URL in system settings
-    3. Recreate connection pool with new credentials
+    2. Recreate connection pool with new credentials
     """
     try:
         result = await SetupManager.change_postgres_password(

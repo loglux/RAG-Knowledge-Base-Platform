@@ -32,17 +32,6 @@ if [ -f "$SECRET_PATH" ]; then
     fi
 fi
 
-# SECOND: Check if Setup Wizard saved DATABASE_URL in logs volume (legacy fallback)
-PERSIST_PATH="/app/logs/.database_url"
-if [ -z "$DATABASE_URL" ] && [ -f "$PERSIST_PATH" ]; then
-    SAVED_DB_URL=$(cat "$PERSIST_PATH" 2>/dev/null | xargs)
-    if [ -n "$SAVED_DB_URL" ]; then
-        echo "✅ Found persisted DATABASE_URL (from Setup Wizard)"
-        export DATABASE_URL="$SAVED_DB_URL"
-        echo "🔗 Using credentials from Setup Wizard"
-    fi
-fi
-
 if [ -z "$DATABASE_URL" ]; then
     echo "ℹ️  No persisted DATABASE_URL found"
     echo "   Attempting connection with DATABASE_URL from environment..."
@@ -60,22 +49,7 @@ if [ -z "$DATABASE_URL" ]; then
         if PGPASSWORD="$DEFAULT_PASSWORD" psql -h db -U kb_user -d knowledge_base -c "SELECT 1" > /dev/null 2>&1; then
             echo "✅ Connected with default password"
 
-            # Try to read DATABASE_URL from system_settings
-            SAVED_DB_URL=$(PGPASSWORD="$DEFAULT_PASSWORD" psql -h db -U kb_user -d knowledge_base -t -c \
-                "SELECT value FROM system_settings WHERE key = 'database_url';" 2>/dev/null | xargs || echo "")
-
-            if [ -n "$SAVED_DB_URL" ]; then
-                echo "✅ Found DATABASE_URL in system_settings, using it"
-                export DATABASE_URL="$SAVED_DB_URL"
-
-                # Save to logs volume for future restarts
-                if [ -d /app/logs ]; then
-                    echo "$SAVED_DB_URL" > "$PERSIST_PATH"
-                    echo "📝 Saved to $PERSIST_PATH for persistence"
-                fi
-            else
-                export DATABASE_URL="postgresql+asyncpg://kb_user:$DEFAULT_PASSWORD@db:5432/knowledge_base"
-            fi
+            export DATABASE_URL="postgresql+asyncpg://kb_user:$DEFAULT_PASSWORD@db:5432/knowledge_base"
         else
             echo "💥 FATAL: Cannot connect to database with any known credentials"
             echo "   Tried: environment password, default password"

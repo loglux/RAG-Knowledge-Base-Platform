@@ -522,17 +522,6 @@ class SetupManager:
             else:
                 raise SetupError("Invalid DATABASE_URL format")
 
-            # Save new DATABASE_URL to system settings
-            await SystemSettingsManager.save_setting(
-                db=db,
-                key="database_url",
-                value=new_url,
-                category="database",
-                description="PostgreSQL connection URL",
-                is_encrypted=False,
-                updated_by=updated_by,
-            )
-
             logger.info(f"Changed PostgreSQL password for user: {username}")
 
             # CRITICAL: Recreate connection pool with new credentials
@@ -541,22 +530,6 @@ class SetupManager:
             from app.db.session import recreate_engine
             logger.info("Recreating database connection pool with new credentials...")
             await recreate_engine(new_url)
-
-            # CRITICAL: Save DATABASE_URL to logs volume for future container restarts
-            # This allows entrypoint.sh to read correct credentials without querying database
-            try:
-                import os
-                persist_dir = "/app/logs"
-                persist_file = os.path.join(persist_dir, ".database_url")
-                if os.path.exists(persist_dir):
-                    with open(persist_file, "w") as f:
-                        f.write(new_url)
-                    logger.info(f"✅ Saved DATABASE_URL to {persist_file} for persistence")
-                else:
-                    logger.warning(f"⚠️  Log volume not mounted at {persist_dir}, credentials may not persist")
-            except Exception as e:
-                logger.error(f"Failed to save DATABASE_URL to log volume: {e}")
-                # Non-fatal - system_settings still has the URL
 
             return {
                 "database_url": new_url,
