@@ -13,45 +13,39 @@ echo "✅ Database is ready"
 # Check and fix DATABASE_URL if password was changed via Setup Wizard
 echo "🔍 Checking database credentials..."
 
-# Extract current password from DATABASE_URL
-CURRENT_PASSWORD=$(echo "$DATABASE_URL" | sed -n 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/p')
-
-# Try to connect with current DATABASE_URL
-if PGPASSWORD="$CURRENT_PASSWORD" psql -h db -U kb_user -d knowledge_base -c "SELECT 1" > /dev/null 2>&1; then
-    echo "✅ Connection successful with DATABASE_URL from environment"
-
-    # Check if there's a different password in system_settings
-    SAVED_DB_URL=$(PGPASSWORD="$CURRENT_PASSWORD" psql -h db -U kb_user -d knowledge_base -t -c \
-        "SELECT value FROM system_settings WHERE key = 'database_url';" 2>/dev/null | xargs || echo "")
-
-    if [ -n "$SAVED_DB_URL" ] && [ "$SAVED_DB_URL" != "$DATABASE_URL" ]; then
-        echo "⚠️  Found different DATABASE_URL in system_settings, using it"
+# FIRST: Check if Setup Wizard saved DATABASE_URL in shared volume
+if [ -f /shared/database_url ]; then
+    SAVED_DB_URL=$(cat /shared/database_url 2>/dev/null | xargs)
+    if [ -n "$SAVED_DB_URL" ]; then
+        echo "✅ Found DATABASE_URL in shared volume (from Setup Wizard)"
         export DATABASE_URL="$SAVED_DB_URL"
+        echo "🔗 Using credentials from Setup Wizard"
     fi
 else
-    echo "❌ Authentication failed with DATABASE_URL from environment"
-    echo "🔄 Trying default credentials..."
+    echo "ℹ️  No saved DATABASE_URL in shared volume"
+    echo "   Attempting connection with DATABASE_URL from environment..."
 
-    # Try default password
-    DEFAULT_PASSWORD="kb_pass_change_me"
-    if PGPASSWORD="$DEFAULT_PASSWORD" psql -h db -U kb_user -d knowledge_base -c "SELECT 1" > /dev/null 2>&1; then
-        echo "✅ Connected with default credentials"
+    # Extract current password from DATABASE_URL
+    CURRENT_PASSWORD=$(echo "$DATABASE_URL" | sed -n 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/p')
 
-        # Read correct DATABASE_URL from system_settings
-        SAVED_DB_URL=$(PGPASSWORD="$DEFAULT_PASSWORD" psql -h db -U kb_user -d knowledge_base -t -c \
-            "SELECT value FROM system_settings WHERE key = 'database_url';" 2>/dev/null | xargs || echo "")
+    # Try to connect
+    if ! PGPASSWORD="$CURRENT_PASSWORD" psql -h db -U kb_user -d knowledge_base -c "SELECT 1" > /dev/null 2>&1; then
+        echo "❌ Authentication failed with DATABASE_URL from environment"
+        echo "🔄 Trying default password as fallback..."
 
-        if [ -n "$SAVED_DB_URL" ]; then
-            echo "✅ Found DATABASE_URL in system_settings, using it"
-            export DATABASE_URL="$SAVED_DB_URL"
-        else
-            echo "⚠️  No database_url in system_settings, using default"
+        # Try default password
+        DEFAULT_PASSWORD="kb_pass_change_me"
+        if PGPASSWORD="$DEFAULT_PASSWORD" psql -h db -U kb_user -d knowledge_base -c "SELECT 1" > /dev/null 2>&1; then
+            echo "✅ Connected with default password"
             export DATABASE_URL="postgresql+asyncpg://kb_user:$DEFAULT_PASSWORD@db:5432/knowledge_base"
+        else
+            echo "💥 FATAL: Cannot connect to database"
+            echo "   If Setup Wizard changed password, please re-run Setup Wizard"
+            echo "   to save credentials to shared volume."
+            exit 1
         fi
     else
-        echo "💥 FATAL: Cannot connect with any known credentials"
-        echo "   Please check database configuration"
-        exit 1
+        echo "✅ Connection successful with DATABASE_URL from environment"
     fi
 fi
 

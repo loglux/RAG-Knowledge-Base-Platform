@@ -542,6 +542,22 @@ class SetupManager:
             logger.info("Recreating database connection pool with new credentials...")
             await recreate_engine(new_url)
 
+            # CRITICAL: Save DATABASE_URL to shared volume for future container restarts
+            # This allows entrypoint.sh to read correct credentials without querying database
+            try:
+                import os
+                shared_dir = "/shared"
+                if os.path.exists(shared_dir):
+                    shared_file = os.path.join(shared_dir, "database_url")
+                    with open(shared_file, "w") as f:
+                        f.write(new_url)
+                    logger.info(f"✅ Saved DATABASE_URL to {shared_file} for persistence")
+                else:
+                    logger.warning(f"⚠️  Shared volume not mounted at {shared_dir}, credentials may not persist")
+            except Exception as e:
+                logger.error(f"Failed to save DATABASE_URL to shared volume: {e}")
+                # Non-fatal - system_settings still has the URL
+
             return {
                 "database_url": new_url,
                 "username": username,

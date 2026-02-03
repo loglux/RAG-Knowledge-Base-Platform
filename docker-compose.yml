@@ -123,6 +123,7 @@ services:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
       - ./docker/entrypoint.sh:/entrypoint.sh:ro
+      - shared_config:/shared
     depends_on:
       db:
         condition: service_healthy
@@ -144,6 +145,8 @@ volumes:
   kb_qdrant_data:
     driver: local
   kb_opensearch_data:
+    driver: local
+  shared_config:
     driver: local
 
 networks:
