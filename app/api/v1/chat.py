@@ -309,6 +309,7 @@ async def chat_query(
             content=rag_response.answer,
             sources_json=json.dumps(sources_payload),
             model=rag_response.model,
+            use_self_check=request.use_self_check if request.use_self_check else None,
             message_index=assistant_index,
         ))
         conversation.updated_at = datetime.utcnow()
@@ -541,6 +542,7 @@ async def get_conversation_messages(
             content=msg.content,
             sources=sources,
             model=msg.model,
+            use_self_check=msg.use_self_check,
             timestamp=msg.created_at,
             message_index=msg.message_index,
         ))

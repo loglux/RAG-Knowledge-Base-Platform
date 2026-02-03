@@ -293,6 +293,7 @@ class ChatMessageResponse(BaseModel):
     content: str = Field(..., description="Message content")
     sources: Optional[List[SourceChunk]] = Field(default=None, description="Source chunks for assistant messages")
     model: Optional[str] = Field(default=None, description="LLM model used for assistant messages")
+    use_self_check: Optional[bool] = Field(default=None, description="Whether self-check was applied")
     timestamp: datetime
     message_index: int
 

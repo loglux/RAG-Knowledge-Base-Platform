@@ -399,6 +399,11 @@ class ChatMessage(Base):
         nullable=True,
         comment="LLM model used for assistant messages"
     )
+    use_self_check: Mapped[Optional[bool]] = mapped_column(
+        Boolean,
+        nullable=True,
+        comment="Whether self-check was applied for assistant messages"
+    )
     message_index: Mapped[int] = mapped_column(Integer, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(

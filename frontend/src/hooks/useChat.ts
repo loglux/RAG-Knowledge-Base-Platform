@@ -33,6 +33,7 @@ export function useChat(kbId: string) {
             sources: msg.sources,
             timestamp: msg.timestamp,
             model: msg.model,
+            use_self_check: msg.use_self_check,
           })))
           return
         }
@@ -60,6 +61,7 @@ export function useChat(kbId: string) {
           sources: msg.sources,
           timestamp: msg.timestamp,
           model: msg.model,
+          use_self_check: msg.use_self_check,
         })))
       } catch (e) {
         console.error('Failed to load conversation history:', e)

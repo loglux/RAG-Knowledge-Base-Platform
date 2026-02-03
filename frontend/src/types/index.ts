@@ -205,6 +205,7 @@ export interface ChatMessageResponse {
   sources?: SourceChunk[]
   timestamp: string
   message_index: number
+  use_self_check?: boolean
 }
 
 export interface AppSettings {
