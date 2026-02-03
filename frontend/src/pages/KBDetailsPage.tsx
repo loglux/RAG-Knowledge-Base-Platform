@@ -258,10 +258,14 @@ export function KBDetailsPage() {
   const qaPresetConfigs = [
     { label: 'Dense top_k=5', config: { top_k: 5, retrieval_mode: 'dense' as const } },
     { label: 'Dense top_k=10', config: { top_k: 10, retrieval_mode: 'dense' as const } },
-    { label: 'Hybrid top_k=3', config: { top_k: 3, retrieval_mode: 'hybrid' as const } },
-    { label: 'Hybrid top_k=5', config: { top_k: 5, retrieval_mode: 'hybrid' as const } },
-    { label: 'Hybrid top_k=10', config: { top_k: 10, retrieval_mode: 'hybrid' as const } },
-    { label: 'Hybrid top_k=15', config: { top_k: 15, retrieval_mode: 'hybrid' as const } },
+    { label: 'Hybrid top_k=5 lex=5 w=0.6', config: { top_k: 5, retrieval_mode: 'hybrid' as const, lexical_top_k: 5, hybrid_dense_weight: 0.6, hybrid_lexical_weight: 0.4 } },
+    { label: 'Hybrid top_k=5 lex=5 w=0.8', config: { top_k: 5, retrieval_mode: 'hybrid' as const, lexical_top_k: 5, hybrid_dense_weight: 0.8, hybrid_lexical_weight: 0.2 } },
+    { label: 'Hybrid top_k=5 lex=10 w=0.6', config: { top_k: 5, retrieval_mode: 'hybrid' as const, lexical_top_k: 10, hybrid_dense_weight: 0.6, hybrid_lexical_weight: 0.4 } },
+    { label: 'Hybrid top_k=5 lex=10 w=0.8', config: { top_k: 5, retrieval_mode: 'hybrid' as const, lexical_top_k: 10, hybrid_dense_weight: 0.8, hybrid_lexical_weight: 0.2 } },
+    { label: 'Hybrid top_k=10 lex=5 w=0.6', config: { top_k: 10, retrieval_mode: 'hybrid' as const, lexical_top_k: 5, hybrid_dense_weight: 0.6, hybrid_lexical_weight: 0.4 } },
+    { label: 'Hybrid top_k=10 lex=5 w=0.8', config: { top_k: 10, retrieval_mode: 'hybrid' as const, lexical_top_k: 5, hybrid_dense_weight: 0.8, hybrid_lexical_weight: 0.2 } },
+    { label: 'Hybrid top_k=10 lex=10 w=0.6', config: { top_k: 10, retrieval_mode: 'hybrid' as const, lexical_top_k: 10, hybrid_dense_weight: 0.6, hybrid_lexical_weight: 0.4 } },
+    { label: 'Hybrid top_k=10 lex=10 w=0.8', config: { top_k: 10, retrieval_mode: 'hybrid' as const, lexical_top_k: 10, hybrid_dense_weight: 0.8, hybrid_lexical_weight: 0.2 } },
   ]
 
   const handleRunPresetSuite = async () => {
@@ -923,10 +927,18 @@ export function KBDetailsPage() {
                   const recommendedScore = (recallRaw !== null && noAnswerAccRaw !== null)
                     ? ((recallRaw + noAnswerAccRaw) / 2).toFixed(3)
                     : '—'
+                  const denseWeight = typeof config?.dense_weight === 'number'
+                    ? config.dense_weight
+                    : (typeof config?.hybrid_dense_weight === 'number' ? config.hybrid_dense_weight : null)
+                  const lexicalWeight = typeof config?.lexical_weight === 'number'
+                    ? config.lexical_weight
+                    : (typeof config?.hybrid_lexical_weight === 'number' ? config.hybrid_lexical_weight : null)
                   const configLabel = config
                     ? [
                         config.retrieval_mode ? String(config.retrieval_mode) : null,
                         config.top_k ? `top_k=${String(config.top_k)}` : null,
+                        config.lexical_top_k ? `lex=${String(config.lexical_top_k)}` : null,
+                        denseWeight !== null ? `w=${denseWeight}` : null,
                         config.use_mmr ? 'mmr' : null,
                       ].filter(Boolean).join(' ')
                     : null
