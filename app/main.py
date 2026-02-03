@@ -36,6 +36,34 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     logger.info(f"Qdrant: {settings.QDRANT_URL}")
     logger.info(f"OpenAI Model: {settings.OPENAI_CHAT_MODEL}")
 
+    # CRITICAL: Check if database password was changed via Setup Wizard
+    # If so, recreate connection pool with correct credentials BEFORE loading settings
+    try:
+        from app.db.session import get_db_session, recreate_engine
+        from app.core.system_settings import SystemSettingsManager
+
+        logger.info("Checking for database credential updates...")
+
+        async with get_db_session() as db:
+            # Try to get database_url from system_settings
+            saved_db_url = await SystemSettingsManager.get_setting(db, "database_url")
+
+            if saved_db_url and saved_db_url != settings.DATABASE_URL:
+                logger.warning("⚠ DATABASE_URL mismatch detected:")
+                logger.warning(f"  ENV:  {settings.DATABASE_URL.split('@')[0]}@...")
+                logger.warning(f"  DB:   {saved_db_url.split('@')[0]}@...")
+                logger.info("🔄 Recreating connection pool with saved credentials...")
+
+                # Recreate engine with correct credentials from database
+                await recreate_engine(saved_db_url)
+                logger.info("✅ Connection pool updated successfully")
+            else:
+                logger.info("✓ Database credentials match")
+
+    except Exception as e:
+        logger.warning(f"Could not check database credentials: {e}")
+        logger.info("Using DATABASE_URL from environment variables")
+
     # Load settings from database (overrides .env)
     try:
         from app.config import load_settings_from_db, is_setup_complete

@@ -107,8 +107,10 @@ services:
       - LOG_LEVEL=INFO
       - API_PREFIX=/api/v1
 
-      # Database connection (uses db service defaults)
-      - DATABASE_URL=postgresql+asyncpg://kb_user:kb_pass_change_me@db:5432/knowledge_base
+      # Database connection
+      # IMPORTANT: Use .env file to override after Setup Wizard changes password
+      # If .env doesn't exist, this default is used for initial bootstrap
+      - DATABASE_URL=${DATABASE_URL:-postgresql+asyncpg://kb_user:kb_pass_change_me@db:5432/knowledge_base}
 
       # Vector databases (defaults, can be overridden via Setup Wizard)
       - QDRANT_URL=http://qdrant:6333
