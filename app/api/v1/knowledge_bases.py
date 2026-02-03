@@ -176,6 +176,34 @@ async def list_knowledge_bases(
     )
 
 
+@router.get("/deleted", response_model=KnowledgeBaseList)
+async def list_deleted_knowledge_bases(
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(10, ge=1, le=100, description="Items per page"),
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """
+    List deleted knowledge bases (trash).
+    """
+    query = select(KnowledgeBaseModel).where(KnowledgeBaseModel.is_deleted == True)
+
+    count_query = select(func.count()).select_from(query.subquery())
+    total = await db.scalar(count_query)
+
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    items = result.scalars().all()
+
+    return KnowledgeBaseList(
+        items=items,
+        total=total or 0,
+        page=page,
+        page_size=page_size,
+        pages=(total + page_size - 1) // page_size if total else 0,
+    )
+
+
 @router.get("/{kb_id}", response_model=KnowledgeBaseResponse)
 async def get_knowledge_base(
     kb_id: UUID,
@@ -320,6 +348,118 @@ async def delete_knowledge_base(
         lexical_store = get_lexical_store()
         await lexical_store.delete_by_kb_id(str(kb_id))
         logger.info(f"Deleted OpenSearch chunks for KB '{kb.name}'")
+    except Exception as e:
+        logger.error(f"Failed to delete OpenSearch chunks for KB '{kb.name}': {e}")
+
+    return None
+
+
+@router.post("/{kb_id}/restore", response_model=dict)
+async def restore_knowledge_base(
+    kb_id: UUID,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """
+    Restore a soft-deleted knowledge base and reindex its documents.
+    """
+    query = select(KnowledgeBaseModel).where(
+        KnowledgeBaseModel.id == kb_id,
+        KnowledgeBaseModel.is_deleted == True,
+    )
+    result = await db.execute(query)
+    kb = result.scalar_one_or_none()
+
+    if not kb:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Deleted knowledge base {kb_id} not found",
+        )
+
+    # Restore KB and documents
+    kb.is_deleted = False
+    docs_query = select(DocumentModel).where(
+        DocumentModel.knowledge_base_id == kb_id,
+        DocumentModel.is_deleted == True,
+    )
+    docs_result = await db.execute(docs_query)
+    documents = docs_result.scalars().all()
+    for doc in documents:
+        doc.is_deleted = False
+        doc.status = DocumentStatus.PENDING
+        doc.embeddings_status = DocumentStatus.PENDING
+        doc.bm25_status = DocumentStatus.PENDING
+        doc.error_message = None
+
+    await db.commit()
+
+    # Recreate Qdrant collection if needed
+    try:
+        vector_store = get_vector_store()
+        await vector_store.create_collection(
+            collection_name=kb.collection_name,
+            vector_size=kb.embedding_dimension,
+        )
+    except Exception as e:
+        logger.error(f"Failed to ensure Qdrant collection for restore: {e}")
+
+    # Queue reprocessing
+    from app.api.v1.documents import _reprocess_document_background
+
+    queued = 0
+    for doc in documents:
+        background_tasks.add_task(
+            _reprocess_document_background,
+            document_id=doc.id,
+        )
+        queued += 1
+
+    logger.info(f"Restored KB {kb_id}, queued {queued} documents for reprocessing")
+    return {"restored": True, "queued": queued, "knowledge_base_id": str(kb_id)}
+
+
+@router.delete("/{kb_id}/purge", status_code=status.HTTP_204_NO_CONTENT)
+async def purge_knowledge_base(
+    kb_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """
+    Permanently delete a knowledge base and its documents from the database.
+    """
+    query = select(KnowledgeBaseModel).where(KnowledgeBaseModel.id == kb_id)
+    result = await db.execute(query)
+    kb = result.scalar_one_or_none()
+
+    if not kb:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Knowledge base {kb_id} not found",
+        )
+
+    # Delete documents (hard delete)
+    docs_query = select(DocumentModel).where(
+        DocumentModel.knowledge_base_id == kb_id,
+    )
+    docs_result = await db.execute(docs_query)
+    documents = docs_result.scalars().all()
+    for doc in documents:
+        await db.delete(doc)
+
+    await db.delete(kb)
+    await db.commit()
+
+    # Best-effort index cleanup
+    try:
+        vector_store = get_vector_store()
+        await vector_store.delete_collection(kb.collection_name)
+    except Exception as e:
+        logger.error(f"Failed to delete Qdrant collection '{kb.collection_name}': {e}")
+
+    try:
+        lexical_store = get_lexical_store()
+        await lexical_store.delete_by_kb_id(str(kb_id))
     except Exception as e:
         logger.error(f"Failed to delete OpenSearch chunks for KB '{kb.name}': {e}")
 

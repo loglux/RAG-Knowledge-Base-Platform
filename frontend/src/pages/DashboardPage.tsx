@@ -4,10 +4,12 @@ import { useKnowledgeBases } from '../hooks/useKnowledgeBases'
 import { useAuth } from '../context/AuthContext'
 import { CreateKBModal } from '../components/kb/CreateKBModal'
 import { KBCard } from '../components/kb/KBCard'
+import { apiClient } from '../services/api'
 
 export function DashboardPage() {
   const navigate = useNavigate()
   const { logout } = useAuth()
+  const [activeTab, setActiveTab] = useState<'active' | 'trash'>('active')
   const {
     knowledgeBases,
     loading,
@@ -17,10 +19,11 @@ export function DashboardPage() {
     total,
     createKnowledgeBase,
     deleteKnowledgeBase,
+    refresh,
     nextPage,
     prevPage,
     goToPage,
-  } = useKnowledgeBases(12)
+  } = useKnowledgeBases(12, { deleted: activeTab === 'trash' })
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
@@ -31,6 +34,17 @@ export function DashboardPage() {
   const handleLogout = async () => {
     await logout()
     navigate('/login')
+  }
+
+  const handleRestore = async (id: string) => {
+    await apiClient.restoreKnowledgeBase(id)
+    await refresh()
+  }
+
+  const handlePurge = async (id: string) => {
+    if (!confirm('Permanently delete this knowledge base? This cannot be undone.')) return
+    await apiClient.purgeKnowledgeBase(id)
+    await refresh()
   }
 
   return (
@@ -68,16 +82,43 @@ export function DashboardPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex items-center gap-2 border-b border-gray-700 mb-6 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('active')}
+            className={`px-6 py-3 font-medium whitespace-nowrap border-b-2 transition-colors ${
+              activeTab === 'active'
+                ? 'border-primary-500 text-primary-500'
+                : 'border-transparent text-gray-400 hover:text-gray-300'
+            }`}
+          >
+            Active
+          </button>
+          <button
+            onClick={() => setActiveTab('trash')}
+            className={`px-6 py-3 font-medium whitespace-nowrap border-b-2 transition-colors ${
+              activeTab === 'trash'
+                ? 'border-primary-500 text-primary-500'
+                : 'border-transparent text-gray-400 hover:text-gray-300'
+            }`}
+          >
+            Trash
+          </button>
+        </div>
+
         {/* Title and Create Button */}
         <div className="flex items-center justify-between mb-8">
-          <h2 className="text-xl font-semibold text-white">Your Knowledge Bases</h2>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="btn-primary flex items-center space-x-2"
-          >
-            <span>+</span>
-            <span>New KB</span>
-          </button>
+          <h2 className="text-xl font-semibold text-white">
+            {activeTab === 'trash' ? 'Deleted Knowledge Bases' : 'Your Knowledge Bases'}
+          </h2>
+          {activeTab === 'active' && (
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="btn-primary flex items-center space-x-2"
+            >
+              <span>+</span>
+              <span>New KB</span>
+            </button>
+          )}
         </div>
 
         {/* Error State */}
@@ -99,16 +140,22 @@ export function DashboardPage() {
         {!loading && knowledgeBases.length === 0 && (
           <div className="card text-center py-12">
             <div className="text-6xl mb-4">📚</div>
-            <h3 className="text-xl font-semibold text-white mb-2">No knowledge bases yet</h3>
+            <h3 className="text-xl font-semibold text-white mb-2">
+              {activeTab === 'trash' ? 'Trash is empty' : 'No knowledge bases yet'}
+            </h3>
             <p className="text-gray-400 mb-6">
-              Create your first knowledge base to get started
+              {activeTab === 'trash'
+                ? 'Deleted knowledge bases will appear here'
+                : 'Create your first knowledge base to get started'}
             </p>
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="btn-primary"
-            >
-              + Create Knowledge Base
-            </button>
+            {activeTab === 'active' && (
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="btn-primary"
+              >
+                + Create Knowledge Base
+              </button>
+            )}
           </div>
         )}
 
@@ -117,11 +164,51 @@ export function DashboardPage() {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {knowledgeBases.map((kb) => (
-                <div key={kb.id} onClick={() => handleCardClick(kb.id)}>
-                  <KBCard
-                    kb={kb}
-                    onDelete={deleteKnowledgeBase}
-                  />
+                <div
+                  key={kb.id}
+                  onClick={activeTab === 'active' ? () => handleCardClick(kb.id) : undefined}
+                >
+                  {activeTab === 'trash' ? (
+                    <div className="card cursor-default">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h3 className="text-lg font-semibold text-white">📖 {kb.name}</h3>
+                          {kb.description && (
+                            <p className="text-gray-400 text-sm mt-1 line-clamp-2">{kb.description}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between text-sm text-gray-400 mb-4">
+                        <span>{kb.document_count} docs</span>
+                        <span>{kb.total_chunks} chunks</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleRestore(kb.id)
+                          }}
+                          className="btn-primary text-sm px-3 py-1.5"
+                        >
+                          Restore
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handlePurge(kb.id)
+                          }}
+                          className="btn-secondary text-sm px-3 py-1.5"
+                        >
+                          Purge
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <KBCard
+                      kb={kb}
+                      onDelete={deleteKnowledgeBase}
+                    />
+                  )}
                 </div>
               ))}
             </div>

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { apiClient } from '../services/api'
 import type { KnowledgeBase, CreateKBRequest } from '../types/index'
 
-export function useKnowledgeBases(pageSize = 12) {
+export function useKnowledgeBases(pageSize = 12, options: { deleted?: boolean } = {}) {
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -14,7 +14,9 @@ export function useKnowledgeBases(pageSize = 12) {
     try {
       setLoading(true)
       setError(null)
-      const data = await apiClient.getKnowledgeBases(currentPage, pageSize)
+      const data = options.deleted
+        ? await apiClient.getDeletedKnowledgeBases(currentPage, pageSize)
+        : await apiClient.getKnowledgeBases(currentPage, pageSize)
       setKnowledgeBases(data.items)
       setTotalPages(data.pages)
       setTotal(data.total)
@@ -24,7 +26,7 @@ export function useKnowledgeBases(pageSize = 12) {
     } finally {
       setLoading(false)
     }
-  }, [pageSize])
+  }, [pageSize, options.deleted])
 
   const createKnowledgeBase = useCallback(async (data: CreateKBRequest): Promise<KnowledgeBase> => {
     const newKB = await apiClient.createKnowledgeBase(data)

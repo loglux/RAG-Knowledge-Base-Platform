@@ -138,6 +138,13 @@ class APIClient {
     return response.data
   }
 
+  async getDeletedKnowledgeBases(page = 1, pageSize = 10): Promise<PaginatedResponse<KnowledgeBase>> {
+    const response = await this.client.get<PaginatedResponse<KnowledgeBase>>('/knowledge-bases/deleted', {
+      params: { page, page_size: pageSize },
+    })
+    return response.data
+  }
+
   async getKnowledgeBase(id: string): Promise<KnowledgeBase> {
     const response = await this.client.get<KnowledgeBase>(`/knowledge-bases/${id}`)
     return response.data
@@ -155,6 +162,17 @@ class APIClient {
 
   async deleteKnowledgeBase(id: string): Promise<void> {
     await this.client.delete(`/knowledge-bases/${id}`)
+  }
+
+  async restoreKnowledgeBase(id: string): Promise<{ restored: boolean; queued: number; knowledge_base_id: string }> {
+    const response = await this.client.post<{ restored: boolean; queued: number; knowledge_base_id: string }>(
+      `/knowledge-bases/${id}/restore`
+    )
+    return response.data
+  }
+
+  async purgeKnowledgeBase(id: string): Promise<void> {
+    await this.client.delete(`/knowledge-bases/${id}/purge`)
   }
 
   async reprocessKnowledgeBase(id: string): Promise<{ queued: number; knowledge_base_id: string }> {
