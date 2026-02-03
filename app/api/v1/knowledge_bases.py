@@ -19,6 +19,7 @@ from app.models.schemas import (
 from app.dependencies import get_current_user_id
 from app.core.embeddings_base import EMBEDDING_MODELS
 from app.core.vector_store import get_vector_store
+from app.core.lexical_store import get_lexical_store
 
 logger = logging.getLogger(__name__)
 
