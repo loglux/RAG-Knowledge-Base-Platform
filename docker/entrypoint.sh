@@ -3,10 +3,9 @@ set -e
 
 echo "🚀 Starting Knowledge Base Platform API..."
 
-# Fix /shared permissions for appuser (container runs as root initially)
-if [ -d /shared ]; then
-    chown -R appuser:appuser /shared
-    echo "✅ Fixed /shared permissions for appuser"
+# Ensure appuser can write to logs volume
+if [ -d /app/logs ]; then
+    chown -R appuser:appuser /app/logs
 fi
 
 # Wait for database to be ready
@@ -19,16 +18,17 @@ echo "✅ Database is ready"
 # Check and fix DATABASE_URL if password was changed via Setup Wizard
 echo "🔍 Checking database credentials..."
 
-# FIRST: Check if Setup Wizard saved DATABASE_URL in shared volume
-if [ -f /shared/database_url ]; then
-    SAVED_DB_URL=$(cat /shared/database_url 2>/dev/null | xargs)
+# FIRST: Check if Setup Wizard saved DATABASE_URL in logs volume
+PERSIST_PATH="/app/logs/.database_url"
+if [ -f "$PERSIST_PATH" ]; then
+    SAVED_DB_URL=$(cat "$PERSIST_PATH" 2>/dev/null | xargs)
     if [ -n "$SAVED_DB_URL" ]; then
-        echo "✅ Found DATABASE_URL in shared volume (from Setup Wizard)"
+        echo "✅ Found persisted DATABASE_URL (from Setup Wizard)"
         export DATABASE_URL="$SAVED_DB_URL"
         echo "🔗 Using credentials from Setup Wizard"
     fi
 else
-    echo "ℹ️  No saved DATABASE_URL in shared volume"
+    echo "ℹ️  No persisted DATABASE_URL found"
     echo "   Attempting connection with DATABASE_URL from environment..."
 
     # Extract current password from DATABASE_URL
@@ -52,10 +52,10 @@ else
                 echo "✅ Found DATABASE_URL in system_settings, using it"
                 export DATABASE_URL="$SAVED_DB_URL"
 
-                # Save to /shared for future restarts
-                if [ -d /shared ]; then
-                    echo "$SAVED_DB_URL" > /shared/database_url
-                    echo "📝 Saved to /shared/database_url for persistence"
+                # Save to logs volume for future restarts
+                if [ -d /app/logs ]; then
+                    echo "$SAVED_DB_URL" > "$PERSIST_PATH"
+                    echo "📝 Saved to $PERSIST_PATH for persistence"
                 fi
             else
                 export DATABASE_URL="postgresql+asyncpg://kb_user:$DEFAULT_PASSWORD@db:5432/knowledge_base"
