@@ -537,14 +537,15 @@ function QueryDefaultsTab(props: any) {
         </div>
 
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-300 mb-2">Top K Results</label>
+          <label className="block text-sm font-medium text-gray-300 mb-2">Top K Results: {topK}</label>
           <input
-            type="number"
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            type="range"
+            className="slider w-full"
             value={topK}
             onChange={(e) => setTopK(parseInt(e.target.value))}
             min="1"
             max="20"
+            step="1"
           />
           <p className="text-xs text-gray-400 mt-1">Number of chunks to retrieve</p>
         </div>
@@ -599,14 +600,15 @@ function QueryDefaultsTab(props: any) {
           {retrievalMode === 'hybrid' && (
             <>
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-300 mb-2">Lexical Top K</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Lexical Top K: {lexicalTopK}</label>
                 <input
-                  type="number"
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                  type="range"
+                  className="slider w-full"
                   value={lexicalTopK}
                   onChange={(e) => setLexicalTopK(parseInt(e.target.value))}
                   min="1"
                   max="100"
+                  step="1"
                 />
                 <p className="text-xs text-gray-400 mt-1">Number of BM25 candidates before reranking</p>
               </div>
