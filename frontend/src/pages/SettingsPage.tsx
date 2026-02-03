@@ -767,40 +767,52 @@ function KBDefaultsTab(props: any) {
       <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-300 mb-2">Default Chunk Size</label>
-          <input
-            type="number"
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-            value={kbChunkSize}
-            onChange={(e) => setKbChunkSize(parseInt(e.target.value))}
-            min="100"
-            max="4000"
-          />
+          <div className="flex items-center gap-4">
+            <input
+              type="range"
+              className="w-full"
+              value={kbChunkSize}
+              onChange={(e) => setKbChunkSize(parseInt(e.target.value))}
+              min="100"
+              max="4000"
+              step="50"
+            />
+            <span className="min-w-[4rem] text-right text-gray-200">{kbChunkSize}</span>
+          </div>
           <p className="text-xs text-gray-400 mt-1">Characters per chunk (recommended: 1000-1500)</p>
         </div>
 
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-300 mb-2">Default Chunk Overlap</label>
-          <input
-            type="number"
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-            value={kbChunkOverlap}
-            onChange={(e) => setKbChunkOverlap(parseInt(e.target.value))}
-            min="0"
-            max="500"
-          />
+          <div className="flex items-center gap-4">
+            <input
+              type="range"
+              className="w-full"
+              value={kbChunkOverlap}
+              onChange={(e) => setKbChunkOverlap(parseInt(e.target.value))}
+              min="0"
+              max="500"
+              step="10"
+            />
+            <span className="min-w-[4rem] text-right text-gray-200">{kbChunkOverlap}</span>
+          </div>
           <p className="text-xs text-gray-400 mt-1">Overlapping characters (recommended: 15-20% of chunk size)</p>
         </div>
 
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-300 mb-2">Upsert Batch Size</label>
-          <input
-            type="number"
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-            value={kbUpsertBatchSize}
-            onChange={(e) => setKbUpsertBatchSize(parseInt(e.target.value))}
-            min="64"
-            max="1024"
-          />
+          <div className="flex items-center gap-4">
+            <input
+              type="range"
+              className="w-full"
+              value={kbUpsertBatchSize}
+              onChange={(e) => setKbUpsertBatchSize(parseInt(e.target.value))}
+              min="64"
+              max="1024"
+              step="32"
+            />
+            <span className="min-w-[4rem] text-right text-gray-200">{kbUpsertBatchSize}</span>
+          </div>
           <p className="text-xs text-gray-400 mt-1">Vectors per batch for Qdrant upload (higher = faster but more memory)</p>
         </div>
       </div>
