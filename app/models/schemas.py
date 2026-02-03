@@ -567,3 +567,80 @@ class MeResponse(BaseModel):
     admin_id: int
     username: str
     role: str
+
+
+# ============================================================================
+# QA Auto-Tuning Schemas
+# ============================================================================
+
+class QASampleResponse(BaseModel):
+    id: UUID
+    knowledge_base_id: UUID
+    question: str
+    answer: str
+    document_id: Optional[UUID] = None
+    chunk_index: Optional[int] = None
+    source_span: Optional[str] = None
+    sample_type: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class QASampleUploadResponse(BaseModel):
+    knowledge_base_id: UUID
+    added_count: int
+    replaced: bool
+
+
+class QAEvalRunRequest(BaseModel):
+    top_k: int = Field(default=5, ge=1, le=50)
+    retrieval_mode: RetrievalMode = Field(default=RetrievalMode.DENSE)
+    lexical_top_k: Optional[int] = Field(default=None, ge=1, le=50)
+    hybrid_dense_weight: float = Field(default=0.6, ge=0.0, le=1.0)
+    hybrid_lexical_weight: float = Field(default=0.4, ge=0.0, le=1.0)
+    bm25_match_mode: Optional[str] = None
+    bm25_min_should_match: Optional[int] = Field(default=None, ge=0, le=100)
+    bm25_use_phrase: Optional[bool] = None
+    bm25_analyzer: Optional[str] = None
+    max_context_chars: Optional[int] = Field(default=None, ge=1000, le=50000)
+    score_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    llm_model: Optional[str] = None
+    llm_provider: Optional[str] = None
+    use_mmr: bool = False
+    mmr_diversity: float = Field(default=0.5, ge=0.0, le=1.0)
+    sample_limit: Optional[int] = Field(default=None, ge=1, le=1000)
+
+
+class QAEvalRunResponse(BaseModel):
+    id: UUID
+    knowledge_base_id: UUID
+    mode: str
+    status: str
+    config: Optional[Dict[str, Any]] = None
+    metrics: Optional[Dict[str, Any]] = None
+    sample_count: int
+    error_message: Optional[str] = None
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class QAEvalResultResponse(BaseModel):
+    id: UUID
+    sample_id: Optional[UUID] = None
+    question: str
+    expected_answer: str
+    answer: Optional[str] = None
+    document_id: Optional[UUID] = None
+    chunk_index: Optional[int] = None
+    source_span: Optional[str] = None
+    metrics: Optional[Dict[str, Any]] = None
+    created_at: datetime
+
+
+class QAEvalRunDetailResponse(BaseModel):
+    run: QAEvalRunResponse
+    results: List[QAEvalResultResponse]

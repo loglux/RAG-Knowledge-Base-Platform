@@ -589,3 +589,138 @@ class SystemSettings(Base):
 
     def __repr__(self) -> str:
         return f"<SystemSettings(key='{self.key}', category={self.category}, encrypted={self.is_encrypted})>"
+
+
+class QASample(Base):
+    """Evaluation sample for QA-based RAG tuning."""
+
+    __tablename__ = "qa_samples"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        nullable=False
+    )
+
+    knowledge_base_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("knowledge_bases.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    answer: Mapped[str] = mapped_column(Text, nullable=False)
+
+    document_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+        index=True
+    )
+    chunk_index: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    source_span: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    sample_type: Mapped[str] = mapped_column(
+        String(20),
+        default="gold",
+        nullable=False,
+        index=True,
+        comment="gold | synthetic | self_consistency"
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return f"<QASample(id={self.id}, kb_id={self.knowledge_base_id})>"
+
+
+class QAEvalRun(Base):
+    """Run metadata for QA-based evaluation."""
+
+    __tablename__ = "qa_eval_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        nullable=False
+    )
+
+    knowledge_base_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("knowledge_bases.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+
+    mode: Mapped[str] = mapped_column(
+        String(20),
+        default="gold",
+        nullable=False,
+        comment="gold | synthetic | self_consistency"
+    )
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default="pending",
+        nullable=False,
+        comment="pending | running | completed | failed"
+    )
+    config_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metrics_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sample_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    def __repr__(self) -> str:
+        return f"<QAEvalRun(id={self.id}, kb_id={self.knowledge_base_id}, status={self.status})>"
+
+
+class QAEvalResult(Base):
+    """Per-sample results for a QA evaluation run."""
+
+    __tablename__ = "qa_eval_results"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        nullable=False
+    )
+
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("qa_eval_runs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    sample_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("qa_samples.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
+
+    answer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sources_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metrics_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return f"<QAEvalResult(id={self.id}, run_id={self.run_id})>"

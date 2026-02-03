@@ -4,7 +4,17 @@
 from app.models.database import Base
 
 # Import all models so Alembic can detect them
-from app.models.database import KnowledgeBase, Document, DocumentStructure, Conversation, ChatMessage, AppSettings
+from app.models.database import (
+    KnowledgeBase,
+    Document,
+    DocumentStructure,
+    Conversation,
+    ChatMessage,
+    AppSettings,
+    QASample,
+    QAEvalRun,
+    QAEvalResult,
+)
 
 __all__ = [
     "Base",
@@ -14,4 +24,7 @@ __all__ = [
     "Conversation",
     "ChatMessage",
     "AppSettings",
+    "QASample",
+    "QAEvalRun",
+    "QAEvalResult",
 ]

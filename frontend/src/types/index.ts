@@ -117,6 +117,64 @@ export interface MeResponse {
   role: string
 }
 
+// QA Auto-Tuning Types
+export interface QASampleUploadResponse {
+  knowledge_base_id: string
+  added_count: number
+  replaced: boolean
+}
+
+export interface QAEvalRunConfig {
+  top_k?: number
+  retrieval_mode?: 'dense' | 'hybrid'
+  lexical_top_k?: number
+  hybrid_dense_weight?: number
+  hybrid_lexical_weight?: number
+  bm25_match_mode?: string | null
+  bm25_min_should_match?: number | null
+  bm25_use_phrase?: boolean | null
+  bm25_analyzer?: string | null
+  max_context_chars?: number | null
+  score_threshold?: number | null
+  llm_model?: string | null
+  llm_provider?: string | null
+  use_mmr?: boolean
+  mmr_diversity?: number
+  sample_limit?: number | null
+}
+
+export interface QAEvalRun {
+  id: string
+  knowledge_base_id: string
+  mode: string
+  status: string
+  config?: Record<string, unknown> | null
+  metrics?: Record<string, unknown> | null
+  sample_count: number
+  error_message?: string | null
+  created_at: string
+  started_at?: string | null
+  completed_at?: string | null
+}
+
+export interface QAEvalResult {
+  id: string
+  sample_id?: string | null
+  question: string
+  expected_answer: string
+  answer?: string | null
+  document_id?: string | null
+  chunk_index?: number | null
+  source_span?: string | null
+  metrics?: Record<string, unknown> | null
+  created_at: string
+}
+
+export interface QAEvalRunDetail {
+  run: QAEvalRun
+  results: QAEvalResult[]
+}
+
 // Chat Types
 export interface ChatMessage {
   role: 'user' | 'assistant'

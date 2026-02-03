@@ -7,7 +7,7 @@ import { useDocumentPolling } from '../hooks/useDocumentPolling'
 import { FileUpload } from '../components/documents/FileUpload'
 import { DocumentItem } from '../components/documents/DocumentItem'
 import { LLMSelector } from '../components/chat/LLMSelector'
-import type { KnowledgeBase, AppSettings } from '../types/index'
+import type { KnowledgeBase, AppSettings, QAEvalRun, QAEvalRunDetail } from '../types/index'
 
 export function KBDetailsPage() {
   const { id } = useParams<{ id: string }>()
@@ -88,6 +88,19 @@ export function KBDetailsPage() {
   const [bulkSkipAnalyzed, setBulkSkipAnalyzed] = useState(true)
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 })
   const [bulkError, setBulkError] = useState<string | null>(null)
+  const [qaRuns, setQaRuns] = useState<QAEvalRun[]>([])
+  const [qaRunsLoading, setQaRunsLoading] = useState(false)
+  const [qaRunsError, setQaRunsError] = useState<string | null>(null)
+  const [qaFile, setQaFile] = useState<File | null>(null)
+  const [qaUploadMessage, setQaUploadMessage] = useState<string | null>(null)
+  const [qaUploading, setQaUploading] = useState(false)
+  const [qaRunConfig, setQaRunConfig] = useState({
+    top_k: 5,
+    retrieval_mode: 'dense' as 'dense' | 'hybrid',
+  })
+  const [qaRunning, setQaRunning] = useState(false)
+  const [qaRunError, setQaRunError] = useState<string | null>(null)
+  const [qaSelectedRun, setQaSelectedRun] = useState<QAEvalRunDetail | null>(null)
 
   const buildSettingsData = (kbData: KnowledgeBase, defaults?: AppSettings | null) => {
     const bm25Override = kbData.bm25_match_mode !== null
@@ -146,6 +159,24 @@ export function KBDetailsPage() {
   }, [id])
 
   useEffect(() => {
+    const loadRuns = async () => {
+      if (!id) return
+      setQaRunsLoading(true)
+      setQaRunsError(null)
+      try {
+        const runs = await apiClient.listAutoTuneRuns(id)
+        setQaRuns(runs)
+      } catch (err) {
+        setQaRunsError(err instanceof Error ? err.message : 'Failed to load auto-tuning runs')
+      } finally {
+        setQaRunsLoading(false)
+      }
+    }
+
+    loadRuns()
+  }, [id])
+
+  useEffect(() => {
     const loadAppDefaults = async () => {
       try {
         const data = await apiClient.getAppSettings()
@@ -157,6 +188,53 @@ export function KBDetailsPage() {
 
     loadAppDefaults()
   }, [])
+
+  const handleUploadQaFile = async () => {
+    if (!id || !qaFile) return
+    setQaUploading(true)
+    setQaUploadMessage(null)
+    setQaRunsError(null)
+    try {
+      const result = await apiClient.uploadGoldQA(id, qaFile, true)
+      setQaUploadMessage(`Uploaded ${result.added_count} questions`)
+      const runs = await apiClient.listAutoTuneRuns(id)
+      setQaRuns(runs)
+    } catch (err) {
+      setQaUploadMessage(err instanceof Error ? err.message : 'Failed to upload QA file')
+    } finally {
+      setQaUploading(false)
+    }
+  }
+
+  const handleRunGoldEval = async () => {
+    if (!id) return
+    setQaRunning(true)
+    setQaRunError(null)
+    try {
+      const run = await apiClient.runGoldEval(id, {
+        top_k: qaRunConfig.top_k,
+        retrieval_mode: qaRunConfig.retrieval_mode,
+      })
+      const runs = await apiClient.listAutoTuneRuns(id)
+      setQaRuns(runs)
+      const detail = await apiClient.getAutoTuneRun(id, run.id)
+      setQaSelectedRun(detail)
+    } catch (err) {
+      setQaRunError(err instanceof Error ? err.message : 'Failed to run evaluation')
+    } finally {
+      setQaRunning(false)
+    }
+  }
+
+  const handleSelectRun = async (runId: string) => {
+    if (!id) return
+    try {
+      const detail = await apiClient.getAutoTuneRun(id, runId)
+      setQaSelectedRun(detail)
+    } catch (err) {
+      setQaRunsError(err instanceof Error ? err.message : 'Failed to load run details')
+    }
+  }
 
   useEffect(() => {
     if (!kb || isEditingSettings) return
@@ -613,6 +691,162 @@ export function KBDetailsPage() {
                   onAnalyze={analyzeDocument}
                 />
               ))}
+            </div>
+          )}
+        </div>
+
+        {/* Auto-Tuning (Gold QA) */}
+        <div className="card mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold text-white">Auto-tuning (Gold QA)</h3>
+              <p className="text-xs text-gray-400 mt-1">
+                Upload a QA file and run evaluation to see baseline metrics for this KB.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-4 text-sm">
+            <div>
+              <label className="block text-gray-400 mb-2">Upload QA file (CSV or JSON)</label>
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                <input
+                  type="file"
+                  accept=".csv,.json"
+                  onChange={(e) => setQaFile(e.target.files?.[0] || null)}
+                  className="text-xs text-gray-300"
+                />
+                <button
+                  onClick={handleUploadQaFile}
+                  disabled={!qaFile || qaUploading}
+                  className="btn-secondary text-xs px-3 py-1.5 disabled:opacity-60"
+                >
+                  {qaUploading ? 'Uploading…' : 'Upload'}
+                </button>
+              </div>
+              {qaUploadMessage && (
+                <div className="mt-2 text-xs text-gray-400">{qaUploadMessage}</div>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+              <div>
+                <label className="block text-gray-400 mb-2">Top K</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={qaRunConfig.top_k}
+                  onChange={(e) => setQaRunConfig({
+                    ...qaRunConfig,
+                    top_k: Math.max(1, Math.min(50, Number(e.target.value) || 1)),
+                  })}
+                  className="w-28 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-gray-400 mb-2">Retrieval mode</label>
+                <select
+                  value={qaRunConfig.retrieval_mode}
+                  onChange={(e) => setQaRunConfig({
+                    ...qaRunConfig,
+                    retrieval_mode: e.target.value as 'dense' | 'hybrid',
+                  })}
+                  className="bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm"
+                >
+                  <option value="dense">Dense</option>
+                  <option value="hybrid">Hybrid</option>
+                </select>
+              </div>
+              <div>
+                <button
+                  onClick={handleRunGoldEval}
+                  disabled={qaRunning}
+                  className="btn-primary text-xs px-3 py-1.5 disabled:opacity-60"
+                >
+                  {qaRunning ? 'Running…' : 'Run Evaluation'}
+                </button>
+              </div>
+            </div>
+
+            {qaRunError && (
+              <div className="text-xs text-red-400">{qaRunError}</div>
+            )}
+          </div>
+
+          <div className="mt-6">
+            <h4 className="text-sm font-semibold text-gray-200 mb-2">Runs</h4>
+            {qaRunsError && <div className="text-xs text-red-400 mb-2">{qaRunsError}</div>}
+            {qaRunsLoading ? (
+              <div className="text-xs text-gray-400">Loading runs…</div>
+            ) : qaRuns.length === 0 ? (
+              <div className="text-xs text-gray-500">No runs yet.</div>
+            ) : (
+              <div className="space-y-2">
+                {qaRuns.map((run) => {
+                  const metrics = run.metrics as Record<string, unknown> | null | undefined
+                  const exact = typeof metrics?.exact_match_avg === 'number'
+                    ? metrics.exact_match_avg.toFixed(3)
+                    : '—'
+                  const f1 = typeof metrics?.f1_avg === 'number'
+                    ? metrics.f1_avg.toFixed(3)
+                    : '—'
+                  const recall = typeof metrics?.recall_avg === 'number'
+                    ? (metrics.recall_avg as number).toFixed(3)
+                    : '—'
+                  return (
+                    <div
+                      key={run.id}
+                      className="flex items-center justify-between bg-gray-900/60 border border-gray-800 rounded px-3 py-2 text-xs"
+                    >
+                      <div className="text-gray-300">
+                        <div className="font-medium">
+                          {run.mode} • {run.status}
+                        </div>
+                        <div className="text-gray-500">
+                          EM {exact} • F1 {f1} • Recall {recall} • {run.sample_count} samples
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleSelectRun(run.id)}
+                        className="btn-secondary text-[11px] px-2 py-1"
+                      >
+                        View
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {qaSelectedRun && (
+            <div className="mt-6">
+              <h4 className="text-sm font-semibold text-gray-200 mb-3">
+                Run Details
+              </h4>
+              <div className="space-y-3 max-h-[420px] overflow-y-auto pr-2">
+                {qaSelectedRun.results.map((result) => (
+                  <details key={result.id} className="bg-gray-900/70 border border-gray-800 rounded px-3 py-2">
+                    <summary className="cursor-pointer text-xs text-gray-200">
+                      {result.question}
+                    </summary>
+                    <div className="mt-2 text-xs text-gray-400 space-y-2">
+                      <div>
+                        <span className="text-gray-500">Expected:</span>{' '}
+                        <span className="text-gray-200">{result.expected_answer}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Answer:</span>{' '}
+                        <span className="text-gray-200">{result.answer || '—'}</span>
+                      </div>
+                      <div className="text-gray-500">
+                        Metrics: {result.metrics ? JSON.stringify(result.metrics) : '—'}
+                      </div>
+                    </div>
+                  </details>
+                ))}
+              </div>
             </div>
           )}
         </div>

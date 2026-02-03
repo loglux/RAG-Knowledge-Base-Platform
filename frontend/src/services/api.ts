@@ -21,6 +21,10 @@ import type {
   LoginRequest,
   TokenResponse,
   MeResponse,
+  QASampleUploadResponse,
+  QAEvalRun,
+  QAEvalRunConfig,
+  QAEvalRunDetail,
 } from '../types/index'
 
 const ACCESS_TOKEN_KEY = 'kb_access_token'
@@ -177,6 +181,42 @@ class APIClient {
 
   async reprocessKnowledgeBase(id: string): Promise<{ queued: number; knowledge_base_id: string }> {
     const response = await this.client.post<{ queued: number; knowledge_base_id: string }>(`/knowledge-bases/${id}/reprocess`)
+    return response.data
+  }
+
+  // QA Auto-Tuning (Gold)
+  async uploadGoldQA(
+    kbId: string,
+    file: File,
+    replaceExisting = true
+  ): Promise<QASampleUploadResponse> {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await this.client.post<QASampleUploadResponse>(
+      `/knowledge-bases/${kbId}/auto-tune/gold/upload`,
+      formData,
+      {
+        params: { replace_existing: replaceExisting },
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }
+    )
+    return response.data
+  }
+
+  async runGoldEval(kbId: string, payload: QAEvalRunConfig): Promise<QAEvalRun> {
+    const response = await this.client.post<QAEvalRun>(`/knowledge-bases/${kbId}/auto-tune/gold/run`, payload)
+    return response.data
+  }
+
+  async listAutoTuneRuns(kbId: string, limit = 20): Promise<QAEvalRun[]> {
+    const response = await this.client.get<QAEvalRun[]>(`/knowledge-bases/${kbId}/auto-tune/runs`, {
+      params: { limit },
+    })
+    return response.data
+  }
+
+  async getAutoTuneRun(kbId: string, runId: string): Promise<QAEvalRunDetail> {
+    const response = await this.client.get<QAEvalRunDetail>(`/knowledge-bases/${kbId}/auto-tune/runs/${runId}`)
     return response.data
   }
 
