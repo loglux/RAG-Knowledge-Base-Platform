@@ -151,6 +151,7 @@ logs/
 *.db
 docs/
 !docs/PRODUCTION_DEPLOYMENT.md
+!docs/GRAPH_PLAN.md
 examples/
 scripts/
 !scripts/backup.sh
