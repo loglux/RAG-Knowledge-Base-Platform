@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { apiClient } from '../services/api'
 import { LLMSelector } from '../components/chat/LLMSelector'
 import type { AppSettings } from '../types/index'
-import './SettingsPage.css'
 
 type TabType = 'query' | 'kb-defaults' | 'ai-providers' | 'databases'
 
@@ -276,11 +275,11 @@ export function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="settings-page">
-        <div className="settings-header">
-          <h1>Settings</h1>
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="mb-8 pb-4 border-b border-gray-700">
+          <h1 className="text-3xl font-bold text-white">Settings</h1>
         </div>
-        <div style={{ textAlign: 'center', padding: '3rem', color: '#666' }}>
+        <div className="text-center py-12 text-gray-400">
           Loading settings...
         </div>
       </div>
@@ -288,55 +287,79 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="settings-page">
-      <div className="settings-header">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-          <h1 style={{ margin: 0 }}>Settings</h1>
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      {/* Header */}
+      <div className="mb-8 pb-4 border-b border-gray-700">
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="text-3xl font-bold text-white">Settings</h1>
           <button
-            className="btn btn-secondary"
             onClick={() => navigate('/')}
-            style={{ fontSize: '0.9rem' }}
+            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm"
           >
             ← Back to Dashboard
           </button>
         </div>
-        <p style={{ margin: 0 }}>Configure system settings and defaults</p>
+        <p className="text-gray-400">Configure system settings and defaults</p>
       </div>
 
       {/* Tab Navigation */}
-      <div className="tabs-navigation">
+      <div className="flex gap-2 border-b border-gray-700 mb-6 overflow-x-auto">
         <button
-          className={`tab-button ${activeTab === 'query' ? 'active' : ''}`}
           onClick={() => setActiveTab('query')}
+          className={`px-6 py-3 font-medium whitespace-nowrap border-b-2 transition-colors ${
+            activeTab === 'query'
+              ? 'border-primary-500 text-primary-500'
+              : 'border-transparent text-gray-400 hover:text-gray-300'
+          }`}
         >
           Query Defaults
         </button>
         <button
-          className={`tab-button ${activeTab === 'kb-defaults' ? 'active' : ''}`}
           onClick={() => setActiveTab('kb-defaults')}
+          className={`px-6 py-3 font-medium whitespace-nowrap border-b-2 transition-colors ${
+            activeTab === 'kb-defaults'
+              ? 'border-primary-500 text-primary-500'
+              : 'border-transparent text-gray-400 hover:text-gray-300'
+          }`}
         >
           KB Defaults
         </button>
         <button
-          className={`tab-button ${activeTab === 'ai-providers' ? 'active' : ''}`}
           onClick={() => setActiveTab('ai-providers')}
+          className={`px-6 py-3 font-medium whitespace-nowrap border-b-2 transition-colors ${
+            activeTab === 'ai-providers'
+              ? 'border-primary-500 text-primary-500'
+              : 'border-transparent text-gray-400 hover:text-gray-300'
+          }`}
         >
           AI Providers
         </button>
         <button
-          className={`tab-button ${activeTab === 'databases' ? 'active' : ''}`}
           onClick={() => setActiveTab('databases')}
+          className={`px-6 py-3 font-medium whitespace-nowrap border-b-2 transition-colors ${
+            activeTab === 'databases'
+              ? 'border-primary-500 text-primary-500'
+              : 'border-transparent text-gray-400 hover:text-gray-300'
+          }`}
         >
           Databases
         </button>
       </div>
 
       {/* Alerts */}
-      {error && <div className="alert alert-error">{error}</div>}
-      {success && <div className="alert alert-success">{success}</div>}
+      {error && (
+        <div className="mb-6 p-4 bg-red-500/10 border border-red-500 rounded-lg text-red-200">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="mb-6 p-4 bg-green-500/10 border border-green-500 rounded-lg text-green-200">
+          {success}
+        </div>
+      )}
 
       {/* Tab Content */}
-      <div className="tab-content">
+      <div>
         {activeTab === 'query' && (
           <QueryDefaultsTab
             llmModel={llmModel}
@@ -469,17 +492,19 @@ function QueryDefaultsTab(props: any) {
   } = props
 
   return (
-    <div className="settings-section">
-      <h2>Query Defaults</h2>
-      <p className="settings-section-description">
-        Default settings for chat queries and RAG retrieval
-      </p>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-white mb-2">Query Defaults</h2>
+        <p className="text-gray-400">
+          Default settings for chat queries and RAG retrieval
+        </p>
+      </div>
 
       {/* LLM Model */}
-      <div className="settings-group">
-        <h3>LLM Model</h3>
-        <div className="form-group">
-          <label>Model & Provider</label>
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-100 mb-4">LLM Model</h3>
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-300 mb-2">Model & Provider</label>
           <LLMSelector
             value={llmModel}
             provider={llmProvider}
@@ -492,101 +517,107 @@ function QueryDefaultsTab(props: any) {
       </div>
 
       {/* RAG Parameters */}
-      <div className="settings-group">
-        <h3>RAG Parameters</h3>
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-100 mb-4">RAG Parameters</h3>
 
-        <div className="form-group">
-          <label>Temperature: {temperature.toFixed(2)}</label>
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Temperature: {temperature.toFixed(2)}
+          </label>
           <input
             type="range"
-            className="form-control"
+            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
             min="0"
             max="2"
             step="0.1"
             value={temperature}
             onChange={(e) => setTemperature(parseFloat(e.target.value))}
           />
-          <small className="form-text">Controls randomness (0 = focused, 2 = creative)</small>
+          <p className="text-xs text-gray-400 mt-1">Controls randomness (0 = focused, 2 = creative)</p>
         </div>
 
-        <div className="form-group">
-          <label>Top K Results</label>
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">Top K Results</label>
           <input
             type="number"
-            className="form-control"
+            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             value={topK}
             onChange={(e) => setTopK(parseInt(e.target.value))}
             min="1"
             max="20"
           />
-          <small className="form-text">Number of chunks to retrieve</small>
+          <p className="text-xs text-gray-400 mt-1">Number of chunks to retrieve</p>
         </div>
 
-        <div className="form-group">
-          <label>Score Threshold: {scoreThreshold.toFixed(2)}</label>
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Score Threshold: {scoreThreshold.toFixed(2)}
+          </label>
           <input
             type="range"
-            className="form-control"
+            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
             min="0"
             max="1"
             step="0.05"
             value={scoreThreshold}
             onChange={(e) => setScoreThreshold(parseFloat(e.target.value))}
           />
-          <small className="form-text">Minimum relevance score (0 = no filter)</small>
+          <p className="text-xs text-gray-400 mt-1">Minimum relevance score (0 = no filter)</p>
         </div>
 
-        <div className="form-group">
-          <label>Max Context Characters</label>
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">Max Context Characters</label>
           <input
             type="number"
-            className="form-control"
+            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             value={maxContextChars}
             onChange={(e) => setMaxContextChars(parseInt(e.target.value))}
             min="0"
           />
-          <small className="form-text">Max total context length (0 = unlimited)</small>
+          <p className="text-xs text-gray-400 mt-1">Max total context length (0 = unlimited)</p>
         </div>
       </div>
 
       {/* Retrieval Mode */}
       {opensearchAvailable && (
-        <div className="settings-group">
-          <h3>Retrieval Mode</h3>
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-100 mb-4">Retrieval Mode</h3>
 
-          <div className="form-group">
-            <label>Mode</label>
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-300 mb-2">Mode</label>
             <select
-              className="form-control"
+              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
               value={retrievalMode}
               onChange={(e) => setRetrievalMode(e.target.value as 'dense' | 'hybrid')}
             >
               <option value="dense">Dense (Vector Only)</option>
               <option value="hybrid">Hybrid (Vector + BM25)</option>
             </select>
-            <small className="form-text">Dense for semantic, Hybrid for keyword + semantic</small>
+            <p className="text-xs text-gray-400 mt-1">Dense for semantic, Hybrid for keyword + semantic</p>
           </div>
 
           {retrievalMode === 'hybrid' && (
             <>
-              <div className="form-group">
-                <label>Lexical Top K</label>
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-300 mb-2">Lexical Top K</label>
                 <input
                   type="number"
-                  className="form-control"
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                   value={lexicalTopK}
                   onChange={(e) => setLexicalTopK(parseInt(e.target.value))}
                   min="1"
                   max="100"
                 />
-                <small className="form-text">Number of BM25 candidates before reranking</small>
+                <p className="text-xs text-gray-400 mt-1">Number of BM25 candidates before reranking</p>
               </div>
 
-              <div className="form-group">
-                <label>Dense Weight: {hybridDenseWeight.toFixed(2)}</label>
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Dense Weight: {hybridDenseWeight.toFixed(2)}
+                </label>
                 <input
                   type="range"
-                  className="form-control"
+                  className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
                   min="0"
                   max="1"
                   step="0.1"
@@ -595,11 +626,13 @@ function QueryDefaultsTab(props: any) {
                 />
               </div>
 
-              <div className="form-group">
-                <label>Lexical Weight: {hybridLexicalWeight.toFixed(2)}</label>
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Lexical Weight: {hybridLexicalWeight.toFixed(2)}
+                </label>
                 <input
                   type="range"
-                  className="form-control"
+                  className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
                   min="0"
                   max="1"
                   step="0.1"
@@ -609,10 +642,10 @@ function QueryDefaultsTab(props: any) {
               </div>
 
               {/* BM25 Settings */}
-              <div className="form-group">
-                <label>BM25 Match Mode</label>
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-300 mb-2">BM25 Match Mode</label>
                 <select
-                  className="form-control"
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                   value={bm25MatchMode}
                   onChange={(e) => setBm25MatchMode(e.target.value)}
                 >
@@ -622,11 +655,13 @@ function QueryDefaultsTab(props: any) {
                 </select>
               </div>
 
-              <div className="form-group">
-                <label>BM25 Min Should Match: {bm25MinShouldMatch}%</label>
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  BM25 Min Should Match: {bm25MinShouldMatch}%
+                </label>
                 <input
                   type="range"
-                  className="form-control"
+                  className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-primary-500"
                   min="0"
                   max="100"
                   step="5"
@@ -635,22 +670,23 @@ function QueryDefaultsTab(props: any) {
                 />
               </div>
 
-              <div className="form-group">
-                <label>
+              <div className="mb-6">
+                <label className="flex items-center text-sm font-medium text-gray-300">
                   <input
                     type="checkbox"
+                    className="mr-2 w-4 h-4 text-primary-500 bg-gray-700 border-gray-600 rounded focus:ring-primary-500"
                     checked={bm25UsePhrase}
                     onChange={(e) => setBm25UsePhrase(e.target.checked)}
                   />
-                  {' '}Use Phrase Matching
+                  Use Phrase Matching
                 </label>
-                <small className="form-text">Boost exact phrase matches</small>
+                <p className="text-xs text-gray-400 mt-1">Boost exact phrase matches</p>
               </div>
 
-              <div className="form-group">
-                <label>BM25 Analyzer</label>
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-300 mb-2">BM25 Analyzer</label>
                 <select
-                  className="form-control"
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                   value={bm25Analyzer}
                   onChange={(e) => setBm25Analyzer(e.target.value)}
                 >
@@ -666,40 +702,41 @@ function QueryDefaultsTab(props: any) {
       )}
 
       {/* Structure Analysis */}
-      <div className="settings-group">
-        <h3>Structure Analysis</h3>
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-100 mb-4">Structure Analysis</h3>
 
-        <div className="form-group">
-          <label>
+        <div className="mb-6">
+          <label className="flex items-center text-sm font-medium text-gray-300">
             <input
               type="checkbox"
+              className="mr-2 w-4 h-4 text-primary-500 bg-gray-700 border-gray-600 rounded focus:ring-primary-500"
               checked={useStructure}
               onChange={(e) => setUseStructure(e.target.checked)}
             />
-            {' '}Enable Structure-Aware Retrieval
+            Enable Structure-Aware Retrieval
           </label>
-          <small className="form-text">Use LLM to identify document structure before retrieval</small>
+          <p className="text-xs text-gray-400 mt-1">Use LLM to identify document structure before retrieval</p>
         </div>
 
         {useStructure && (
-          <div className="form-group">
-            <label>Requests Per Minute</label>
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-300 mb-2">Requests Per Minute</label>
             <input
               type="number"
-              className="form-control"
+              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
               value={structureRequestsPerMinute}
               onChange={(e) => setStructureRequestsPerMinute(parseInt(e.target.value))}
               min="0"
               max="100"
             />
-            <small className="form-text">Rate limit for structure analysis (0 = unlimited)</small>
+            <p className="text-xs text-gray-400 mt-1">Rate limit for structure analysis (0 = unlimited)</p>
           </div>
         )}
       </div>
 
-      <div className="settings-actions">
+      <div className="flex justify-end">
         <button
-          className="btn btn-primary"
+          className="btn-primary"
           onClick={onSave}
           disabled={saving}
         >
@@ -719,54 +756,58 @@ function KBDefaultsTab(props: any) {
   } = props
 
   return (
-    <div className="settings-section">
-      <h2>Knowledge Base Defaults</h2>
-      <p className="settings-section-description">
-        Default settings for new knowledge bases
-      </p>
-
-      <div className="form-group">
-        <label>Default Chunk Size</label>
-        <input
-          type="number"
-          className="form-control"
-          value={kbChunkSize}
-          onChange={(e) => setKbChunkSize(parseInt(e.target.value))}
-          min="100"
-          max="4000"
-        />
-        <small className="form-text">Characters per chunk (recommended: 1000-1500)</small>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-white mb-2">Knowledge Base Defaults</h2>
+        <p className="text-gray-400">
+          Default settings for new knowledge bases
+        </p>
       </div>
 
-      <div className="form-group">
-        <label>Default Chunk Overlap</label>
-        <input
-          type="number"
-          className="form-control"
-          value={kbChunkOverlap}
-          onChange={(e) => setKbChunkOverlap(parseInt(e.target.value))}
-          min="0"
-          max="500"
-        />
-        <small className="form-text">Overlapping characters (recommended: 15-20% of chunk size)</small>
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">Default Chunk Size</label>
+          <input
+            type="number"
+            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            value={kbChunkSize}
+            onChange={(e) => setKbChunkSize(parseInt(e.target.value))}
+            min="100"
+            max="4000"
+          />
+          <p className="text-xs text-gray-400 mt-1">Characters per chunk (recommended: 1000-1500)</p>
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">Default Chunk Overlap</label>
+          <input
+            type="number"
+            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            value={kbChunkOverlap}
+            onChange={(e) => setKbChunkOverlap(parseInt(e.target.value))}
+            min="0"
+            max="500"
+          />
+          <p className="text-xs text-gray-400 mt-1">Overlapping characters (recommended: 15-20% of chunk size)</p>
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">Upsert Batch Size</label>
+          <input
+            type="number"
+            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            value={kbUpsertBatchSize}
+            onChange={(e) => setKbUpsertBatchSize(parseInt(e.target.value))}
+            min="64"
+            max="1024"
+          />
+          <p className="text-xs text-gray-400 mt-1">Vectors per batch for Qdrant upload (higher = faster but more memory)</p>
+        </div>
       </div>
 
-      <div className="form-group">
-        <label>Upsert Batch Size</label>
-        <input
-          type="number"
-          className="form-control"
-          value={kbUpsertBatchSize}
-          onChange={(e) => setKbUpsertBatchSize(parseInt(e.target.value))}
-          min="64"
-          max="1024"
-        />
-        <small className="form-text">Vectors per batch for Qdrant upload (higher = faster but more memory)</small>
-      </div>
-
-      <div className="settings-actions">
+      <div className="flex justify-end">
         <button
-          className="btn btn-primary"
+          className="btn-primary"
           onClick={onSave}
           disabled={saving}
         >
@@ -789,134 +830,136 @@ function AIProvidersTab(props: any) {
   } = props
 
   return (
-    <div className="settings-section">
-      <h2>AI Providers</h2>
-      <p className="settings-section-description">
-        Configure API keys for cloud AI services or Ollama URL for local LLM
-      </p>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-white mb-2">AI Providers</h2>
+        <p className="text-gray-400">
+          Configure API keys for cloud AI services or Ollama URL for local LLM
+        </p>
+      </div>
 
-      <div className="alert alert-info">
+      <div className="p-4 bg-blue-500/10 border border-blue-500 rounded-lg text-blue-200">
         API keys are masked for security. To change a key, enter the new value and click Save.
       </div>
 
       {/* API Keys */}
-      <div className="settings-group">
-        <h3>Cloud AI Services</h3>
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-100 mb-4">Cloud AI Services</h3>
 
-        <div className="form-group">
-          <label>OpenAI API Key</label>
-          <div className="masked-input-group">
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">OpenAI API Key</label>
+          <div className="flex gap-2">
             <input
               type={showOpenaiKey ? 'text' : 'password'}
-              className="form-control"
+              className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
               placeholder="sk-proj-..."
               value={openaiApiKey}
               onChange={(e) => setOpenaiApiKey(e.target.value)}
             />
             <button
               type="button"
-              className="btn-toggle-mask"
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
               onClick={() => setShowOpenaiKey(!showOpenaiKey)}
             >
               {showOpenaiKey ? 'Hide' : 'Show'}
             </button>
           </div>
-          <small className="form-text">Used for embeddings and chat (GPT models)</small>
+          <p className="text-xs text-gray-400 mt-1">Used for embeddings and chat (GPT models)</p>
         </div>
 
-        <div className="form-group">
-          <label>VoyageAI API Key (Optional)</label>
-          <div className="masked-input-group">
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">VoyageAI API Key (Optional)</label>
+          <div className="flex gap-2">
             <input
               type={showVoyageKey ? 'text' : 'password'}
-              className="form-control"
+              className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
               placeholder="pa-..."
               value={voyageApiKey}
               onChange={(e) => setVoyageApiKey(e.target.value)}
             />
             <button
               type="button"
-              className="btn-toggle-mask"
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
               onClick={() => setShowVoyageKey(!showVoyageKey)}
             >
               {showVoyageKey ? 'Hide' : 'Show'}
             </button>
           </div>
-          <small className="form-text">Alternative embedding provider</small>
+          <p className="text-xs text-gray-400 mt-1">Alternative embedding provider</p>
         </div>
 
-        <div className="form-group">
-          <label>Anthropic API Key (Optional)</label>
-          <div className="masked-input-group">
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">Anthropic API Key (Optional)</label>
+          <div className="flex gap-2">
             <input
               type={showAnthropicKey ? 'text' : 'password'}
-              className="form-control"
+              className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
               placeholder="sk-ant-..."
               value={anthropicApiKey}
               onChange={(e) => setAnthropicApiKey(e.target.value)}
             />
             <button
               type="button"
-              className="btn-toggle-mask"
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
               onClick={() => setShowAnthropicKey(!showAnthropicKey)}
             >
               {showAnthropicKey ? 'Hide' : 'Show'}
             </button>
           </div>
-          <small className="form-text">Used for Claude models</small>
+          <p className="text-xs text-gray-400 mt-1">Used for Claude models</p>
         </div>
       </div>
 
       {/* Ollama */}
-      <div className="settings-group">
-        <h3>Local / Self-Hosted LLM</h3>
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-100 mb-4">Local / Self-Hosted LLM</h3>
 
-        <div className="form-group">
-          <label>Ollama API URL (Optional)</label>
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">Ollama API URL (Optional)</label>
           <input
             type="text"
-            className="form-control"
+            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             placeholder="http://localhost:11434 or https://your-cloud-ollama.com"
             value={ollamaBaseUrl}
             onChange={(e) => setOllamaBaseUrl(e.target.value)}
           />
-          <small className="form-text">Ollama server URL (local or cloud-hosted)</small>
+          <p className="text-xs text-gray-400 mt-1">Ollama server URL (local or cloud-hosted)</p>
         </div>
       </div>
 
       {/* System Settings */}
-      <div className="settings-group">
-        <h3>System Settings</h3>
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-100 mb-4">System Settings</h3>
 
-        <div className="form-group">
-          <label>System Name</label>
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">System Name</label>
           <input
             type="text"
-            className="form-control"
+            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             placeholder="Knowledge Base Platform"
             value={systemName}
             onChange={(e) => setSystemName(e.target.value)}
           />
-          <small className="form-text">Displayed in UI</small>
+          <p className="text-xs text-gray-400 mt-1">Displayed in UI</p>
         </div>
 
-        <div className="form-group">
-          <label>Max File Size (MB)</label>
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">Max File Size (MB)</label>
           <input
             type="number"
-            className="form-control"
+            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             value={maxFileSizeMb}
             onChange={(e) => setMaxFileSizeMb(parseInt(e.target.value))}
             min="1"
             max="500"
           />
-          <small className="form-text">Maximum upload file size</small>
+          <p className="text-xs text-gray-400 mt-1">Maximum upload file size</p>
         </div>
       </div>
 
-      <div className="settings-actions">
+      <div className="flex justify-end">
         <button
-          className="btn btn-primary"
+          className="btn-primary"
           onClick={onSave}
           disabled={saving}
         >
@@ -940,41 +983,45 @@ function DatabasesTab(props: any) {
   } = props
 
   return (
-    <div className="settings-section">
-      <h2>Database Connections</h2>
-      <p className="settings-section-description">
-        Configure connections to vector, lexical, and metadata databases
-      </p>
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-white mb-2">Database Connections</h2>
+        <p className="text-gray-400">
+          Configure connections to vector, lexical, and metadata databases
+        </p>
+      </div>
 
       {/* Qdrant */}
-      <div className="settings-group">
-        <h3>Qdrant (Vector Database)</h3>
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-100 mb-4">Qdrant (Vector Database)</h3>
 
-        <div className="form-group">
-          <label>Qdrant URL</label>
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">Qdrant URL</label>
           <input
             type="text"
-            className="form-control"
+            autoComplete="off"
+            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             placeholder="http://qdrant:6333"
             value={qdrantUrl}
             onChange={(e) => setQdrantUrl(e.target.value)}
           />
-          <small className="form-text">Qdrant HTTP API URL</small>
+          <p className="text-xs text-gray-400 mt-1">Qdrant HTTP API URL</p>
         </div>
 
-        <div className="form-group">
-          <label>Qdrant API Key (Optional)</label>
-          <div className="masked-input-group">
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">Qdrant API Key (Optional)</label>
+          <div className="flex gap-2">
             <input
               type={showQdrantKey ? 'text' : 'password'}
-              className="form-control"
+              autoComplete="off"
+              className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
               placeholder="Optional for local deployments"
               value={qdrantApiKey}
               onChange={(e) => setQdrantApiKey(e.target.value)}
             />
             <button
               type="button"
-              className="btn-toggle-mask"
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
               onClick={() => setShowQdrantKey(!showQdrantKey)}
             >
               {showQdrantKey ? 'Hide' : 'Show'}
@@ -984,45 +1031,48 @@ function DatabasesTab(props: any) {
       </div>
 
       {/* OpenSearch */}
-      <div className="settings-group">
-        <h3>OpenSearch (Lexical Search)</h3>
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-100 mb-4">OpenSearch (Lexical Search)</h3>
 
-        <div className="form-group">
-          <label>OpenSearch URL</label>
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">OpenSearch URL</label>
           <input
             type="text"
-            className="form-control"
+            autoComplete="off"
+            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             placeholder="http://opensearch:9200"
             value={opensearchUrl}
             onChange={(e) => setOpensearchUrl(e.target.value)}
           />
-          <small className="form-text">OpenSearch HTTP URL</small>
+          <p className="text-xs text-gray-400 mt-1">OpenSearch HTTP URL</p>
         </div>
 
-        <div className="form-group">
-          <label>Username (Optional)</label>
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">Username (Optional)</label>
           <input
             type="text"
-            className="form-control"
+            autoComplete="off"
+            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             placeholder="admin"
             value={opensearchUsername}
             onChange={(e) => setOpensearchUsername(e.target.value)}
           />
         </div>
 
-        <div className="form-group">
-          <label>Password (Optional)</label>
-          <div className="masked-input-group">
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">Password (Optional)</label>
+          <div className="flex gap-2">
             <input
               type={showOpensearchPassword ? 'text' : 'password'}
-              className="form-control"
+              autoComplete="new-password"
+              className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
               placeholder="••••••••"
               value={opensearchPassword}
               onChange={(e) => setOpensearchPassword(e.target.value)}
             />
             <button
               type="button"
-              className="btn-toggle-mask"
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
               onClick={() => setShowOpensearchPassword(!showOpensearchPassword)}
             >
               {showOpensearchPassword ? 'Hide' : 'Show'}
@@ -1031,9 +1081,9 @@ function DatabasesTab(props: any) {
         </div>
       </div>
 
-      <div className="settings-actions">
+      <div className="flex justify-end">
         <button
-          className="btn btn-primary"
+          className="btn-primary"
           onClick={onSave}
           disabled={saving}
         >
@@ -1042,39 +1092,41 @@ function DatabasesTab(props: any) {
       </div>
 
       {/* PostgreSQL Password Change */}
-      <div className="settings-group" style={{ marginTop: '3rem', paddingTop: '2rem', borderTop: '2px solid #e0e0e0' }}>
-        <h3>PostgreSQL Database Security</h3>
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 mt-12">
+        <h3 className="text-lg font-semibold text-gray-100 mb-4">PostgreSQL Database Security</h3>
 
-        <div className="alert alert-info">
+        <div className="p-4 bg-blue-500/10 border border-blue-500 rounded-lg text-blue-200 mb-6">
           Changing PostgreSQL password will recreate the connection pool automatically.
         </div>
 
-        <div className="form-group">
-          <label>Username</label>
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">Username</label>
           <input
             type="text"
-            className="form-control"
+            autoComplete="off"
+            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             value={postgresUsername}
             onChange={(e) => setPostgresUsername(e.target.value)}
           />
         </div>
 
-        <div className="form-group">
-          <label>New Password</label>
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">New Password</label>
           <input
             type="password"
-            className="form-control"
+            autoComplete="new-password"
+            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             placeholder="Enter new password (min 8 characters)"
             value={postgresNewPassword}
             onChange={(e) => setPostgresNewPassword(e.target.value)}
             minLength={8}
           />
-          <small className="form-text">Minimum 8 characters</small>
+          <p className="text-xs text-gray-400 mt-1">Minimum 8 characters</p>
         </div>
 
-        <div className="settings-actions">
+        <div className="flex justify-end">
           <button
-            className="btn btn-danger"
+            className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={onChangePostgresPassword}
             disabled={saving || !postgresNewPassword || postgresNewPassword.length < 8}
           >

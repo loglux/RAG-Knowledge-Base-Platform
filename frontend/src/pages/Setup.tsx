@@ -112,7 +112,14 @@ const Setup: React.FC = () => {
       await createAdminUser(adminData);
       setCurrentStep('db-security');
     } catch (err: any) {
-      setError(err.message || 'Failed to create admin user');
+      const errorMessage = err.message || 'Failed to create admin user';
+
+      // If admin already exists, just proceed to next step
+      if (errorMessage.toLowerCase().includes('already exists')) {
+        setCurrentStep('db-security');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -818,8 +825,19 @@ const Setup: React.FC = () => {
 
       <div className="setup-content">
         <div className="setup-header">
-          <h1>Knowledge Base Platform</h1>
-          <p className="setup-subtitle">Initial Setup Wizard</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div>
+              <h1>Knowledge Base Platform</h1>
+              <p className="setup-subtitle">Initial Setup Wizard</p>
+            </div>
+            <button
+              className="btn btn-secondary"
+              onClick={() => navigate('/')}
+              style={{ alignSelf: 'flex-start' }}
+            >
+              ← Exit Setup
+            </button>
+          </div>
         </div>
 
         {renderStep()}
