@@ -85,6 +85,7 @@ export function MessageBubble({ message, onDelete }: MessageBubbleProps) {
                 onClick={onDelete}
                 className="text-xs text-red-400 hover:text-red-300 transition-colors"
                 aria-label="Delete message"
+                title="Delete this Q&A pair"
               >
                 Delete
               </button>
