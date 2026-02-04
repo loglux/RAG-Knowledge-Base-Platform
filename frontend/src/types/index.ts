@@ -183,10 +183,12 @@ export interface QAEvalRunDetail {
 
 // Chat Types
 export interface ChatMessage {
+  id?: string
   role: 'user' | 'assistant'
   content: string
   sources?: SourceChunk[]
   timestamp: string
+  message_index?: number
   model?: string
   use_mmr?: boolean
   mmr_diversity?: number
@@ -240,6 +242,8 @@ export interface ChatResponse {
   model: string
   knowledge_base_id: string
   conversation_id?: string
+  user_message_id?: string
+  assistant_message_id?: string
   use_mmr?: boolean
   mmr_diversity?: number
   use_self_check?: boolean
@@ -290,6 +294,7 @@ export interface ChatMessageResponse {
   sources?: SourceChunk[]
   timestamp: string
   message_index: number
+  model?: string
   use_self_check?: boolean
 }
 

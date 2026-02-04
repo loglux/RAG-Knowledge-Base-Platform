@@ -81,7 +81,15 @@ export function ChatPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  const { messages, isLoading, error, sendMessage, clearMessages, conversationId } = useChat(id!)
+  const {
+    messages,
+    isLoading,
+    error,
+    sendMessage,
+    deleteMessagePair,
+    clearMessages,
+    conversationId,
+  } = useChat(id!)
 
   const handleLogout = async () => {
     await logout()
@@ -225,7 +233,7 @@ export function ChatPage() {
         const metadata = await apiClient.getSettingsMetadata()
         setBm25MatchModes(metadata.bm25_match_modes || null)
         setBm25Analyzers(metadata.bm25_analyzers || null)
-      } catch (err) {
+      } catch {
         setBm25MatchModes(null)
         setBm25Analyzers(null)
       }
@@ -239,7 +247,7 @@ export function ChatPage() {
       try {
         const info = await apiClient.getApiInfo()
         setOpensearchAvailable(info.integrations?.opensearch_available ?? null)
-      } catch (err) {
+      } catch {
         setOpensearchAvailable(null)
       }
     }
@@ -581,9 +589,26 @@ export function ChatPage() {
 
           {/* Messages */}
           <div className="space-y-6">
-            {messages.map((message, index) => (
-              <div key={index}>
-                <MessageBubble message={message} />
+            {messages.map((message, index) => {
+              const previous = messages[index - 1]
+              const canDeletePair = (
+                message.role === 'assistant' &&
+                previous?.role === 'user' &&
+                message.id &&
+                previous.id
+              )
+              const handleDelete = canDeletePair
+                ? () => {
+                    if (!message.id) return
+                    const ok = window.confirm('Delete this Q&A pair from the chat history?')
+                    if (ok) {
+                      deleteMessagePair(message.id, true)
+                    }
+                  }
+                : undefined
+              return (
+                <div key={message.id ?? index}>
+                  <MessageBubble message={message} onDelete={handleDelete} />
                 {message.sources && message.sources.length > 0 && (
                   <details className="mt-4 space-y-2">
                     <summary className="text-xs text-gray-500 font-medium cursor-pointer select-none sources-summary">
@@ -602,8 +627,9 @@ export function ChatPage() {
                     </div>
                   </details>
                 )}
-              </div>
-            ))}
+                </div>
+              )
+            })}
           </div>
 
           {/* Loading Indicator */}

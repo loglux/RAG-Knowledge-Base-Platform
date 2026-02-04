@@ -3,8 +3,6 @@ import { apiClient } from '../services/api'
 import type { ChatMessage, ChatRequest } from '../types/index'
 
 const CONVERSATION_KEY_PREFIX = 'chat_conversation_'
-const SETTINGS_DRAFT_KEY_PREFIX = 'chat_settings_draft_'
-
 export function useChat(kbId: string) {
   const conversationKey = `${CONVERSATION_KEY_PREFIX}${kbId}`
 
@@ -28,10 +26,12 @@ export function useChat(kbId: string) {
           const history = await apiClient.getConversationMessages(conversationId)
           if (!isMounted) return
           setMessages(history.map(msg => ({
+            id: msg.id,
             role: msg.role,
             content: msg.content,
             sources: msg.sources,
             timestamp: msg.timestamp,
+            message_index: msg.message_index,
             model: msg.model,
             use_self_check: msg.use_self_check,
           })))
@@ -56,10 +56,12 @@ export function useChat(kbId: string) {
         const history = await apiClient.getConversationMessages(latest.id)
         if (!isMounted) return
         setMessages(history.map(msg => ({
+          id: msg.id,
           role: msg.role,
           content: msg.content,
           sources: msg.sources,
           timestamp: msg.timestamp,
+          message_index: msg.message_index,
           model: msg.model,
           use_self_check: msg.use_self_check,
         })))
@@ -156,6 +158,7 @@ export function useChat(kbId: string) {
         }
 
         const assistantMessage: ChatMessage = {
+          id: response.assistant_message_id,
           role: 'assistant',
           content: response.answer,
           sources: response.sources,
@@ -166,7 +169,19 @@ export function useChat(kbId: string) {
           use_self_check: response.use_self_check,
         }
 
-        setMessages((prev) => [...prev, assistantMessage])
+        setMessages((prev) => {
+          const next = [...prev]
+          if (response.user_message_id) {
+            for (let i = next.length - 1; i >= 0; i -= 1) {
+              if (next[i].role === 'user' && !next[i].id) {
+                next[i] = { ...next[i], id: response.user_message_id }
+                break
+              }
+            }
+          }
+          next.push(assistantMessage)
+          return next
+        })
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to send message'
         setError(errorMessage)
@@ -184,6 +199,17 @@ export function useChat(kbId: string) {
     },
     [kbId, conversationId, conversationKey]
   )
+
+  const deleteMessagePair = useCallback(async (messageId: string, pair = true) => {
+    if (!conversationId) return
+    try {
+      const response = await apiClient.deleteConversationMessage(conversationId, messageId, pair)
+      const deletedSet = new Set(response.deleted_ids)
+      setMessages((prev) => prev.filter((msg) => !msg.id || !deletedSet.has(msg.id)))
+    } catch (e) {
+      console.error('Failed to delete chat message:', e)
+    }
+  }, [conversationId])
 
   const clearMessages = useCallback(() => {
     setMessages([])
@@ -206,6 +232,7 @@ export function useChat(kbId: string) {
     isLoading,
     error,
     sendMessage,
+    deleteMessagePair,
     clearMessages,
     conversationId,
   }

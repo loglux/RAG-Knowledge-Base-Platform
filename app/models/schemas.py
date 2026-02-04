@@ -501,9 +501,18 @@ class ChatResponse(BaseModel):
     model: str = Field(..., description="Model used for generation")
     knowledge_base_id: UUID = Field(..., description="Knowledge base queried")
     conversation_id: Optional[UUID] = Field(default=None, description="Conversation ID for persistent chat")
+    user_message_id: Optional[UUID] = Field(default=None, description="Stored user message ID")
+    assistant_message_id: Optional[UUID] = Field(default=None, description="Stored assistant message ID")
     use_mmr: Optional[bool] = Field(default=None, description="Whether MMR was used")
     mmr_diversity: Optional[float] = Field(default=None, description="MMR diversity parameter (0.0-1.0)")
     use_self_check: Optional[bool] = Field(default=None, description="Whether self-check was applied")
+
+
+class ChatDeleteResponse(BaseModel):
+    """Schema for chat message deletion response."""
+
+    status: str = Field(..., description="Deletion status")
+    deleted_ids: List[UUID] = Field(default_factory=list, description="Deleted message IDs")
 
 
 # ============================================================================

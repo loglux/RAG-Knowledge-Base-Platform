@@ -333,6 +333,18 @@ class APIClient {
     return response.data
   }
 
+  async deleteConversationMessage(
+    conversationId: string,
+    messageId: string,
+    pair = true
+  ): Promise<{ status: string; deleted_ids: string[] }> {
+    const response = await this.client.delete(
+      `/chat/conversations/${conversationId}/messages/${messageId}`,
+      { params: { pair } }
+    )
+    return response.data
+  }
+
   // Embedding Models
   async getEmbeddingModels(): Promise<EmbeddingModel[]> {
     const response = await this.client.get<EmbeddingModel[]>('/embeddings/models')

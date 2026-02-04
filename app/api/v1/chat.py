@@ -6,7 +6,7 @@ from uuid import UUID
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 import httpx
 
@@ -21,6 +21,7 @@ from app.models.database import (
 from app.models.schemas import (
     ChatRequest,
     ChatResponse,
+    ChatDeleteResponse,
     SourceChunk,
     ConversationSummary,
     ChatMessageResponse,
@@ -284,12 +285,13 @@ async def chat_query(
         user_index = max_index + 1
         assistant_index = max_index + 2
 
-        db.add(ChatMessageModel(
+        user_message = ChatMessageModel(
             conversation_id=conversation.id,
             role="user",
             content=request.question,
             message_index=user_index,
-        ))
+        )
+        db.add(user_message)
 
         sources_payload = [
             {
@@ -303,7 +305,7 @@ async def chat_query(
             for chunk in rag_response.sources
         ]
 
-        db.add(ChatMessageModel(
+        assistant_message = ChatMessageModel(
             conversation_id=conversation.id,
             role="assistant",
             content=rag_response.answer,
@@ -311,7 +313,9 @@ async def chat_query(
             model=rag_response.model,
             use_self_check=request.use_self_check if request.use_self_check else None,
             message_index=assistant_index,
-        ))
+        )
+        db.add(assistant_message)
+        await db.flush()
         conversation.updated_at = datetime.utcnow()
 
         # 7. Convert to API response format
@@ -335,6 +339,8 @@ async def chat_query(
             model=rag_response.model,
             knowledge_base_id=request.knowledge_base_id,
             conversation_id=conversation.id,
+            user_message_id=user_message.id,
+            assistant_message_id=assistant_message.id,
             use_mmr=request.use_mmr if request.use_mmr else None,
             mmr_diversity=request.mmr_diversity if request.use_mmr else None,
             use_self_check=request.use_self_check if request.use_self_check else None,
@@ -548,6 +554,70 @@ async def get_conversation_messages(
         ))
 
     return response_messages
+
+
+@router.delete(
+    "/conversations/{conversation_id}/messages/{message_id}",
+    response_model=ChatDeleteResponse,
+)
+async def delete_conversation_message(
+    conversation_id: UUID,
+    message_id: UUID,
+    pair: bool = True,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """Delete a message (optionally with its paired question/answer)."""
+    convo_query = select(ConversationModel).where(
+        ConversationModel.id == conversation_id,
+        ConversationModel.is_deleted == False,
+    )
+    convo_result = await db.execute(convo_query)
+    conversation = convo_result.scalar_one_or_none()
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Conversation {conversation_id} not found"
+        )
+
+    msg_query = select(ChatMessageModel).where(
+        ChatMessageModel.id == message_id,
+        ChatMessageModel.conversation_id == conversation_id,
+    )
+    msg_result = await db.execute(msg_query)
+    target_message = msg_result.scalar_one_or_none()
+    if not target_message:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Message {message_id} not found"
+        )
+
+    deleted_ids = {target_message.id}
+    if pair:
+        adjacent_index = (
+            target_message.message_index + 1
+            if target_message.role == "user"
+            else target_message.message_index - 1
+        )
+        if adjacent_index > 0:
+            adjacent_query = select(ChatMessageModel).where(
+                ChatMessageModel.conversation_id == conversation_id,
+                ChatMessageModel.message_index == adjacent_index,
+            )
+            adjacent_result = await db.execute(adjacent_query)
+            adjacent_message = adjacent_result.scalar_one_or_none()
+            if adjacent_message:
+                deleted_ids.add(adjacent_message.id)
+
+    await db.execute(
+        delete(ChatMessageModel).where(ChatMessageModel.id.in_(deleted_ids))
+    )
+    conversation.updated_at = datetime.utcnow()
+
+    return ChatDeleteResponse(
+        status="deleted",
+        deleted_ids=list(deleted_ids),
+    )
 
 
 @router.delete("/conversations/{conversation_id}")

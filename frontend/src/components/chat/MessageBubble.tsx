@@ -7,9 +7,10 @@ import type { ChatMessage } from '../../types/index'
 
 interface MessageBubbleProps {
   message: ChatMessage
+  onDelete?: () => void
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, onDelete }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const timestamp = new Date(message.timestamp).toLocaleTimeString('en-US', {
     hour: '2-digit',
@@ -77,16 +78,28 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             )}
             <span className="text-xs opacity-50">{timestamp}</span>
           </div>
-          <button
-            type="button"
-            onClick={handleCopy}
-            className={`text-xs transition-colors ${
-              copied ? 'text-green-400' : 'text-gray-400 hover:text-gray-200'
-            }`}
-            aria-label="Copy message"
-          >
-            {copied ? 'Copied!' : 'Copy'}
-          </button>
+          <div className="flex items-center gap-2">
+            {onDelete && (
+              <button
+                type="button"
+                onClick={onDelete}
+                className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                aria-label="Delete message"
+              >
+                Delete
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleCopy}
+              className={`text-xs transition-colors ${
+                copied ? 'text-green-400' : 'text-gray-400 hover:text-gray-200'
+              }`}
+              aria-label="Copy message"
+            >
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
         </div>
         <div className="text-sm leading-relaxed prose prose-invert prose-sm max-w-none">
           {isUser ? (
@@ -101,8 +114,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                 [rehypeKatex, { strict: false, throwOnError: false }]
               ]}
               components={{
-                code: ({ node, inline, className, children, ...props }) => {
-                  const match = /language-(\w+)/.exec(className || '')
+                code: ({ inline, className, children, ...props }) => {
                   const childText = String(children).trim()
 
                   // Check if this is a single-line path/command (likely should be inline)
