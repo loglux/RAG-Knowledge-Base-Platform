@@ -37,6 +37,7 @@ It can be used as a standalone service or integrated into other products via its
 - Optional BM25 lexical index (OpenSearch) for hybrid retrieval
 - **Self-Check Validation** (optional): Two-stage answer generation with validation for improved accuracy
 - **Chat history controls**: delete individual Q/A pairs from a conversation
+- **BM25 phrase matching**: adds an exact `match_phrase` clause for strict wording
 - Structured document analysis and TOC metadata
 - RAG answers with citations
 - FastAPI backend + React frontend

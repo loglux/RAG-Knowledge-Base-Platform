@@ -765,7 +765,10 @@ function QueryDefaultsTab({
               </div>
 
               <div className="mb-6">
-                <label className="flex items-center text-sm font-medium text-gray-300">
+                <label
+                  className="flex items-center text-sm font-medium text-gray-300"
+                  title="Adds an exact match_phrase clause to BM25 (OpenSearch) queries."
+                >
                   <input
                     type="checkbox"
                     className="mr-2 w-4 h-4 text-primary-500 bg-gray-700 border-gray-600 rounded focus:ring-primary-500"
@@ -774,7 +777,9 @@ function QueryDefaultsTab({
                   />
                   Use Phrase Matching
                 </label>
-                <p className="text-xs text-gray-400 mt-1">Boost exact phrase matches</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  Adds an exact phrase (match_phrase) to BM25 for stricter wording.
+                </p>
               </div>
 
               <div className="mb-6">

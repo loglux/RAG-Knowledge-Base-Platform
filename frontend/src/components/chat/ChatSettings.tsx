@@ -528,7 +528,10 @@ export function ChatSettings({
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   Use phrase match
                 </label>
-                <label className="flex items-center gap-2 text-sm text-gray-300">
+                <label
+                  className="flex items-center gap-2 text-sm text-gray-300"
+                  title="Adds an exact match_phrase clause to BM25 (OpenSearch) queries."
+                >
                   <input
                     type="checkbox"
                     checked={safeBm25UsePhrase}
@@ -538,7 +541,7 @@ export function ChatSettings({
                   Include exact phrase matches
                 </label>
                 <p className="text-xs text-gray-500 mt-1">
-                  Helps when the wording matters, but can miss paraphrases
+                  Adds an exact phrase (match_phrase). Helps when wording matters, but can miss paraphrases.
                 </p>
               </div>
             </div>
