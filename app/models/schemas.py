@@ -333,6 +333,8 @@ class ConversationSettings(BaseModel):
     conversation_history_limit: Optional[int] = Field(default=None, ge=0, le=100)
     use_document_filter: Optional[bool] = Field(default=None)
     document_ids: Optional[List[UUID]] = Field(default=None)
+    context_expansion: Optional[List[str]] = Field(default=None)
+    context_window: Optional[int] = Field(default=None, ge=0, le=5)
 
 
 class AppSettingsBase(BaseModel):
@@ -510,6 +512,16 @@ class ChatRequest(BaseModel):
     document_ids: Optional[List[UUID]] = Field(
         default=None,
         description="Optional document ID allow-list for retrieval"
+    )
+    context_expansion: Optional[List[str]] = Field(
+        default=None,
+        description="Context expansion strategies (e.g., ['window'])"
+    )
+    context_window: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=5,
+        description="Window size (chunks on each side) for windowed retrieval"
     )
 
 

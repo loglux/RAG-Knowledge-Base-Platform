@@ -407,6 +407,68 @@ class QdrantVectorStore:
             logger.error(f"Search failed: {e}")
             raise VectorStoreException(f"Search failed: {e}") from e
 
+    async def scroll(
+        self,
+        collection_name: str,
+        filter_conditions: Optional[Dict[str, Any]] = None,
+        limit: int = 100,
+    ) -> List[SearchResult]:
+        """
+        Scroll points by filter (no vector search).
+
+        Args:
+            collection_name: Collection to scroll
+            filter_conditions: Optional metadata filters
+            limit: Maximum number of points to return
+
+        Returns:
+            List of SearchResult objects with score=0.0
+        """
+        try:
+            if not await self.collection_exists(collection_name):
+                raise CollectionNotFoundError(
+                    f"Collection '{collection_name}' does not exist"
+                )
+
+            query_filter = None
+            if filter_conditions:
+                query_filter = self._build_filter(filter_conditions)
+
+            scroll_result = await self.client.scroll(
+                collection_name=collection_name,
+                scroll_filter=query_filter,
+                limit=limit,
+                with_payload=True,
+                with_vectors=False,
+            )
+
+            if isinstance(scroll_result, tuple):
+                points, _ = scroll_result
+            else:
+                points = scroll_result
+
+            results = [
+                SearchResult(
+                    id=str(point.id),
+                    score=0.0,
+                    payload=point.payload or {},
+                    vector=None,
+                )
+                for point in points
+            ]
+
+            logger.info(
+                f"Scroll in '{collection_name}' returned {len(results)} results "
+                f"(limit={limit})"
+            )
+            return results
+
+        except CollectionNotFoundError:
+            raise
+        except Exception as e:
+            logger.error(f"Scroll failed: {e}")
+            raise VectorStoreException(f"Scroll failed: {e}") from e
+
     async def delete_by_document_id(
         self,
         collection_name: str,

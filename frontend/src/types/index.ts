@@ -236,6 +236,8 @@ export interface ChatRequest {
   use_self_check?: boolean
   use_document_filter?: boolean
   document_ids?: string[]
+  context_expansion?: string[] | null
+  context_window?: number | null
 }
 
 export interface ChatResponse {
@@ -284,6 +286,8 @@ export interface ConversationSettings {
   conversation_history_limit?: number
   use_document_filter?: boolean
   document_ids?: string[] | null
+  context_expansion?: string[] | null
+  context_window?: number | null
 }
 
 export interface ConversationDetail {

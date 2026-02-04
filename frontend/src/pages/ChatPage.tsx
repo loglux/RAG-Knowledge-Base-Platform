@@ -82,6 +82,10 @@ export function ChatPage() {
   const [useDocumentFilter, setUseDocumentFilter] = useState(() => {
     return false
   })
+  const [contextExpansion, setContextExpansion] = useState<string[]>([])
+  const [contextWindow, setContextWindow] = useState(() => {
+    return 1
+  })
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([])
   const [documents, setDocuments] = useState<Document[]>([])
   const [documentsLoading, setDocumentsLoading] = useState(false)
@@ -163,6 +167,12 @@ export function ChatPage() {
         }
         if (Array.isArray(settings.document_ids)) {
           setSelectedDocumentIds(settings.document_ids)
+        }
+        if (Array.isArray(settings.context_expansion)) {
+          setContextExpansion(settings.context_expansion)
+        }
+        if (typeof settings.context_window === 'number') {
+          setContextWindow(settings.context_window)
         }
         setSettingsLoaded(true)
       } catch (err) {
@@ -258,6 +268,12 @@ export function ChatPage() {
       if (Array.isArray(draft.document_ids)) {
         setSelectedDocumentIds(draft.document_ids)
       }
+      if (Array.isArray(draft.context_expansion)) {
+        setContextExpansion(draft.context_expansion)
+      }
+      if (typeof draft.context_window === 'number') {
+        setContextWindow(draft.context_window)
+      }
     } catch (err) {
       console.error('Failed to load draft chat settings:', err)
     }
@@ -339,12 +355,14 @@ export function ChatPage() {
       conversation_history_limit: safeHistoryLimit,
       use_document_filter: Boolean(useDocumentFilter),
       document_ids: useDocumentFilter ? selectedDocumentIds : [],
+      context_expansion: contextExpansion,
+      context_window: contextExpansion.includes('window') ? contextWindow : 0,
     }
 
     apiClient.updateConversationSettings(conversationId, payload).catch((err) => {
       console.error('Failed to update conversation settings:', err)
     })
-  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, llmModel, llmProvider, useStructure, useMmr, mmrDiversity, useSelfCheck, useConversationHistory, conversationHistoryLimit, useDocumentFilter, selectedDocumentIds])
+  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, llmModel, llmProvider, useStructure, useMmr, mmrDiversity, useSelfCheck, useConversationHistory, conversationHistoryLimit, useDocumentFilter, selectedDocumentIds, contextExpansion, contextWindow])
 
   useEffect(() => {
     if (conversationId || !settingsLoaded) return
@@ -374,13 +392,15 @@ export function ChatPage() {
       conversation_history_limit: safeHistoryLimit,
       use_document_filter: Boolean(useDocumentFilter),
       document_ids: useDocumentFilter ? selectedDocumentIds : [],
+      context_expansion: contextExpansion,
+      context_window: contextExpansion.includes('window') ? contextWindow : 0,
     }
     try {
       localStorage.setItem(settingsDraftKey, JSON.stringify(payload))
     } catch (err) {
       console.error('Failed to persist draft chat settings:', err)
     }
-  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, llmModel, llmProvider, useStructure, useMmr, mmrDiversity, useSelfCheck, useConversationHistory, conversationHistoryLimit, useDocumentFilter, selectedDocumentIds, settingsDraftKey])
+  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, llmModel, llmProvider, useStructure, useMmr, mmrDiversity, useSelfCheck, useConversationHistory, conversationHistoryLimit, useDocumentFilter, selectedDocumentIds, contextExpansion, contextWindow, settingsDraftKey])
 
   useEffect(() => {
     const fetchKB = async () => {
@@ -431,6 +451,7 @@ export function ChatPage() {
       setError('Select at least one document or disable the document filter.')
       return
     }
+    const effectiveWindow = contextExpansion.includes('window') ? contextWindow : 0
     sendMessage(
       question,
       topK,
@@ -454,7 +475,9 @@ export function ChatPage() {
       Boolean(useConversationHistory),
       safeHistoryLimit,
       Boolean(useDocumentFilter),
-      selectedDocumentIds
+      selectedDocumentIds,
+      contextExpansion,
+      effectiveWindow
     )
   }
 
@@ -499,6 +522,8 @@ export function ChatPage() {
       setConversationHistoryLimit(10)
       setUseDocumentFilter(false)
       setSelectedDocumentIds([])
+      setContextExpansion([])
+      setContextWindow(1)
 
       if (kb) {
         if (kb.bm25_match_mode !== null && kb.bm25_match_mode !== undefined) setBm25MatchMode(kb.bm25_match_mode)
@@ -617,6 +642,8 @@ export function ChatPage() {
           useConversationHistory={useConversationHistory}
           conversationHistoryLimit={conversationHistoryLimit}
           useDocumentFilter={useDocumentFilter}
+          contextExpansion={contextExpansion}
+          contextWindow={contextWindow}
           selectedDocumentIds={selectedDocumentIds}
           documents={documents}
           documentsLoading={documentsLoading}
@@ -642,6 +669,8 @@ export function ChatPage() {
             setConversationHistoryLimit(Number.isFinite(value) ? value : 0)
           }}
           onUseDocumentFilterChange={setUseDocumentFilter}
+          onContextExpansionChange={setContextExpansion}
+          onContextWindowChange={setContextWindow}
           onSelectedDocumentIdsChange={setSelectedDocumentIds}
           onResetDefaults={handleResetDefaults}
           onClose={() => setShowSettings(false)}

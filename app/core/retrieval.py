@@ -240,6 +240,78 @@ class RetrievalEngine:
             logger.error(f"Retrieval failed: {e}")
             raise
 
+    async def expand_windowed(
+        self,
+        *,
+        collection_name: str,
+        chunks: List[RetrievedChunk],
+        window_size: int,
+    ) -> List[RetrievedChunk]:
+        """
+        Expand retrieved chunks by including neighboring chunks within a window.
+
+        Args:
+            collection_name: Qdrant collection to scroll
+            chunks: Base retrieved chunks
+            window_size: Number of chunks to include on each side
+
+        Returns:
+            Expanded chunks ordered around original matches
+        """
+        if not chunks or window_size <= 0:
+            return chunks
+
+        indices_by_doc: Dict[str, set[int]] = {}
+        for chunk in chunks:
+            start = max(0, chunk.chunk_index - window_size)
+            end = chunk.chunk_index + window_size
+            for idx in range(start, end + 1):
+                indices_by_doc.setdefault(chunk.document_id, set()).add(idx)
+
+        expanded_map: Dict[str, RetrievedChunk] = {
+            f"{chunk.document_id}:{chunk.chunk_index}": chunk for chunk in chunks
+        }
+
+        for document_id, indices in indices_by_doc.items():
+            if not indices:
+                continue
+            results = await self.vector_store.scroll(
+                collection_name=collection_name,
+                filter_conditions={
+                    "document_id": document_id,
+                    "chunk_index": sorted(indices),
+                },
+                limit=len(indices),
+            )
+            extra_chunks = self._convert_search_results(results)
+            for extra in extra_chunks:
+                key = f"{extra.document_id}:{extra.chunk_index}"
+                if key in expanded_map:
+                    continue
+                metadata = dict(extra.metadata or {})
+                metadata.update(
+                    {
+                        "source_type": "window",
+                        "window_radius": window_size,
+                    }
+                )
+                expanded_map[key] = extra.model_copy(update={"score": 0.0, "metadata": metadata})
+
+        ordered: List[RetrievedChunk] = []
+        seen: set[str] = set()
+        for chunk in chunks:
+            start = max(0, chunk.chunk_index - window_size)
+            end = chunk.chunk_index + window_size
+            for idx in range(start, end + 1):
+                key = f"{chunk.document_id}:{idx}"
+                candidate = expanded_map.get(key)
+                if not candidate or key in seen:
+                    continue
+                ordered.append(candidate)
+                seen.add(key)
+
+        return ordered
+
     async def retrieve_by_document(
         self,
         query: str,

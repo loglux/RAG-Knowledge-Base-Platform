@@ -27,6 +27,8 @@ interface ChatSettingsProps {
   useConversationHistory: boolean
   conversationHistoryLimit: number
   useDocumentFilter: boolean
+  contextExpansion: string[]
+  contextWindow: number
   selectedDocumentIds: string[]
   documents: Document[]
   documentsLoading?: boolean
@@ -50,6 +52,8 @@ interface ChatSettingsProps {
   onUseConversationHistoryChange: (value: boolean) => void
   onConversationHistoryLimitChange: (value: number) => void
   onUseDocumentFilterChange: (value: boolean) => void
+  onContextExpansionChange: (value: string[]) => void
+  onContextWindowChange: (value: number) => void
   onSelectedDocumentIdsChange: (value: string[]) => void
   onResetDefaults: () => void
   onClose: () => void
@@ -80,6 +84,8 @@ export function ChatSettings({
   useConversationHistory,
   conversationHistoryLimit,
   useDocumentFilter,
+  contextExpansion,
+  contextWindow,
   selectedDocumentIds,
   documents,
   documentsLoading,
@@ -103,6 +109,8 @@ export function ChatSettings({
   onUseConversationHistoryChange,
   onConversationHistoryLimitChange,
   onUseDocumentFilterChange,
+  onContextExpansionChange,
+  onContextWindowChange,
   onSelectedDocumentIdsChange,
   onResetDefaults,
   onClose,
@@ -116,6 +124,8 @@ export function ChatSettings({
   const safeHybridLexicalWeight = Number.isFinite(hybridLexicalWeight) ? hybridLexicalWeight : 0.4
   const safeBm25MinShouldMatch = Number.isFinite(bm25MinShouldMatch) ? bm25MinShouldMatch : 0
   const safeBm25UsePhrase = typeof bm25UsePhrase === 'boolean' ? bm25UsePhrase : true
+  const safeContextWindow = Number.isFinite(contextWindow) && contextWindow > 0 ? contextWindow : 1
+  const windowEnabled = Array.isArray(contextExpansion) && contextExpansion.includes('window')
   const [showAdvancedBm25, setShowAdvancedBm25] = useState(false)
   const [linkHybridWeights, setLinkHybridWeights] = useState(true)
   const matchModeOptions = bm25MatchModes && bm25MatchModes.length > 0 ? bm25MatchModes : []
@@ -142,6 +152,17 @@ export function ChatSettings({
       const nextDense = Number((1 - nextLexical).toFixed(2))
       onHybridDenseWeightChange(nextDense)
     }
+  }
+
+  const handleWindowToggle = (enabled: boolean) => {
+    if (enabled) {
+      const next = Array.isArray(contextExpansion) ? contextExpansion : []
+      if (!next.includes('window')) {
+        onContextExpansionChange([...next, 'window'])
+      }
+      return
+    }
+    onContextExpansionChange((contextExpansion || []).filter((mode) => mode !== 'window'))
   }
 
   return (
@@ -240,6 +261,46 @@ export function ChatSettings({
                 <span>0.5 - Balanced</span>
                 <span>1.0 - Max diversity</span>
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Context Expansion */}
+        <div className="mb-6 p-4 bg-gray-900 rounded-lg border border-gray-700">
+          <label className="flex items-center space-x-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={windowEnabled}
+              onChange={(e) => handleWindowToggle(e.target.checked)}
+              className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
+            />
+            <div className="flex-1">
+              <span className="text-sm font-medium text-white">
+                Windowed Retrieval (Context Expansion)
+              </span>
+              <p className="text-xs text-gray-400 mt-1">
+                Adds neighboring chunks around each match to avoid truncated citations and missing continuations.
+              </p>
+            </div>
+          </label>
+
+          {windowEnabled && (
+            <div className="mt-4 pl-8">
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Window size (chunks on each side)
+              </label>
+              <select
+                value={safeContextWindow}
+                onChange={(e) => onContextWindowChange(Number(e.target.value))}
+                className="w-40 px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white focus:ring-primary-500 focus:border-primary-500"
+              >
+                <option value={1}>1 chunk</option>
+                <option value={2}>2 chunks</option>
+                <option value={3}>3 chunks</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-2">
+                Use 1 for tight continuity, 2-3 for longer lists or multi-step questions.
+              </p>
             </div>
           )}
         </div>

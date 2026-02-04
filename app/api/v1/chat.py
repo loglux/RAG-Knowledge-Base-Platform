@@ -234,6 +234,8 @@ async def chat_query(
             use_self_check=request.use_self_check,
             document_ids=[str(doc_id) for doc_id in request.document_ids]
             if request.document_ids else None,
+            context_expansion=request.context_expansion,
+            context_window=request.context_window,
             db=db,
             kb_id=request.knowledge_base_id,
         )
@@ -260,6 +262,8 @@ async def chat_query(
                 "use_mmr": request.use_mmr,
                 "mmr_diversity": request.mmr_diversity,
                 "use_self_check": request.use_self_check,
+                "context_expansion": request.context_expansion,
+                "context_window": request.context_window,
             }
             conversation = ConversationModel(
                 knowledge_base_id=request.knowledge_base_id,
@@ -300,6 +304,8 @@ async def chat_query(
                 "use_document_filter": request.use_document_filter,
                 "document_ids": [str(doc_id) for doc_id in request.document_ids]
                 if request.document_ids else None,
+                "context_expansion": request.context_expansion,
+                "context_window": request.context_window,
             })
             conversation.settings_json = json.dumps(existing_settings)
 

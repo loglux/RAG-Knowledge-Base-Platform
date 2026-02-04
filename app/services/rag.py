@@ -130,6 +130,8 @@ Context follows below.
         mmr_diversity: float = 0.5,
         use_self_check: bool = False,
         document_ids: Optional[List[str]] = None,
+        context_expansion: Optional[List[str]] = None,
+        context_window: Optional[int] = None,
         db: Optional[AsyncSession] = None,
         kb_id: Optional[UUID] = None,
     ) -> RAGResponse:
@@ -274,20 +276,30 @@ Context follows below.
                     model=llm_service.model,
                 )
 
+            chunks = retrieval_result.chunks
+            expansion_modes = context_expansion or []
+            window_size = context_window or 0
+            if "window" in expansion_modes and window_size > 0:
+                chunks = await self.retrieval.expand_windowed(
+                    collection_name=collection_name,
+                    chunks=chunks,
+                    window_size=window_size,
+                )
+
             # 3. Generate answer with context
-            context = retrieval_result.context
+            context = self.retrieval._assemble_context(chunks)
             if max_context_chars is not None:
                 context = self.retrieval._assemble_context(
-                    retrieval_result.chunks,
+                    chunks,
                     max_length=max_context_chars,
                 )
             elif chunk_filters:
                 # For structured question retrieval, avoid truncating the target section.
                 context = self.retrieval._assemble_context(
-                    retrieval_result.chunks,
+                    chunks,
                     max_length=max_context_chars,
                 )
-            logger.debug(f"Generating answer with {len(retrieval_result.chunks)} chunks")
+            logger.debug(f"Generating answer with {len(chunks)} chunks")
             # Generate draft answer
             draft_answer = await self._generate_answer(
                 question=question,
@@ -318,7 +330,7 @@ Context follows below.
 
             return RAGResponse(
                 answer=answer,
-                sources=retrieval_result.chunks,
+                sources=chunks,
                 query=question,
                 context_used=context,
                 model=llm_service.model,

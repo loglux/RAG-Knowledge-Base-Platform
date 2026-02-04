@@ -111,7 +111,9 @@ export function useChat(kbId: string) {
       useConversationHistory = true,
       conversationHistoryLimit = 10,
       useDocumentFilter = false,
-      documentIds: string[] = []
+      documentIds: string[] = [],
+      contextExpansion: string[] = [],
+      contextWindow = 0
     ) => {
       if (!question.trim()) return
 
@@ -152,6 +154,8 @@ export function useChat(kbId: string) {
           conversation_history_limit: conversationHistoryLimit,
           use_document_filter: useDocumentFilter,
           document_ids: useDocumentFilter ? documentIds : undefined,
+          context_expansion: contextExpansion.length > 0 ? contextExpansion : undefined,
+          context_window: contextExpansion.includes('window') ? contextWindow : undefined,
         }
 
         const response = await apiClient.chat(request)
