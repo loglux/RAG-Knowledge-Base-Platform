@@ -16,6 +16,7 @@ from qdrant_client.models import (
     PointStruct,
     Filter,
     FieldCondition,
+    MatchAny,
     MatchValue,
     SearchRequest,
     NearestQuery,
@@ -537,6 +538,14 @@ class QdrantVectorStore:
                     )
                 )
             else:
+                if isinstance(value, list):
+                    must_conditions.append(
+                        FieldCondition(
+                            key=key,
+                            match=MatchAny(any=value),
+                        )
+                    )
+                    continue
                 # Simple match condition
                 must_conditions.append(
                     FieldCondition(

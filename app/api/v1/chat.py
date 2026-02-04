@@ -232,6 +232,8 @@ async def chat_query(
             use_mmr=request.use_mmr,
             mmr_diversity=request.mmr_diversity,
             use_self_check=request.use_self_check,
+            document_ids=[str(doc_id) for doc_id in request.document_ids]
+            if request.document_ids else None,
             db=db,
             kb_id=request.knowledge_base_id,
         )
@@ -295,6 +297,9 @@ async def chat_query(
                 "use_self_check": request.use_self_check,
                 "use_conversation_history": request.use_conversation_history,
                 "conversation_history_limit": request.conversation_history_limit,
+                "use_document_filter": request.use_document_filter,
+                "document_ids": [str(doc_id) for doc_id in request.document_ids]
+                if request.document_ids else None,
             })
             conversation.settings_json = json.dumps(existing_settings)
 

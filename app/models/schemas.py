@@ -331,6 +331,8 @@ class ConversationSettings(BaseModel):
     use_self_check: Optional[bool] = Field(default=None)
     use_conversation_history: Optional[bool] = Field(default=None)
     conversation_history_limit: Optional[int] = Field(default=None, ge=0, le=100)
+    use_document_filter: Optional[bool] = Field(default=None)
+    document_ids: Optional[List[UUID]] = Field(default=None)
 
 
 class AppSettingsBase(BaseModel):
@@ -500,6 +502,14 @@ class ChatRequest(BaseModel):
         ge=0,
         le=100,
         description="Number of recent messages to include from history"
+    )
+    use_document_filter: Optional[bool] = Field(
+        default=None,
+        description="Whether to limit retrieval to selected documents"
+    )
+    document_ids: Optional[List[UUID]] = Field(
+        default=None,
+        description="Optional document ID allow-list for retrieval"
     )
 
 

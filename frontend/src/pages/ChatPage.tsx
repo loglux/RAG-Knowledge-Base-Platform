@@ -7,7 +7,7 @@ import { MessageBubble } from '../components/chat/MessageBubble'
 import { SourceCard } from '../components/chat/SourceCard'
 import { ChatInput } from '../components/chat/ChatInput'
 import { ChatSettings } from '../components/chat/ChatSettings'
-import type { KnowledgeBase, ConversationSettings } from '../types/index'
+import type { KnowledgeBase, ConversationSettings, Document } from '../types/index'
 
 export function ChatPage() {
   const { id } = useParams<{ id: string }>()
@@ -79,6 +79,12 @@ export function ChatPage() {
   const [conversationHistoryLimit, setConversationHistoryLimit] = useState(() => {
     return 10
   })
+  const [useDocumentFilter, setUseDocumentFilter] = useState(() => {
+    return false
+  })
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([])
+  const [documents, setDocuments] = useState<Document[]>([])
+  const [documentsLoading, setDocumentsLoading] = useState(false)
   const [opensearchAvailable, setOpensearchAvailable] = useState<boolean | null>(null)
   const [settingsLoaded, setSettingsLoaded] = useState(false)
   const [kbDefaultsApplied, setKbDefaultsApplied] = useState(false)
@@ -151,6 +157,12 @@ export function ChatPage() {
         }
         if (typeof settings.conversation_history_limit === 'number') {
           setConversationHistoryLimit(settings.conversation_history_limit)
+        }
+        if (typeof settings.use_document_filter === 'boolean') {
+          setUseDocumentFilter(settings.use_document_filter)
+        }
+        if (Array.isArray(settings.document_ids)) {
+          setSelectedDocumentIds(settings.document_ids)
         }
         setSettingsLoaded(true)
       } catch (err) {
@@ -240,6 +252,12 @@ export function ChatPage() {
       if (typeof draft.conversation_history_limit === 'number') {
         setConversationHistoryLimit(draft.conversation_history_limit)
       }
+      if (typeof draft.use_document_filter === 'boolean') {
+        setUseDocumentFilter(draft.use_document_filter)
+      }
+      if (Array.isArray(draft.document_ids)) {
+        setSelectedDocumentIds(draft.document_ids)
+      }
     } catch (err) {
       console.error('Failed to load draft chat settings:', err)
     }
@@ -273,6 +291,25 @@ export function ChatPage() {
     loadInfo()
   }, [])
 
+  useEffect(() => {
+    const loadDocuments = async () => {
+      if (!id) return
+      setDocumentsLoading(true)
+      try {
+        const response = await apiClient.getDocuments(id, 1, 100)
+        const items = response.items.filter((doc) => !doc.is_deleted)
+        setDocuments(items)
+      } catch (err) {
+        console.error('Failed to load documents:', err)
+        setDocuments([])
+      } finally {
+        setDocumentsLoading(false)
+      }
+    }
+
+    loadDocuments()
+  }, [id])
+
   // Persist conversation settings to server when they change
   useEffect(() => {
     if (!conversationId || !settingsLoaded) return
@@ -300,12 +337,14 @@ export function ChatPage() {
       use_self_check: useSelfCheck,
       use_conversation_history: Boolean(useConversationHistory),
       conversation_history_limit: safeHistoryLimit,
+      use_document_filter: Boolean(useDocumentFilter),
+      document_ids: useDocumentFilter ? selectedDocumentIds : [],
     }
 
     apiClient.updateConversationSettings(conversationId, payload).catch((err) => {
       console.error('Failed to update conversation settings:', err)
     })
-  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, llmModel, llmProvider, useStructure, useMmr, mmrDiversity, useSelfCheck, useConversationHistory, conversationHistoryLimit])
+  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, llmModel, llmProvider, useStructure, useMmr, mmrDiversity, useSelfCheck, useConversationHistory, conversationHistoryLimit, useDocumentFilter, selectedDocumentIds])
 
   useEffect(() => {
     if (conversationId || !settingsLoaded) return
@@ -333,13 +372,15 @@ export function ChatPage() {
       use_self_check: useSelfCheck,
       use_conversation_history: Boolean(useConversationHistory),
       conversation_history_limit: safeHistoryLimit,
+      use_document_filter: Boolean(useDocumentFilter),
+      document_ids: useDocumentFilter ? selectedDocumentIds : [],
     }
     try {
       localStorage.setItem(settingsDraftKey, JSON.stringify(payload))
     } catch (err) {
       console.error('Failed to persist draft chat settings:', err)
     }
-  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, llmModel, llmProvider, useStructure, useMmr, mmrDiversity, useSelfCheck, useConversationHistory, conversationHistoryLimit, settingsDraftKey])
+  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, llmModel, llmProvider, useStructure, useMmr, mmrDiversity, useSelfCheck, useConversationHistory, conversationHistoryLimit, useDocumentFilter, selectedDocumentIds, settingsDraftKey])
 
   useEffect(() => {
     const fetchKB = async () => {
@@ -386,6 +427,10 @@ export function ChatPage() {
     const safeHistoryLimit = Number.isFinite(conversationHistoryLimit)
       ? conversationHistoryLimit
       : 10
+    if (useDocumentFilter && selectedDocumentIds.length === 0) {
+      setError('Select at least one document or disable the document filter.')
+      return
+    }
     sendMessage(
       question,
       topK,
@@ -407,7 +452,9 @@ export function ChatPage() {
       mmrDiversity,
       useSelfCheck,
       Boolean(useConversationHistory),
-      safeHistoryLimit
+      safeHistoryLimit,
+      Boolean(useDocumentFilter),
+      selectedDocumentIds
     )
   }
 
@@ -450,6 +497,8 @@ export function ChatPage() {
       setUseSelfCheck(false)
       setUseConversationHistory(true)
       setConversationHistoryLimit(10)
+      setUseDocumentFilter(false)
+      setSelectedDocumentIds([])
 
       if (kb) {
         if (kb.bm25_match_mode !== null && kb.bm25_match_mode !== undefined) setBm25MatchMode(kb.bm25_match_mode)
@@ -567,6 +616,10 @@ export function ChatPage() {
           useSelfCheck={useSelfCheck}
           useConversationHistory={useConversationHistory}
           conversationHistoryLimit={conversationHistoryLimit}
+          useDocumentFilter={useDocumentFilter}
+          selectedDocumentIds={selectedDocumentIds}
+          documents={documents}
+          documentsLoading={documentsLoading}
           onTopKChange={setTopK}
           onTemperatureChange={setTemperature}
           onMaxContextCharsChange={setMaxContextChars}
@@ -588,6 +641,8 @@ export function ChatPage() {
           onConversationHistoryLimitChange={(value) => {
             setConversationHistoryLimit(Number.isFinite(value) ? value : 0)
           }}
+          onUseDocumentFilterChange={setUseDocumentFilter}
+          onSelectedDocumentIdsChange={setSelectedDocumentIds}
           onResetDefaults={handleResetDefaults}
           onClose={() => setShowSettings(false)}
         />

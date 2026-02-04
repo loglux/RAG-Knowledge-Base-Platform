@@ -129,6 +129,7 @@ Context follows below.
         use_mmr: bool = False,
         mmr_diversity: float = 0.5,
         use_self_check: bool = False,
+        document_ids: Optional[List[str]] = None,
         db: Optional[AsyncSession] = None,
         kb_id: Optional[UUID] = None,
     ) -> RAGResponse:
@@ -154,6 +155,7 @@ Context follows below.
             llm_provider: Override LLM provider for this query
             conversation_history: Previous messages for follow-up questions
             use_structure: Use document structure for structured search (default: False)
+            document_ids: Optional list of document IDs to filter retrieval
             db: Database session for structure lookups (required if use_structure=True)
             kb_id: Knowledge base ID for document lookup (required if use_structure=True)
 
@@ -183,6 +185,10 @@ Context follows below.
             # 1. Handle structure-based search if enabled
             chunk_filters = None
 
+            document_filter = None
+            if document_ids:
+                document_filter = {"document_id": document_ids if len(document_ids) > 1 else document_ids[0]}
+
             logger.warning(f"[DEBUG] RAG query with use_structure={use_structure}, db={db is not None}, kb_id={kb_id}")
 
             if use_structure:
@@ -200,6 +206,25 @@ Context follows below.
                     else:
                         logger.warning("[DEBUG] Structure filters returned None, using semantic search")
 
+            if document_filter and chunk_filters and "document_id" in chunk_filters:
+                if chunk_filters["document_id"] not in document_ids:
+                    logger.warning("Document filter excludes structured document. Returning empty result.")
+                    return RAGResponse(
+                        answer="I couldn't find any relevant information in the knowledge base to answer your question.",
+                        sources=[],
+                        query=question,
+                        context_used="",
+                        model=llm_service.model,
+                    )
+
+            merged_filters = None
+            if chunk_filters and document_filter:
+                merged_filters = {**document_filter, **chunk_filters}
+            elif chunk_filters:
+                merged_filters = chunk_filters
+            elif document_filter:
+                merged_filters = document_filter
+
             # 2. Retrieve relevant chunks (with optional structure filters)
             if mode == "hybrid":
                 if not kb_id:
@@ -216,7 +241,7 @@ Context follows below.
                     top_k=top_k,
                     lexical_top_k=lexical_top_k,
                     score_threshold=score_threshold,
-                    filters=chunk_filters,
+                    filters=merged_filters,
                     dense_weight=dense_weight,
                     lexical_weight=lexical_weight,
                     bm25_match_mode=bm25_match_mode,
@@ -234,7 +259,7 @@ Context follows below.
                     embedding_model=embedding_model,
                     top_k=top_k,
                     score_threshold=score_threshold,
-                    filters=chunk_filters,
+                    filters=merged_filters,
                     use_mmr=use_mmr,
                     mmr_diversity=mmr_diversity,
                 )

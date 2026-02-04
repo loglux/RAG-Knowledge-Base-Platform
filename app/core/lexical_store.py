@@ -196,7 +196,10 @@ class OpenSearchStore:
         if filters:
             document_id = filters.get("document_id")
             if document_id:
-                filter_clauses.append({"term": {"document_id": document_id}})
+                if isinstance(document_id, list):
+                    filter_clauses.append({"terms": {"document_id": document_id}})
+                else:
+                    filter_clauses.append({"term": {"document_id": document_id}})
             chunk_index = filters.get("chunk_index")
             if isinstance(chunk_index, dict):
                 filter_clauses.append({"range": {"chunk_index": chunk_index}})

@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { LLMSelector } from './LLMSelector'
+import type { Document } from '../../types/index'
 
 interface ChatSettingsProps {
   topK: number
@@ -25,6 +26,10 @@ interface ChatSettingsProps {
   useSelfCheck: boolean
   useConversationHistory: boolean
   conversationHistoryLimit: number
+  useDocumentFilter: boolean
+  selectedDocumentIds: string[]
+  documents: Document[]
+  documentsLoading?: boolean
   onTopKChange: (value: number) => void
   onTemperatureChange: (value: number) => void
   onMaxContextCharsChange: (value: number) => void
@@ -44,6 +49,8 @@ interface ChatSettingsProps {
   onUseSelfCheckChange: (value: boolean) => void
   onUseConversationHistoryChange: (value: boolean) => void
   onConversationHistoryLimitChange: (value: number) => void
+  onUseDocumentFilterChange: (value: boolean) => void
+  onSelectedDocumentIdsChange: (value: string[]) => void
   onResetDefaults: () => void
   onClose: () => void
 }
@@ -72,6 +79,10 @@ export function ChatSettings({
   useSelfCheck,
   useConversationHistory,
   conversationHistoryLimit,
+  useDocumentFilter,
+  selectedDocumentIds,
+  documents,
+  documentsLoading,
   onTopKChange,
   onTemperatureChange,
   onMaxContextCharsChange,
@@ -91,6 +102,8 @@ export function ChatSettings({
   onUseSelfCheckChange,
   onUseConversationHistoryChange,
   onConversationHistoryLimitChange,
+  onUseDocumentFilterChange,
+  onSelectedDocumentIdsChange,
   onResetDefaults,
   onClose,
 }: ChatSettingsProps) {
@@ -283,6 +296,99 @@ export function ChatSettings({
             className="w-20 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-gray-100 disabled:opacity-50"
           />
           <span className="text-gray-500">messages</span>
+        </div>
+      </div>
+
+      {/* Document scope */}
+      <div className="mb-6 p-4 bg-gray-900 rounded-lg border border-gray-700">
+        <label className="flex items-center space-x-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={useDocumentFilter}
+            onChange={(e) => onUseDocumentFilterChange(e.target.checked)}
+            className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
+          />
+          <div className="flex-1">
+            <span className="text-sm font-medium text-white">
+              Limit to Selected Documents
+            </span>
+            <p className="text-xs text-gray-400 mt-1">
+              When enabled, retrieval will only use the documents you choose below.
+            </p>
+          </div>
+        </label>
+
+        <div className="mt-4">
+          <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
+            <span>Documents</span>
+            {useDocumentFilter && documents.length > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onSelectedDocumentIdsChange(documents.map((doc) => doc.id))}
+                  className="text-xs text-primary-300 hover:text-primary-200"
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSelectedDocumentIdsChange([])}
+                  className="text-xs text-gray-400 hover:text-gray-200"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="max-h-48 overflow-y-auto space-y-2 border border-gray-800 rounded p-2 bg-gray-950/40">
+            {documentsLoading && (
+              <div className="text-xs text-gray-500">Loading documents…</div>
+            )}
+            {!documentsLoading && documents.length === 0 && (
+              <div className="text-xs text-gray-500">No documents available.</div>
+            )}
+            {!documentsLoading && documents.map((doc) => {
+              const disabled = !useDocumentFilter
+              const checked = selectedDocumentIds.includes(doc.id)
+              const statusLabel = doc.status === 'completed' ? null : doc.status
+              return (
+                <label key={doc.id} className="flex items-start gap-2 text-xs text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={disabled}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        onSelectedDocumentIdsChange([...selectedDocumentIds, doc.id])
+                      } else {
+                        onSelectedDocumentIdsChange(selectedDocumentIds.filter((id) => id !== doc.id))
+                      }
+                    }}
+                    className="mt-0.5 w-4 h-4 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900 disabled:opacity-50"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className={doc.status === 'completed' ? 'text-gray-200' : 'text-gray-500'}>
+                        {doc.filename}
+                      </span>
+                      {statusLabel && (
+                        <span className="text-[10px] uppercase text-gray-500">
+                          {statusLabel}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </label>
+              )
+            })}
+          </div>
+
+          {useDocumentFilter && selectedDocumentIds.length === 0 && (
+            <p className="text-xs text-yellow-400 mt-2">
+              Select at least one document to apply the filter.
+            </p>
+          )}
         </div>
       </div>
 

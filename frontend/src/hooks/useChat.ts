@@ -109,7 +109,9 @@ export function useChat(kbId: string) {
       mmrDiversity = 0.5,
       useSelfCheck = false,
       useConversationHistory = true,
-      conversationHistoryLimit = 10
+      conversationHistoryLimit = 10,
+      useDocumentFilter = false,
+      documentIds: string[] = []
     ) => {
       if (!question.trim()) return
 
@@ -148,6 +150,8 @@ export function useChat(kbId: string) {
           use_self_check: useSelfCheck,
           use_conversation_history: useConversationHistory,
           conversation_history_limit: conversationHistoryLimit,
+          use_document_filter: useDocumentFilter,
+          document_ids: useDocumentFilter ? documentIds : undefined,
         }
 
         const response = await apiClient.chat(request)
