@@ -71,7 +71,6 @@ const Setup: React.FC = () => {
   });
 
   const [generatedPassword, setGeneratedPassword] = useState<string>('');
-  const [newDatabaseUrl, setNewDatabaseUrl] = useState<string>('');
   const [passwordChanged, setPasswordChanged] = useState<boolean>(false);
 
   // Ollama connection test
@@ -147,8 +146,7 @@ const Setup: React.FC = () => {
     setError(null);
 
     try {
-      const result = await changePostgresPassword(dbSecurityData);
-      setNewDatabaseUrl('');
+      await changePostgresPassword(dbSecurityData);
       setPasswordChanged(true);
 
       // Show success message for a moment
@@ -196,7 +194,7 @@ const Setup: React.FC = () => {
         setOllamaTestStatus('error');
         setOllamaTestMessage(data.message || data.error || '❌ Connection failed');
       }
-    } catch (err) {
+    } catch {
       setOllamaTestStatus('error');
       setOllamaTestMessage('❌ Connection test failed');
     }

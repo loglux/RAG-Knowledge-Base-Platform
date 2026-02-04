@@ -523,9 +523,7 @@ type QueryDefaultsTabProps = {
   lexicalTopK: number
   setLexicalTopK: (value: number) => void
   hybridDenseWeight: number
-  setHybridDenseWeight: (value: number) => void
   hybridLexicalWeight: number
-  setHybridLexicalWeight: (value: number) => void
   linkHybridWeights: boolean
   setLinkHybridWeights: (value: boolean) => void
   handleDenseWeightChange: (value: number) => void
@@ -556,8 +554,8 @@ function QueryDefaultsTab({
   scoreThreshold, setScoreThreshold,
   retrievalMode, setRetrievalMode,
   lexicalTopK, setLexicalTopK,
-  hybridDenseWeight, setHybridDenseWeight,
-  hybridLexicalWeight, setHybridLexicalWeight,
+  hybridDenseWeight,
+  hybridLexicalWeight,
   linkHybridWeights, setLinkHybridWeights,
   handleDenseWeightChange, handleLexicalWeightChange,
   bm25MatchMode, setBm25MatchMode,

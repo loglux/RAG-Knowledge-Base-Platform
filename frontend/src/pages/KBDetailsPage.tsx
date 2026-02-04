@@ -208,7 +208,7 @@ export function KBDetailsPage() {
       try {
         const data = await apiClient.getAppSettings()
         setAppDefaults(data)
-      } catch (err) {
+      } catch {
         setAppDefaults(null)
       }
     }
@@ -340,7 +340,7 @@ export function KBDetailsPage() {
         const metadata = await apiClient.getSettingsMetadata()
         setBm25MatchModes(metadata.bm25_match_modes || null)
         setBm25Analyzers(metadata.bm25_analyzers || null)
-      } catch (err) {
+      } catch {
         setBm25MatchModes(null)
         setBm25Analyzers(null)
       }
@@ -938,7 +938,8 @@ export function KBDetailsPage() {
                         config.retrieval_mode ? String(config.retrieval_mode) : null,
                         config.top_k ? `top_k=${String(config.top_k)}` : null,
                         config.lexical_top_k ? `lex=${String(config.lexical_top_k)}` : null,
-                        denseWeight !== null ? `w=${denseWeight}` : null,
+                        denseWeight !== null ? `dense_w=${denseWeight}` : null,
+                        lexicalWeight !== null ? `lex_w=${lexicalWeight}` : null,
                         config.use_mmr ? 'mmr' : null,
                       ].filter(Boolean).join(' ')
                     : null

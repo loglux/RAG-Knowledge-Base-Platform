@@ -25,7 +25,7 @@ export function DocumentItem({ document, onReprocess, onDelete, onAnalyze }: Doc
           if (structure.has_structure) {
             setHasStructure(true)
           }
-        } catch (error) {
+        } catch {
           // Structure doesn't exist yet
         }
       }

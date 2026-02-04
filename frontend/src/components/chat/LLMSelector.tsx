@@ -20,7 +20,7 @@ interface LLMSelectorProps {
 export function LLMSelector({ value, onChange }: LLMSelectorProps) {
   const [models, setModels] = useState<LLMModel[]>([])
   const [loading, setLoading] = useState(true)
-  const [groupBy, setGroupBy] = useState<'provider' | 'all'>('provider')
+  const [groupBy] = useState<'provider' | 'all'>('provider')
 
   useEffect(() => {
     const fetchModels = async () => {

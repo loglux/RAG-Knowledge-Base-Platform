@@ -61,7 +61,7 @@ export function ChatSettings({
   bm25Analyzers,
   opensearchAvailable,
   llmModel,
-  llmProvider,
+  llmProvider: _llmProvider,
   useStructure,
   useMmr,
   mmrDiversity,
