@@ -146,10 +146,10 @@ export function ChatPage() {
           setMmrDiversity(settings.mmr_diversity)
         }
         if (settings.use_self_check !== undefined) setUseSelfCheck(settings.use_self_check)
-        if (settings.use_conversation_history !== undefined) {
+        if (typeof settings.use_conversation_history === 'boolean') {
           setUseConversationHistory(settings.use_conversation_history)
         }
-        if (settings.conversation_history_limit !== undefined && settings.conversation_history_limit !== null) {
+        if (typeof settings.conversation_history_limit === 'number') {
           setConversationHistoryLimit(settings.conversation_history_limit)
         }
         setSettingsLoaded(true)
@@ -234,10 +234,10 @@ export function ChatPage() {
       if (draft.use_mmr !== undefined) setUseMmr(draft.use_mmr)
       if (draft.mmr_diversity !== undefined && draft.mmr_diversity !== null) setMmrDiversity(draft.mmr_diversity)
       if (draft.use_self_check !== undefined) setUseSelfCheck(draft.use_self_check)
-      if (draft.use_conversation_history !== undefined) {
+      if (typeof draft.use_conversation_history === 'boolean') {
         setUseConversationHistory(draft.use_conversation_history)
       }
-      if (draft.conversation_history_limit !== undefined && draft.conversation_history_limit !== null) {
+      if (typeof draft.conversation_history_limit === 'number') {
         setConversationHistoryLimit(draft.conversation_history_limit)
       }
     } catch (err) {
@@ -276,6 +276,9 @@ export function ChatPage() {
   // Persist conversation settings to server when they change
   useEffect(() => {
     if (!conversationId || !settingsLoaded) return
+    const safeHistoryLimit = Number.isFinite(conversationHistoryLimit)
+      ? conversationHistoryLimit
+      : 10
     const payload: ConversationSettings = {
       top_k: topK,
       temperature,
@@ -295,8 +298,8 @@ export function ChatPage() {
       use_mmr: useMmr,
       mmr_diversity: mmrDiversity,
       use_self_check: useSelfCheck,
-      use_conversation_history: useConversationHistory,
-      conversation_history_limit: conversationHistoryLimit,
+      use_conversation_history: Boolean(useConversationHistory),
+      conversation_history_limit: safeHistoryLimit,
     }
 
     apiClient.updateConversationSettings(conversationId, payload).catch((err) => {
@@ -306,6 +309,9 @@ export function ChatPage() {
 
   useEffect(() => {
     if (conversationId || !settingsLoaded) return
+    const safeHistoryLimit = Number.isFinite(conversationHistoryLimit)
+      ? conversationHistoryLimit
+      : 10
     const payload: ConversationSettings = {
       top_k: topK,
       temperature,
@@ -325,8 +331,8 @@ export function ChatPage() {
       use_mmr: useMmr,
       mmr_diversity: mmrDiversity,
       use_self_check: useSelfCheck,
-      use_conversation_history: useConversationHistory,
-      conversation_history_limit: conversationHistoryLimit,
+      use_conversation_history: Boolean(useConversationHistory),
+      conversation_history_limit: safeHistoryLimit,
     }
     try {
       localStorage.setItem(settingsDraftKey, JSON.stringify(payload))
@@ -377,6 +383,9 @@ export function ChatPage() {
   }, [messages])
 
   const handleSendMessage = (question: string) => {
+    const safeHistoryLimit = Number.isFinite(conversationHistoryLimit)
+      ? conversationHistoryLimit
+      : 10
     sendMessage(
       question,
       topK,
@@ -397,8 +406,8 @@ export function ChatPage() {
       useMmr,
       mmrDiversity,
       useSelfCheck,
-      useConversationHistory,
-      conversationHistoryLimit
+      Boolean(useConversationHistory),
+      safeHistoryLimit
     )
   }
 
@@ -576,7 +585,9 @@ export function ChatPage() {
           onMmrDiversityChange={setMmrDiversity}
           onUseSelfCheckChange={setUseSelfCheck}
           onUseConversationHistoryChange={setUseConversationHistory}
-          onConversationHistoryLimitChange={setConversationHistoryLimit}
+          onConversationHistoryLimitChange={(value) => {
+            setConversationHistoryLimit(Number.isFinite(value) ? value : 0)
+          }}
           onResetDefaults={handleResetDefaults}
           onClose={() => setShowSettings(false)}
         />
