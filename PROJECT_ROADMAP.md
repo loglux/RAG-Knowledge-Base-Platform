@@ -389,6 +389,10 @@ ALTER TABLE conversations ADD COLUMN user_id UUID;
 3. How to handle user data on deletion?
    - *Leaning:* Soft delete with retention period
 
+4. Add API key validation/verification in Settings + Wizard?
+   - *Idea:* Validate key formats (e.g., `sk-`, `sk-ant-`) and add a "Verify" button (Ollama ping, minimal provider checks).
+   - *Rationale:* Avoid silent failures from malformed keys (e.g., whitespace, missing prefix).
+
 ---
 
 ## Next Steps
