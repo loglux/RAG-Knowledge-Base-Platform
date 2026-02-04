@@ -414,6 +414,10 @@ export function SettingsPage() {
             setHybridDenseWeight={setHybridDenseWeight}
             hybridLexicalWeight={hybridLexicalWeight}
             setHybridLexicalWeight={setHybridLexicalWeight}
+            linkHybridWeights={linkHybridWeights}
+            setLinkHybridWeights={setLinkHybridWeights}
+            handleDenseWeightChange={handleDenseWeightChange}
+            handleLexicalWeightChange={handleLexicalWeightChange}
             bm25MatchMode={bm25MatchMode}
             setBm25MatchMode={setBm25MatchMode}
             bm25MinShouldMatch={bm25MinShouldMatch}
@@ -513,6 +517,8 @@ function QueryDefaultsTab(props: any) {
     lexicalTopK, setLexicalTopK,
     hybridDenseWeight, setHybridDenseWeight,
     hybridLexicalWeight, setHybridLexicalWeight,
+    linkHybridWeights, setLinkHybridWeights,
+    handleDenseWeightChange, handleLexicalWeightChange,
     bm25MatchMode, setBm25MatchMode,
     bm25MinShouldMatch, setBm25MinShouldMatch,
     bm25UsePhrase, setBm25UsePhrase,
