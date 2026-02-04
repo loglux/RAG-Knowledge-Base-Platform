@@ -277,6 +277,7 @@ The chat UI exposes retrieval controls to tune answer quality:
 - **Use Document Structure**: enables TOC‑aware, section‑targeted retrieval (e.g., "show question 2").
 - **Use MMR (Maximal Marginal Relevance)**: enables diversity-aware search to avoid retrieving too many similar chunks from the same section. Balances relevance and diversity.
 - **MMR Diversity** (when MMR enabled): controls the relevance-diversity tradeoff (0.0–1.0). See detailed guidance below.
+- **Windowed retrieval**: expands context by adding neighboring chunks (prevents truncated citations; useful for multi-part questions).
 - **Retrieval mode**: dense (vectors) or hybrid (BM25 + vectors).
 - **BM25 controls** (hybrid only): lexical top‑K and weight blending.
 
