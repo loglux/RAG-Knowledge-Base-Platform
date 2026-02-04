@@ -36,6 +36,7 @@ It can be used as a standalone service or integrated into other products via its
 - **MMR (Maximal Marginal Relevance)** for diversity-aware search
 - Optional BM25 lexical index (OpenSearch) for hybrid retrieval
 - **Self-Check Validation** (optional): Two-stage answer generation with validation for improved accuracy
+- **Chat history controls**: delete individual Q/A pairs from a conversation
 - Structured document analysis and TOC metadata
 - RAG answers with citations
 - FastAPI backend + React frontend
