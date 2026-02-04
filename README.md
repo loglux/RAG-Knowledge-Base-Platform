@@ -186,6 +186,8 @@ Documentation source files are available in the [`docs/`](docs/) directory:
 
 API details are available in Swagger (`/docs`).
 
+Pagination note: list endpoints accept `page` and `page_size` (default 10, max 100).
+
 ## Configuration
 
 All configuration lives in `.env`. The sample file is `.env.example`.
