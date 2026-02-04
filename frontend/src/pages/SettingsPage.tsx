@@ -505,29 +505,70 @@ export function SettingsPage() {
 }
 
 // Tab Components
-function QueryDefaultsTab(props: any) {
-  const {
-    llmModel, setLlmModel,
-    llmProvider, setLlmProvider,
-    temperature, setTemperature,
-    topK, setTopK,
-    maxContextChars, setMaxContextChars,
-    scoreThreshold, setScoreThreshold,
-    retrievalMode, setRetrievalMode,
-    lexicalTopK, setLexicalTopK,
-    hybridDenseWeight, setHybridDenseWeight,
-    hybridLexicalWeight, setHybridLexicalWeight,
-    linkHybridWeights, setLinkHybridWeights,
-    handleDenseWeightChange, handleLexicalWeightChange,
-    bm25MatchMode, setBm25MatchMode,
-    bm25MinShouldMatch, setBm25MinShouldMatch,
-    bm25UsePhrase, setBm25UsePhrase,
-    bm25Analyzer, setBm25Analyzer,
-    useStructure, setUseStructure,
-    structureRequestsPerMinute, setStructureRequestsPerMinute,
-    opensearchAvailable,
-    onSave, saving
-  } = props
+type QueryDefaultsTabProps = {
+  llmModel: string
+  setLlmModel: (value: string) => void
+  llmProvider: string
+  setLlmProvider: (value: string) => void
+  temperature: number
+  setTemperature: (value: number) => void
+  topK: number
+  setTopK: (value: number) => void
+  maxContextChars: number
+  setMaxContextChars: (value: number) => void
+  scoreThreshold: number
+  setScoreThreshold: (value: number) => void
+  retrievalMode: 'dense' | 'hybrid'
+  setRetrievalMode: (value: 'dense' | 'hybrid') => void
+  lexicalTopK: number
+  setLexicalTopK: (value: number) => void
+  hybridDenseWeight: number
+  setHybridDenseWeight: (value: number) => void
+  hybridLexicalWeight: number
+  setHybridLexicalWeight: (value: number) => void
+  linkHybridWeights: boolean
+  setLinkHybridWeights: (value: boolean) => void
+  handleDenseWeightChange: (value: number) => void
+  handleLexicalWeightChange: (value: number) => void
+  bm25MatchMode: string
+  setBm25MatchMode: (value: string) => void
+  bm25MinShouldMatch: number
+  setBm25MinShouldMatch: (value: number) => void
+  bm25UsePhrase: boolean
+  setBm25UsePhrase: (value: boolean) => void
+  bm25Analyzer: string
+  setBm25Analyzer: (value: string) => void
+  useStructure: boolean
+  setUseStructure: (value: boolean) => void
+  structureRequestsPerMinute: number
+  setStructureRequestsPerMinute: (value: number) => void
+  opensearchAvailable: boolean | null
+  onSave: () => void
+  saving: boolean
+}
+
+function QueryDefaultsTab({
+  llmModel, setLlmModel,
+  llmProvider, setLlmProvider,
+  temperature, setTemperature,
+  topK, setTopK,
+  maxContextChars, setMaxContextChars,
+  scoreThreshold, setScoreThreshold,
+  retrievalMode, setRetrievalMode,
+  lexicalTopK, setLexicalTopK,
+  hybridDenseWeight, setHybridDenseWeight,
+  hybridLexicalWeight, setHybridLexicalWeight,
+  linkHybridWeights, setLinkHybridWeights,
+  handleDenseWeightChange, handleLexicalWeightChange,
+  bm25MatchMode, setBm25MatchMode,
+  bm25MinShouldMatch, setBm25MinShouldMatch,
+  bm25UsePhrase, setBm25UsePhrase,
+  bm25Analyzer, setBm25Analyzer,
+  useStructure, setUseStructure,
+  structureRequestsPerMinute, setStructureRequestsPerMinute,
+  opensearchAvailable,
+  onSave, saving
+}: QueryDefaultsTabProps) {
 
   return (
     <div className="space-y-6">
@@ -802,13 +843,23 @@ function QueryDefaultsTab(props: any) {
   )
 }
 
-function KBDefaultsTab(props: any) {
-  const {
-    kbChunkSize, setKbChunkSize,
-    kbChunkOverlap, setKbChunkOverlap,
-    kbUpsertBatchSize, setKbUpsertBatchSize,
-    onSave, saving
-  } = props
+type KBDefaultsTabProps = {
+  kbChunkSize: number
+  setKbChunkSize: (value: number) => void
+  kbChunkOverlap: number
+  setKbChunkOverlap: (value: number) => void
+  kbUpsertBatchSize: number
+  setKbUpsertBatchSize: (value: number) => void
+  onSave: () => void
+  saving: boolean
+}
+
+function KBDefaultsTab({
+  kbChunkSize, setKbChunkSize,
+  kbChunkOverlap, setKbChunkOverlap,
+  kbUpsertBatchSize, setKbUpsertBatchSize,
+  onSave, saving
+}: KBDefaultsTabProps) {
 
   return (
     <div className="space-y-6">
