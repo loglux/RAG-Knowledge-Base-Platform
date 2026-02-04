@@ -9,7 +9,7 @@ interface FileUploadProps {
 
 export function FileUpload({
   onUpload,
-  accept = '.txt,.md,.fb2',
+  accept = '.txt,.md,.fb2,.docx',
   maxSize = 50,
   multiple = true,
 }: FileUploadProps) {

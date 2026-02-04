@@ -119,7 +119,7 @@ async def create_document(
 
     Processing happens in the background. Check document status to monitor progress.
 
-    Supported formats (MVP): txt, md, fb2
+    Supported formats (MVP): txt, md, fb2, docx
     """
     # Verify KB exists
     kb_query = select(KnowledgeBaseModel).where(
@@ -145,26 +145,40 @@ async def create_document(
         file_type = FileType.MD
     elif extension == "fb2":
         file_type = FileType.FB2
+    elif extension == "docx":
+        file_type = FileType.DOCX
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file type: {extension}. Supported: txt, md, fb2"
+            detail=f"Unsupported file type: {extension}. Supported: txt, md, fb2, docx"
         )
 
     # Read file content
     content_bytes = await file.read()
-    try:
-        content = content_bytes.decode('utf-8')
-    except UnicodeDecodeError:
-        import chardet
-        detected = chardet.detect(content_bytes)
-        encoding = detected.get("encoding")
-        if not encoding:
+    content: str
+    if file_type == FileType.DOCX:
+        from app.utils.file_handlers import process_file
+        try:
+            processed = process_file(content_bytes, filename, file_type)
+            content = processed["text"]
+        except Exception as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="File must be UTF-8 or a detectable text encoding"
-            )
-        content = content_bytes.decode(encoding, errors="replace")
+                detail=f"Failed to parse DOCX: {exc}"
+            ) from exc
+    else:
+        try:
+            content = content_bytes.decode('utf-8')
+        except UnicodeDecodeError:
+            import chardet
+            detected = chardet.detect(content_bytes)
+            encoding = detected.get("encoding")
+            if not encoding:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="File must be UTF-8 or a detectable text encoding"
+                )
+            content = content_bytes.decode(encoding, errors="replace")
 
     # Validate file size
     from app.config import settings

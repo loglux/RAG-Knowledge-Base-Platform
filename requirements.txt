@@ -32,6 +32,7 @@ langchain-openai==1.1.7
 
 # Document processing utilities
 pypdf==4.0.1
+python-docx==1.1.2
 python-magic==0.4.27
 chardet==5.2.0
 aiofiles==23.2.1

@@ -1,7 +1,10 @@
 """File type handlers for document processing."""
-from typing import Dict, Any
+from typing import Dict, Any, Union
 from pathlib import Path
 from xml.etree import ElementTree
+import io
+
+from docx import Document as DocxDocument
 
 from app.models.enums import FileType
 from app.utils.logger import get_logger
@@ -17,11 +20,11 @@ class FileHandler:
         """Check if this handler can process the given file type."""
         raise NotImplementedError
 
-    def extract_text(self, content: str, metadata: Dict[str, Any]) -> str:
+    def extract_text(self, content: Union[str, bytes], metadata: Dict[str, Any]) -> str:
         """Extract text content from file."""
         raise NotImplementedError
 
-    def extract_metadata(self, content: str, filename: str) -> Dict[str, Any]:
+    def extract_metadata(self, content: Union[str, bytes], filename: str) -> Dict[str, Any]:
         """Extract metadata from file."""
         raise NotImplementedError
 
@@ -33,21 +36,25 @@ class TextFileHandler(FileHandler):
         """Check if this is a text file."""
         return file_type == FileType.TXT
 
-    def extract_text(self, content: str, metadata: Dict[str, Any]) -> str:
+    def extract_text(self, content: Union[str, bytes], metadata: Dict[str, Any]) -> str:
         """
         Extract text from plain text file.
 
         For .txt files, content is already text, just sanitize it.
         """
         logger.debug("Extracting text from .txt file")
+        if isinstance(content, bytes):
+            content = content.decode("utf-8", errors="replace")
         return sanitize_text_content(content)
 
-    def extract_metadata(self, content: str, filename: str) -> Dict[str, Any]:
+    def extract_metadata(self, content: Union[str, bytes], filename: str) -> Dict[str, Any]:
         """
         Extract metadata from text file.
 
         Returns basic metadata like line count, character count.
         """
+        if isinstance(content, bytes):
+            content = content.decode("utf-8", errors="replace")
         lines = content.split('\n')
         return {
             "file_type": "txt",
@@ -65,7 +72,7 @@ class MarkdownFileHandler(FileHandler):
         """Check if this is a markdown file."""
         return file_type == FileType.MD
 
-    def extract_text(self, content: str, metadata: Dict[str, Any]) -> str:
+    def extract_text(self, content: Union[str, bytes], metadata: Dict[str, Any]) -> str:
         """
         Extract text from markdown file.
 
@@ -73,14 +80,18 @@ class MarkdownFileHandler(FileHandler):
         Future: Option to strip markdown syntax or convert to plain text.
         """
         logger.debug("Extracting text from .md file")
+        if isinstance(content, bytes):
+            content = content.decode("utf-8", errors="replace")
         return sanitize_text_content(content)
 
-    def extract_metadata(self, content: str, filename: str) -> Dict[str, Any]:
+    def extract_metadata(self, content: Union[str, bytes], filename: str) -> Dict[str, Any]:
         """
         Extract metadata from markdown file.
 
         Includes markdown-specific metadata like heading count.
         """
+        if isinstance(content, bytes):
+            content = content.decode("utf-8", errors="replace")
         lines = content.split('\n')
 
         # Count headings
@@ -106,8 +117,10 @@ class FB2FileHandler(FileHandler):
     def can_handle(self, file_type: FileType) -> bool:
         return file_type == FileType.FB2
 
-    def extract_text(self, content: str, metadata: Dict[str, Any]) -> str:
+    def extract_text(self, content: Union[str, bytes], metadata: Dict[str, Any]) -> str:
         logger.debug("Extracting text from .fb2 file")
+        if isinstance(content, bytes):
+            content = content.decode("utf-8", errors="replace")
         try:
             root = ElementTree.fromstring(content)
         except ElementTree.ParseError:
@@ -125,7 +138,9 @@ class FB2FileHandler(FileHandler):
 
         return sanitize_text_content("\n\n".join(texts))
 
-    def extract_metadata(self, content: str, filename: str) -> Dict[str, Any]:
+    def extract_metadata(self, content: Union[str, bytes], filename: str) -> Dict[str, Any]:
+        if isinstance(content, bytes):
+            content = content.decode("utf-8", errors="replace")
         try:
             root = ElementTree.fromstring(content)
         except ElementTree.ParseError:
@@ -166,6 +181,44 @@ class FB2FileHandler(FileHandler):
         }
 
 
+class DocxFileHandler(FileHandler):
+    """Handler for DOCX files."""
+
+    def can_handle(self, file_type: FileType) -> bool:
+        return file_type == FileType.DOCX
+
+    def _load_document(self, content: Union[str, bytes]) -> DocxDocument:
+        if isinstance(content, str):
+            content = content.encode("utf-8")
+        return DocxDocument(io.BytesIO(content))
+
+    def extract_text(self, content: Union[str, bytes], metadata: Dict[str, Any]) -> str:
+        logger.debug("Extracting text from .docx file")
+        doc = self._load_document(content)
+        texts = [p.text for p in doc.paragraphs if p.text and p.text.strip()]
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    cell_text = cell.text.strip()
+                    if cell_text:
+                        texts.append(cell_text)
+        return sanitize_text_content("\n\n".join(texts))
+
+    def extract_metadata(self, content: Union[str, bytes], filename: str) -> Dict[str, Any]:
+        doc = self._load_document(content)
+        paragraph_count = len(doc.paragraphs)
+        table_count = len(doc.tables)
+        text = "\n".join(p.text for p in doc.paragraphs if p.text)
+        return {
+            "file_type": "docx",
+            "filename": filename,
+            "paragraph_count": paragraph_count,
+            "table_count": table_count,
+            "char_count": len(text),
+            "word_count": len(text.split()),
+        }
+
+
 class FileHandlerFactory:
     """
     Factory for creating appropriate file handlers.
@@ -179,6 +232,7 @@ class FileHandlerFactory:
         TextFileHandler(),
         MarkdownFileHandler(),
         FB2FileHandler(),
+        DocxFileHandler(),
     ]
 
     @classmethod
@@ -215,7 +269,7 @@ class FileHandlerFactory:
         logger.info(f"Registered file handler: {handler.__class__.__name__}")
 
 
-def process_file(content: str, filename: str, file_type: FileType) -> Dict[str, Any]:
+def process_file(content: Union[str, bytes], filename: str, file_type: FileType) -> Dict[str, Any]:
     """
     Process a file and extract text and metadata.
 

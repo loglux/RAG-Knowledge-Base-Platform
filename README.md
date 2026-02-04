@@ -27,7 +27,7 @@ It can be used as a standalone service or integrated into other products via its
 
 ## Key features
 
-- **Document ingestion with intelligent chunking** (txt, md, fb2):
+- **Document ingestion with intelligent chunking** (txt, md, fb2, docx):
   - **Simple**: Fast fixed-size chunking with overlap
   - **Smart**: Recursive chunking respecting sentence/paragraph boundaries (recommended for most cases)
   - **Semantic**: Advanced embedding-based boundary detection using cosine similarity to find natural topic changes

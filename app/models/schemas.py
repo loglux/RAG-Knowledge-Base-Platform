@@ -164,8 +164,10 @@ class DocumentCreate(DocumentBase):
             return FileType.MD
         elif extension == "fb2":
             return FileType.FB2
+        elif extension == "docx":
+            return FileType.DOCX
         else:
-            raise ValueError(f"Unsupported file type: .{extension}. Supported: txt, md, fb2")
+            raise ValueError(f"Unsupported file type: .{extension}. Supported: txt, md, fb2, docx")
 
 
 class DocumentUpload(BaseModel):
