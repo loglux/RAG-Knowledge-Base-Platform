@@ -126,6 +126,8 @@ class SystemSettingsManager:
         Returns:
             Created or updated SystemSettings instance
         """
+        if isinstance(value, str):
+            value = value.strip()
         # Check if setting exists
         result = await db.execute(
             select(SystemSettings).where(SystemSettings.key == key)
@@ -236,7 +238,10 @@ class SystemSettingsManager:
         # Override with DB settings
         for db_key, env_key in SystemSettingsManager.DB_OVERRIDABLE_SETTINGS.items():
             if db_key in db_settings and db_settings[db_key]:
-                merged[env_key] = db_settings[db_key]
+                value = db_settings[db_key]
+                if isinstance(value, str):
+                    value = value.strip()
+                merged[env_key] = value
                 logger.debug(f"Overriding {env_key} from database")
 
         return merged
