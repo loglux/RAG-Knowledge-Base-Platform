@@ -107,7 +107,9 @@ export function useChat(kbId: string) {
       useStructure = false,
       useMmr = false,
       mmrDiversity = 0.5,
-      useSelfCheck = false
+      useSelfCheck = false,
+      useConversationHistory = true,
+      conversationHistoryLimit = 10
     ) => {
       if (!question.trim()) return
 
@@ -144,6 +146,8 @@ export function useChat(kbId: string) {
           use_mmr: useMmr,
           mmr_diversity: mmrDiversity,
           use_self_check: useSelfCheck,
+          use_conversation_history: useConversationHistory,
+          conversation_history_limit: conversationHistoryLimit,
         }
 
         const response = await apiClient.chat(request)

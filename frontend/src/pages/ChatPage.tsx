@@ -73,6 +73,12 @@ export function ChatPage() {
   const [useSelfCheck, setUseSelfCheck] = useState(() => {
     return false
   })
+  const [useConversationHistory, setUseConversationHistory] = useState(() => {
+    return true
+  })
+  const [conversationHistoryLimit, setConversationHistoryLimit] = useState(() => {
+    return 10
+  })
   const [opensearchAvailable, setOpensearchAvailable] = useState<boolean | null>(null)
   const [settingsLoaded, setSettingsLoaded] = useState(false)
   const [kbDefaultsApplied, setKbDefaultsApplied] = useState(false)
@@ -140,6 +146,12 @@ export function ChatPage() {
           setMmrDiversity(settings.mmr_diversity)
         }
         if (settings.use_self_check !== undefined) setUseSelfCheck(settings.use_self_check)
+        if (settings.use_conversation_history !== undefined) {
+          setUseConversationHistory(settings.use_conversation_history)
+        }
+        if (settings.conversation_history_limit !== undefined && settings.conversation_history_limit !== null) {
+          setConversationHistoryLimit(settings.conversation_history_limit)
+        }
         setSettingsLoaded(true)
       } catch (err) {
         console.error('Failed to load conversation settings:', err)
@@ -222,6 +234,12 @@ export function ChatPage() {
       if (draft.use_mmr !== undefined) setUseMmr(draft.use_mmr)
       if (draft.mmr_diversity !== undefined && draft.mmr_diversity !== null) setMmrDiversity(draft.mmr_diversity)
       if (draft.use_self_check !== undefined) setUseSelfCheck(draft.use_self_check)
+      if (draft.use_conversation_history !== undefined) {
+        setUseConversationHistory(draft.use_conversation_history)
+      }
+      if (draft.conversation_history_limit !== undefined && draft.conversation_history_limit !== null) {
+        setConversationHistoryLimit(draft.conversation_history_limit)
+      }
     } catch (err) {
       console.error('Failed to load draft chat settings:', err)
     }
@@ -277,12 +295,14 @@ export function ChatPage() {
       use_mmr: useMmr,
       mmr_diversity: mmrDiversity,
       use_self_check: useSelfCheck,
+      use_conversation_history: useConversationHistory,
+      conversation_history_limit: conversationHistoryLimit,
     }
 
     apiClient.updateConversationSettings(conversationId, payload).catch((err) => {
       console.error('Failed to update conversation settings:', err)
     })
-  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, llmModel, llmProvider, useStructure, useMmr, mmrDiversity, useSelfCheck])
+  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, llmModel, llmProvider, useStructure, useMmr, mmrDiversity, useSelfCheck, useConversationHistory, conversationHistoryLimit])
 
   useEffect(() => {
     if (conversationId || !settingsLoaded) return
@@ -305,13 +325,15 @@ export function ChatPage() {
       use_mmr: useMmr,
       mmr_diversity: mmrDiversity,
       use_self_check: useSelfCheck,
+      use_conversation_history: useConversationHistory,
+      conversation_history_limit: conversationHistoryLimit,
     }
     try {
       localStorage.setItem(settingsDraftKey, JSON.stringify(payload))
     } catch (err) {
       console.error('Failed to persist draft chat settings:', err)
     }
-  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, llmModel, llmProvider, useStructure, useMmr, mmrDiversity, useSelfCheck, settingsDraftKey])
+  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, llmModel, llmProvider, useStructure, useMmr, mmrDiversity, useSelfCheck, useConversationHistory, conversationHistoryLimit, settingsDraftKey])
 
   useEffect(() => {
     const fetchKB = async () => {
@@ -374,7 +396,9 @@ export function ChatPage() {
       useStructure,
       useMmr,
       mmrDiversity,
-      useSelfCheck
+      useSelfCheck,
+      useConversationHistory,
+      conversationHistoryLimit
     )
   }
 
@@ -415,6 +439,8 @@ export function ChatPage() {
       setUseMmr(false)
       setMmrDiversity(0.5)
       setUseSelfCheck(false)
+      setUseConversationHistory(true)
+      setConversationHistoryLimit(10)
 
       if (kb) {
         if (kb.bm25_match_mode !== null && kb.bm25_match_mode !== undefined) setBm25MatchMode(kb.bm25_match_mode)
@@ -530,6 +556,8 @@ export function ChatPage() {
           useMmr={useMmr}
           mmrDiversity={mmrDiversity}
           useSelfCheck={useSelfCheck}
+          useConversationHistory={useConversationHistory}
+          conversationHistoryLimit={conversationHistoryLimit}
           onTopKChange={setTopK}
           onTemperatureChange={setTemperature}
           onMaxContextCharsChange={setMaxContextChars}
@@ -547,6 +575,8 @@ export function ChatPage() {
           onUseMmrChange={setUseMmr}
           onMmrDiversityChange={setMmrDiversity}
           onUseSelfCheckChange={setUseSelfCheck}
+          onUseConversationHistoryChange={setUseConversationHistory}
+          onConversationHistoryLimitChange={setConversationHistoryLimit}
           onResetDefaults={handleResetDefaults}
           onClose={() => setShowSettings(false)}
         />

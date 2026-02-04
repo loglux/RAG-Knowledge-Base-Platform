@@ -23,6 +23,8 @@ interface ChatSettingsProps {
   useMmr: boolean
   mmrDiversity: number
   useSelfCheck: boolean
+  useConversationHistory: boolean
+  conversationHistoryLimit: number
   onTopKChange: (value: number) => void
   onTemperatureChange: (value: number) => void
   onMaxContextCharsChange: (value: number) => void
@@ -40,6 +42,8 @@ interface ChatSettingsProps {
   onUseMmrChange: (value: boolean) => void
   onMmrDiversityChange: (value: number) => void
   onUseSelfCheckChange: (value: boolean) => void
+  onUseConversationHistoryChange: (value: boolean) => void
+  onConversationHistoryLimitChange: (value: number) => void
   onResetDefaults: () => void
   onClose: () => void
 }
@@ -66,6 +70,8 @@ export function ChatSettings({
   useMmr,
   mmrDiversity,
   useSelfCheck,
+  useConversationHistory,
+  conversationHistoryLimit,
   onTopKChange,
   onTemperatureChange,
   onMaxContextCharsChange,
@@ -83,6 +89,8 @@ export function ChatSettings({
   onUseMmrChange,
   onMmrDiversityChange,
   onUseSelfCheckChange,
+  onUseConversationHistoryChange,
+  onConversationHistoryLimitChange,
   onResetDefaults,
   onClose,
 }: ChatSettingsProps) {
@@ -223,26 +231,60 @@ export function ChatSettings({
           )}
         </div>
 
-        {/* Self-Check Validation Toggle */}
-        <div className="mb-6 p-4 bg-gray-900 rounded-lg border border-gray-700">
-          <label className="flex items-center space-x-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={useSelfCheck}
-              onChange={(e) => onUseSelfCheckChange(e.target.checked)}
-              className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
-            />
-            <div className="flex-1">
-              <span className="text-sm font-medium text-white">
-                Enable Self-Check Validation
-              </span>
-              <p className="text-xs text-gray-400 mt-1">
-                Validates generated answers against retrieved context to ensure accuracy and prevent hallucinations.
-                The system generates a draft answer, then validates it for factual grounding before returning.
-              </p>
-            </div>
-          </label>
+      {/* Self-Check Validation Toggle */}
+      <div className="mb-6 p-4 bg-gray-900 rounded-lg border border-gray-700">
+        <label className="flex items-center space-x-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={useSelfCheck}
+            onChange={(e) => onUseSelfCheckChange(e.target.checked)}
+            className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
+          />
+          <div className="flex-1">
+            <span className="text-sm font-medium text-white">
+              Enable Self-Check Validation
+            </span>
+            <p className="text-xs text-gray-400 mt-1">
+              Validates generated answers against retrieved context to ensure accuracy and prevent hallucinations.
+              The system generates a draft answer, then validates it for factual grounding before returning.
+            </p>
+          </div>
+        </label>
+      </div>
+
+      {/* Conversation History */}
+      <div className="mb-6 p-4 bg-gray-900 rounded-lg border border-gray-700">
+        <label className="flex items-center space-x-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={useConversationHistory}
+            onChange={(e) => onUseConversationHistoryChange(e.target.checked)}
+            className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
+          />
+          <div className="flex-1">
+            <span className="text-sm font-medium text-white">
+              Use Conversation History
+            </span>
+            <p className="text-xs text-gray-400 mt-1">
+              Include recent messages to preserve context across turns.
+            </p>
+          </div>
+        </label>
+        <div className="mt-3 flex items-center gap-3 text-xs text-gray-300">
+          <span>History limit</span>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            value={conversationHistoryLimit}
+            onChange={(e) => onConversationHistoryLimitChange(Number(e.target.value))}
+            disabled={!useConversationHistory}
+            className="w-20 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-gray-100 disabled:opacity-50"
+          />
+          <span className="text-gray-500">messages</span>
         </div>
+      </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* LLM Model */}

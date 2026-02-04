@@ -193,6 +193,8 @@ export interface ChatMessage {
   use_mmr?: boolean
   mmr_diversity?: number
   use_self_check?: boolean
+  use_conversation_history?: boolean
+  conversation_history_limit?: number
 }
 
 export interface SourceChunk {
@@ -276,6 +278,8 @@ export interface ConversationSettings {
   use_mmr?: boolean
   mmr_diversity?: number
   use_self_check?: boolean
+  use_conversation_history?: boolean
+  conversation_history_limit?: number
 }
 
 export interface ConversationDetail {

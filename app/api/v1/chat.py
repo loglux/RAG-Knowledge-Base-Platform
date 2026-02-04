@@ -145,17 +145,37 @@ async def chat_query(
 
         # Convert conversation history to dict format
         history_dicts = None
+        use_history = request.use_conversation_history
+        history_limit = request.conversation_history_limit
+
+        if use_history is None and conversation and conversation.settings_json:
+            try:
+                settings_payload = json.loads(conversation.settings_json)
+                if use_history is None:
+                    use_history = settings_payload.get("use_conversation_history")
+                if history_limit is None:
+                    history_limit = settings_payload.get("conversation_history_limit")
+            except Exception:
+                pass
+
+        if use_history is None:
+            use_history = True
+        if history_limit is None:
+            history_limit = 10
+        if history_limit < 0:
+            history_limit = 0
+
         if request.conversation_history:
             history_dicts = [
                 {"role": msg.role, "content": msg.content}
                 for msg in request.conversation_history
             ]
-        elif conversation:
+        elif conversation and use_history and history_limit > 0:
             history_query = (
                 select(ChatMessageModel)
                 .where(ChatMessageModel.conversation_id == conversation.id)
                 .order_by(desc(ChatMessageModel.message_index))
-                .limit(10)
+                .limit(history_limit)
             )
             history_result = await db.execute(history_query)
             history_messages = list(reversed(history_result.scalars().all()))
@@ -273,6 +293,8 @@ async def chat_query(
                 "use_mmr": request.use_mmr,
                 "mmr_diversity": request.mmr_diversity,
                 "use_self_check": request.use_self_check,
+                "use_conversation_history": request.use_conversation_history,
+                "conversation_history_limit": request.conversation_history_limit,
             })
             conversation.settings_json = json.dumps(existing_settings)
 

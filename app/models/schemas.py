@@ -329,6 +329,8 @@ class ConversationSettings(BaseModel):
     use_mmr: Optional[bool] = Field(default=None)
     mmr_diversity: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     use_self_check: Optional[bool] = Field(default=None)
+    use_conversation_history: Optional[bool] = Field(default=None)
+    conversation_history_limit: Optional[int] = Field(default=None, ge=0, le=100)
 
 
 class AppSettingsBase(BaseModel):
@@ -488,6 +490,16 @@ class ChatRequest(BaseModel):
     use_self_check: Optional[bool] = Field(
         default=False,
         description="Enable self-check validation of generated answers"
+    )
+    use_conversation_history: Optional[bool] = Field(
+        default=None,
+        description="Whether to include conversation history in the prompt"
+    )
+    conversation_history_limit: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description="Number of recent messages to include from history"
     )
 
 
