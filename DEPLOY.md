@@ -164,21 +164,13 @@ docker exec kb-platform-backend-prod grep -n "your_change" /app/path/to/file.py
 
 ---
 
-## Development vs Production
+## Local Docker (single stack)
 
-### Development (с hot-reload)
 ```bash
-docker-compose -f docker-compose.dev.yml up -d
+docker compose up -d --build
 ```
 
-**Особенность:** Код монтируется как volume, изменения видны мгновенно (uvicorn --reload)
-
-### Production (требует пересборку при изменениях)
-```bash
-docker compose --env-file .env.production up -d
-```
-
-**Особенность:** Код "запекается" в образ, требует rebuild для любых изменений
+**Важно:** код "запекается" в образ, поэтому при изменениях нужен rebuild.
 
 ---
 

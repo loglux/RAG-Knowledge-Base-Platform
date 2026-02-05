@@ -8,11 +8,7 @@ Keep it practical: steps, context, and troubleshooting.
 ## 1) Architecture & Responsibility
 
 **Backend** runs in Docker (API + DB + Qdrant + OpenSearch).  
-**Frontend** runs locally with Vite (dev UX, instant HMR, no rebuilds).
-
-Why this split:
-- Backend dependencies are heavy and stable → containerized.
-- Frontend iteration is frequent → local Vite is fastest.
+**Frontend** runs in Docker (nginx serving a production build).
 
 ---
 
@@ -21,7 +17,7 @@ Why this split:
 We use **5174** for the UI because **5173 is already taken** on this host.  
 We use **8004** for the API because **8000/8001** were already occupied here.  
 These are local conventions only—ports can be changed if needed (including the API port). If you change them, update:
-- `frontend/.env` (`VITE_API_BASE_URL`)
+- `frontend/.env.production.local` (`VITE_API_BASE_URL`) and rebuild the frontend
 - backend `CORS_ORIGINS`
 - any docs/scripts that mention the port
 
@@ -35,48 +31,25 @@ These are local conventions only—ports can be changed if needed (including the
 
 ---
 
-## 3) Backend (Docker)
+## 3) Stack (Docker)
 
-Start backend services (order matters: db/qdrant/opensearch first, then api):
+Start the stack:
 ```bash
-docker compose -f docker-compose.dev.yml up -d db qdrant opensearch api
+docker compose up -d --build
 ```
 
-Why:
-- DB/Qdrant/OpenSearch must be running before the API.
-- Docker guarantees stable dependencies.
+This brings up frontend, API, DB, and vector stores.
 
 ---
 
-## 4) Frontend (Vite)
+## 4) How URLs Are Formed
 
-Start Vite dev server:
-```bash
-cd frontend
-npm run dev -- --host 0.0.0.0 --port 5174
-```
-
-Why:
-- Local HMR = instant changes.
-- Host `0.0.0.0` allows access from another machine.
+The frontend is served by nginx and proxies `/api/` to the API container,
+so the UI can call `/api/v1` without a separate base URL.
 
 ---
 
-## 5) How URLs Are Formed
-
-The frontend calls the API directly with a base URL, **not** via Vite proxy.
-We set:
-```
-VITE_API_BASE_URL=http://<host>:8004
-VITE_API_PREFIX=/api/v1
-```
-
-This ensures the browser requests hit the API on the server IP
-and never try to call `localhost` on the client machine.
-
----
-
-## 6) Environment Variables
+## 5) Environment Variables
 
 ### Backend `.env`
 Important:
@@ -85,21 +58,23 @@ Important:
 - `OPENSEARCH_URL` should point to the OpenSearch container:
   `http://opensearch:9200`
 
-### Frontend `frontend/.env`
+### Frontend env (optional)
+If you need a custom API base URL (different domain/port), set:
 ```
 VITE_API_BASE_URL=http://<host>:8004
 VITE_API_PREFIX=/api/v1
 ```
+Then rebuild the frontend image.
 
 ---
 
-## 7) CORS: Applying Changes
+## 6) CORS: Applying Changes
 
 Changing `.env` does **not** update a running container.
 You must recreate the API container:
 
 ```bash
-docker compose -f docker-compose.dev.yml up -d --force-recreate api
+docker compose up -d --force-recreate api
 ```
 
 Verify:
@@ -109,7 +84,7 @@ docker exec kb-platform-api printenv CORS_ORIGINS
 
 ---
 
-## 8) Migrations
+## 7) Migrations
 
 Migrations are run automatically on API container start (see `docker/entrypoint.sh`).
 If the API is already running, you can apply migrations manually inside the container:
@@ -121,7 +96,7 @@ Note: Alembic revision IDs in this repo use numeric IDs (e.g., `012`, `013`). En
 
 ---
 
-## 8.1) Update After `git pull` (Local Docker)
+## 7.1) Update After `git pull` (Local Docker)
 
 Recommended quick update:
 ```bash
@@ -155,7 +130,7 @@ echo ">>> Done!"
 
 ---
 
-## 9) Verification Checklist
+## 8) Verification Checklist
 
 1) API health:
 ```bash

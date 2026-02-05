@@ -127,31 +127,29 @@ cp .env.example .env
 
 [RUNBOOK.md](RUNBOOK.md)
 
-3) Start backend services
+3) Start the stack
 
 ```bash
-docker compose -f docker-compose.dev.yml up -d
+docker compose up -d --build
 ```
 
 4) Open API docs
 
 ```text
-http://localhost:8000/docs
+http://localhost:8004/docs
 ```
 
-## Quick start (local dev)
+## Quick start (local Docker)
 
-This is for running the API on the host (not Docker).
+The default setup runs everything in Docker (frontend + API + DB + vector stores).
 
 ```bash
-python3.12 -m venv venv
-source venv/bin/activate
-pip install -r requirements-dev.txt
-
-docker compose -f docker-compose.dev.yml up -d db qdrant opensearch
-alembic upgrade head
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+docker compose up -d --build
 ```
+
+URLs:
+- UI: `http://localhost:5174`
+- API: `http://localhost:8004/api/v1`
 
 ## 📚 Documentation
 
