@@ -225,13 +225,13 @@ export function DashboardPage() {
                   Page {page} of {totalPages} · {total} total
                 </div>
                 <div className="flex items-center space-x-2">
-                  <button
+                  <Button
                     onClick={prevPage}
                     disabled={page === 1}
-                    className="btn-secondary px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     ← Previous
-                  </button>
+                  </Button>
                   <div className="flex items-center space-x-1">
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
                       // Show first page, last page, current page, and pages around current
@@ -269,13 +269,13 @@ export function DashboardPage() {
                       )
                     })}
                   </div>
-                  <button
+                  <Button
                     onClick={nextPage}
                     disabled={page === totalPages}
-                    className="btn-secondary px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Next →
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}

@@ -643,9 +643,9 @@ export function ChatPage() {
           <div className="text-6xl mb-4">❌</div>
           <h2 className="text-xl font-semibold text-white mb-2">Error</h2>
           <p className="text-gray-400 mb-4">{kbError || 'Knowledge base not found'}</p>
-          <button onClick={() => navigate('/')} className="btn-primary">
+          <Button variant="primary" onClick={() => navigate('/')}>
             Go Home
-          </button>
+          </Button>
         </div>
       </div>
     )

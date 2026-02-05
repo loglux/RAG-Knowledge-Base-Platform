@@ -1,4 +1,5 @@
 import React from 'react'
+import { Button } from '../common/Button'
 
 interface TOCSection {
   id: string
@@ -119,19 +120,19 @@ export function StructureAnalysisModal({
             )}
           </div>
           <div className="flex space-x-3">
-            <button onClick={onClose} className="btn-secondary">
+            <Button onClick={onClose}>
               Cancel
-            </button>
+            </Button>
             {onApply && (
-              <button
+              <Button
+                variant="primary"
                 onClick={() => {
                   onApply(analysis)
                   onClose()
                 }}
-                className="btn-primary"
               >
                 {isApplied ? '🔄 Update Structure' : '✓ Apply Structure'}
-              </button>
+              </Button>
             )}
           </div>
         </div>

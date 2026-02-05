@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { apiClient } from '../services/api'
 import { LLMSelector } from '../components/chat/LLMSelector'
+import { Button } from '../components/common/Button'
 import type {
   AppSettings,
   PromptVersionDetail,
@@ -1157,13 +1158,13 @@ function QueryDefaultsTab({
       </div>
 
       <div className="flex justify-end">
-        <button
-          className="btn-primary"
+        <Button
+          variant="primary"
           onClick={onSave}
           disabled={saving}
         >
           {saving ? 'Saving...' : 'Save Query Defaults'}
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -1252,13 +1253,13 @@ function KBDefaultsTab({
       </div>
 
       <div className="flex justify-end">
-        <button
-          className="btn-primary"
+        <Button
+          variant="primary"
           onClick={onSave}
           disabled={saving}
         >
           {saving ? 'Saving...' : 'Save KB Defaults'}
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -1404,13 +1405,13 @@ function AIProvidersTab(props: any) {
       </div>
 
       <div className="flex justify-end">
-        <button
-          className="btn-primary"
+        <Button
+          variant="primary"
           onClick={onSave}
           disabled={saving}
         >
           {saving ? 'Saving...' : 'Save AI Provider Settings'}
-        </button>
+        </Button>
       </div>
     </div>
   )
@@ -1490,20 +1491,19 @@ function PromptsTab(props: any) {
             User template is fixed in code for safety and consistency.
           </p>
           <div className="flex flex-wrap gap-3">
-            <button
-              className="btn-secondary"
+            <Button
               onClick={onSaveDraft}
               disabled={saving}
             >
               {saving ? 'Saving...' : 'Save Draft'}
-            </button>
-            <button
-              className="btn-primary"
+            </Button>
+            <Button
+              variant="primary"
               onClick={onActivateDraft}
               disabled={saving}
             >
               {saving ? 'Saving...' : 'Activate'}
-            </button>
+            </Button>
           </div>
           <p className="text-xs text-gray-400 mt-3">
             Activate sets this prompt for KB chat responses.
@@ -1631,20 +1631,19 @@ function PromptsTab(props: any) {
             User template is fixed in code for safety and consistency.
           </p>
           <div className="flex flex-wrap gap-3">
-            <button
-              className="btn-secondary"
+            <Button
               onClick={onSaveSelfCheckDraft}
               disabled={saving}
             >
               {saving ? 'Saving...' : 'Save Draft'}
-            </button>
-            <button
-              className="btn-primary"
+            </Button>
+            <Button
+              variant="primary"
               onClick={onActivateSelfCheckDraft}
               disabled={saving}
             >
               {saving ? 'Saving...' : 'Activate'}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -1751,13 +1750,13 @@ function PromptsTab(props: any) {
           <span className="text-gray-200 text-sm">Show prompt version badges in chat responses</span>
         </label>
         <div className="flex justify-end mt-4">
-          <button
-            className="btn-primary"
+          <Button
+            variant="primary"
             onClick={onSaveDisplaySettings}
             disabled={saving}
           >
             {saving ? 'Saving...' : 'Save Display Settings'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -1876,13 +1875,13 @@ function DatabasesTab(props: any) {
       </div>
 
       <div className="flex justify-end">
-        <button
-          className="btn-primary"
+        <Button
+          variant="primary"
           onClick={onSave}
           disabled={saving}
         >
           {saving ? 'Saving...' : 'Save Database Settings'}
-        </button>
+        </Button>
       </div>
 
       {/* PostgreSQL Password Change */}

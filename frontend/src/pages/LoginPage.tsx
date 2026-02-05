@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { Button } from '../components/common/Button'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -60,13 +61,14 @@ export function LoginPage() {
               required
             />
           </div>
-          <button
+          <Button
             type="submit"
-            className="btn-primary w-full"
+            variant="primary"
+            className="w-full"
             disabled={loading}
           >
             {loading ? 'Signing in...' : 'Sign in'}
-          </button>
+          </Button>
         </form>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { Button } from '../common/Button'
 
 interface ChatInputProps {
   onSend: (message: string) => void
@@ -50,13 +51,14 @@ export function ChatInput({ onSend, disabled = false }: ChatInputProps) {
           style={{ maxHeight: '200px' }}
         />
       </div>
-      <button
+      <Button
         type="submit"
+        variant="primary"
         disabled={disabled || !input.trim()}
-        className="btn-primary px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Send
-      </button>
+      </Button>
     </form>
   )
 }

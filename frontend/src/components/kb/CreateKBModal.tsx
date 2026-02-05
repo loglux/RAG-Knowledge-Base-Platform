@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { Button } from '../common/Button'
 import { Modal } from '../common/Modal'
 import { apiClient } from '../../services/api'
 import type { CreateKBRequest, EmbeddingModel } from '../../types/index'
@@ -487,21 +488,21 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
 
         {/* Actions */}
         <div className="flex justify-end space-x-3 pt-4">
-          <button
+          <Button
             type="button"
             onClick={handleClose}
             disabled={isSubmitting}
-            className="btn-secondary"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
+            variant="primary"
             disabled={isSubmitting}
-            className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            className="disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? 'Creating...' : 'Create KB'}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

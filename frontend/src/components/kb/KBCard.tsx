@@ -1,4 +1,5 @@
 import React from 'react'
+import { Button } from '../common/Button'
 import { useNavigate } from 'react-router-dom'
 import type { KnowledgeBase } from '../../types/index'
 
@@ -79,26 +80,30 @@ export function KBCard({ kb, onDelete }: KBCardProps) {
       </div>
 
       <div className="pt-4 border-t border-gray-700 flex space-x-2">
-        <button
-          className="btn-primary text-sm flex-1"
+        <Button
+          variant="primary"
+          size="sm"
+          className="flex-1"
           onClick={handleChatClick}
         >
           💬 Chat
-        </button>
-        <button
-          className="btn-secondary text-sm flex-1"
+        </Button>
+        <Button
+          size="sm"
+          className="flex-1"
           onClick={handleDocumentsClick}
         >
           📄 Documents
-        </button>
+        </Button>
         {onDelete && (
-          <button
-            className="btn-secondary text-sm px-3"
+          <Button
+            size="sm"
+            className="px-3"
             onClick={handleDelete}
             aria-label="Delete knowledge base"
           >
             🗑️
-          </button>
+          </Button>
         )}
       </div>
     </div>

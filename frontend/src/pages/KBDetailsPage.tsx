@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { apiClient } from '../services/api'
+import { Button } from '../components/common/Button'
 import { useDocuments } from '../hooks/useDocuments'
 import { useDocumentPolling } from '../hooks/useDocumentPolling'
 import { FileUpload } from '../components/documents/FileUpload'
@@ -634,9 +635,9 @@ export function KBDetailsPage() {
           <div className="text-6xl mb-4">❌</div>
           <h2 className="text-xl font-semibold text-white mb-2">Error</h2>
           <p className="text-gray-400 mb-4">{kbError || 'Knowledge base not found'}</p>
-          <button onClick={() => navigate('/')} className="btn-primary">
+          <Button variant="primary" onClick={() => navigate('/')}>
             Go Home
-          </button>
+          </Button>
         </div>
       </div>
     )
@@ -676,20 +677,21 @@ export function KBDetailsPage() {
                       placeholder="Knowledge base name"
                       disabled={nameSaving}
                     />
-                    <button
+                    <Button
                       onClick={handleSaveName}
-                      className="btn-primary btn-sm"
+                      variant="primary"
+                      size="sm"
                       disabled={nameSaving}
                     >
                       {nameSaving ? 'Saving...' : 'Save'}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={handleCancelEditName}
-                      className="btn-secondary btn-sm"
+                      size="sm"
                       disabled={nameSaving}
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
@@ -708,12 +710,9 @@ export function KBDetailsPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={handleLogout}
-                className="btn-secondary btn-sm"
-              >
+              <Button onClick={handleLogout} size="sm">
                 Logout
-              </button>
+              </Button>
               <button
                 onClick={handleDelete}
                 className="text-gray-400 hover:text-red-500 transition-colors px-3 py-2"
@@ -738,25 +737,26 @@ export function KBDetailsPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Action Buttons */}
         <div className="flex items-center space-x-4 mb-8">
-          <button
+          <Button
             onClick={() => navigate(`/kb/${kb.id}/chat`)}
-            className="btn-primary flex items-center space-x-2"
+            variant="primary"
+            className="flex items-center space-x-2"
           >
             <span>💬</span>
             <span>Chat with KB</span>
-          </button>
-          <button onClick={refreshDocuments} className="btn-secondary flex items-center space-x-2">
+          </Button>
+          <Button onClick={refreshDocuments} className="flex items-center space-x-2">
             <span>⟳</span>
             <span>Refresh</span>
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={handleAnalyzeAll}
             disabled={bulkAnalyzing}
-            className="btn-secondary flex items-center space-x-2 disabled:opacity-60"
+            className="flex items-center space-x-2 disabled:opacity-60"
           >
             <span>🔍</span>
             <span>{bulkAnalyzing ? 'Analyzing…' : 'Analyze All'}</span>
-          </button>
+          </Button>
           <label className="flex items-center space-x-2 text-sm text-gray-400">
             <input
               type="checkbox"
@@ -847,13 +847,14 @@ export function KBDetailsPage() {
                   onChange={(e) => setQaFile(e.target.files?.[0] || null)}
                   className="text-xs text-gray-300"
                 />
-                <button
+                <Button
                   onClick={handleUploadQaFile}
                   disabled={!qaFile || qaUploading}
-                  className="btn-secondary btn-xs-wide disabled:opacity-60"
+                  size="xs-wide"
+                  className="disabled:opacity-60"
                 >
                   {qaUploading ? 'Uploading…' : 'Upload'}
-                </button>
+                </Button>
               </div>
               {qaUploadMessage && (
                 <div className="mt-2 text-xs text-gray-400">{qaUploadMessage}</div>
@@ -890,22 +891,25 @@ export function KBDetailsPage() {
                 </select>
               </div>
               <div>
-                <button
+                <Button
                   onClick={handleRunGoldEval}
                   disabled={qaRunning}
-                  className="btn-primary btn-xs-wide disabled:opacity-60"
+                  variant="primary"
+                  size="xs-wide"
+                  className="disabled:opacity-60"
                 >
                   {qaRunning ? 'Running…' : 'Run Evaluation'}
-                </button>
+                </Button>
               </div>
               <div>
-                <button
+                <Button
                   onClick={handleRunPresetSuite}
                   disabled={qaPresetRunning || qaRunning}
-                  className="btn-secondary btn-xs-wide disabled:opacity-60"
+                  size="xs-wide"
+                  className="disabled:opacity-60"
                 >
                   {qaPresetRunning ? 'Running presets…' : 'Run Preset Suite'}
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -918,13 +922,14 @@ export function KBDetailsPage() {
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-sm font-semibold text-gray-200">Runs</h4>
               {qaRuns.length > 0 && (
-                <button
+                <Button
                   onClick={handleDeleteAllRuns}
                   disabled={qaDeleting}
-                  className="btn-secondary text-[11px] px-2 py-1 disabled:opacity-60"
+                  size="xs"
+                  className="disabled:opacity-60"
                 >
                   Clear All
-                </button>
+                </Button>
               )}
             </div>
             {qaRunsError && <div className="text-xs text-red-400 mb-2">{qaRunsError}</div>}
@@ -1009,19 +1014,19 @@ export function KBDetailsPage() {
                           </div>
                         )}
                       </div>
-                      <button
+                      <Button
                         onClick={() => handleSelectRun(run.id)}
-                        className="btn-secondary text-[11px] px-2 py-1"
+                        size="xs"
                       >
                         View
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         onClick={() => handleDeleteRun(run.id)}
                         disabled={qaDeleting}
-                        className="btn-secondary text-[11px] px-2 py-1"
+                        size="xs"
                       >
                         Delete
-                      </button>
+                      </Button>
                     </div>
                   )
                 })}
@@ -1035,12 +1040,12 @@ export function KBDetailsPage() {
                 <h4 className="text-sm font-semibold text-gray-200">
                   Run Details
                 </h4>
-                <button
+                <Button
                   onClick={() => setQaDetailsSeed((value) => value + 1)}
-                  className="btn-secondary text-[11px] px-2 py-1"
+                  size="xs"
                 >
                   Collapse All
-                </button>
+                </Button>
               </div>
               {qaSelectedRun.run.metrics && (
                 <div className="mb-4 text-xs text-gray-300 bg-gray-900/70 border border-gray-800 rounded px-3 py-2">
@@ -1134,12 +1139,12 @@ export function KBDetailsPage() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-white">Configuration</h3>
             {!isEditingSettings && (
-              <button
+              <Button
                 onClick={() => setIsEditingSettings(true)}
-                className="btn-secondary btn-xs-wide"
+                size="xs-wide"
               >
                 Edit
-              </button>
+              </Button>
             )}
           </div>
 
@@ -1429,20 +1434,21 @@ export function KBDetailsPage() {
               )}
 
               <div className="flex items-center gap-2">
-                <button
+                <Button
                   onClick={handleSaveSettings}
-                  className="btn-primary btn-xs-wide"
+                  variant="primary"
+                  size="xs-wide"
                   disabled={settingsSaving}
                 >
                   {settingsSaving ? 'Saving...' : 'Save'}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={handleCancelSettings}
-                  className="btn-secondary btn-xs-wide"
+                  size="xs-wide"
                   disabled={settingsSaving}
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
@@ -1503,26 +1509,26 @@ export function KBDetailsPage() {
             <div className="text-xs text-gray-500">
               Reindex is required to include existing documents in BM25 hybrid search.
             </div>
-            <button
+            <Button
               onClick={handleReindexBm25}
-              className="btn-secondary btn-xs-wide"
+              size="xs-wide"
               disabled={reindexing}
             >
               {reindexing ? 'Reindexing…' : 'Reindex for BM25'}
-            </button>
+            </Button>
           </div>
 
           <div className="mt-4 flex items-center justify-between">
             <div className="text-xs text-gray-500">
               Reprocess documents to apply current chunking strategy to existing documents.
             </div>
-            <button
+            <Button
               onClick={handleReprocessWithNewStrategy}
-              className="btn-secondary btn-xs-wide"
+              size="xs-wide"
               disabled={reindexing}
             >
               {reindexing ? 'Reprocessing…' : 'Reprocess All Documents'}
-            </button>
+            </Button>
           </div>
 
           <div className="mt-4 border-t border-gray-700 pt-4 space-y-3">
@@ -1550,13 +1556,13 @@ export function KBDetailsPage() {
                   className="w-40 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-100"
                   disabled={regenTitlesLoading}
                 />
-                <button
+                <Button
                   onClick={handleRegenerateTitles}
-                  className="btn-secondary btn-xs-wide"
+                  size="xs-wide"
                   disabled={regenTitlesLoading}
                 >
                   {regenTitlesLoading ? 'Regenerating…' : 'Regenerate Chat Titles'}
-                </button>
+                </Button>
               </div>
             </div>
             {regenTitlesMessage && (
