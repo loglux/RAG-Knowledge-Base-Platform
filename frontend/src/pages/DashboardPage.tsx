@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { CreateKBModal } from '../components/kb/CreateKBModal'
 import { KBCard } from '../components/kb/KBCard'
 import { apiClient } from '../services/api'
+import { Button } from '../components/common/Button'
 
 export function DashboardPage() {
   const navigate = useNavigate()
@@ -58,20 +59,22 @@ export function DashboardPage() {
               <h1 className="text-2xl font-bold text-white">Knowledge Base Platform</h1>
             </div>
             <div className="flex items-center space-x-4">
-              <button
+              <Button
                 onClick={() => navigate('/settings')}
-                className="btn-secondary btn-sm flex items-center gap-2"
+                size="sm"
+                className="flex items-center gap-2"
               >
                 <span aria-hidden="true">⚙️</span>
                 <span>Settings</span>
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleLogout}
-                className="btn-secondary btn-sm flex items-center gap-2"
+                size="sm"
+                className="flex items-center gap-2"
               >
                 <span aria-hidden="true">⎋</span>
                 <span>Logout</span>
-              </button>
+              </Button>
               <div className="text-sm text-gray-400">
                 {loading ? 'Loading...' : `${total} knowledge base${total !== 1 ? 's' : ''}`}
               </div>
@@ -111,13 +114,14 @@ export function DashboardPage() {
             {activeTab === 'trash' ? 'Deleted Knowledge Bases' : 'Your Knowledge Bases'}
           </h2>
           {activeTab === 'active' && (
-            <button
+            <Button
               onClick={() => setIsCreateModalOpen(true)}
-              className="btn-primary flex items-center space-x-2"
+              variant="primary"
+              className="flex items-center space-x-2"
             >
               <span>+</span>
               <span>New KB</span>
-            </button>
+            </Button>
           )}
         </div>
 
@@ -149,12 +153,12 @@ export function DashboardPage() {
                 : 'Create your first knowledge base to get started'}
             </p>
             {activeTab === 'active' && (
-              <button
+              <Button
                 onClick={() => setIsCreateModalOpen(true)}
-                className="btn-primary"
+                variant="primary"
               >
                 + Create Knowledge Base
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -183,24 +187,25 @@ export function DashboardPage() {
                         <span>{kb.total_chunks} chunks</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <button
+                        <Button
                           onClick={(e) => {
                             e.stopPropagation()
                             handleRestore(kb.id)
                           }}
-                          className="btn-primary btn-sm"
+                          variant="primary"
+                          size="sm"
                         >
                           Restore
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           onClick={(e) => {
                             e.stopPropagation()
                             handlePurge(kb.id)
                           }}
-                          className="btn-secondary btn-sm"
+                          size="sm"
                         >
                           Purge
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   ) : (

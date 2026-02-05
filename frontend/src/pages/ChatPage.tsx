@@ -8,6 +8,9 @@ import { SourceCard } from '../components/chat/SourceCard'
 import { ChatInput } from '../components/chat/ChatInput'
 import { ChatSettings } from '../components/chat/ChatSettings'
 import { ConversationList } from '../components/chat/ConversationList'
+import { Panel } from '../components/common/Panel'
+import { PanelHeader } from '../components/common/PanelHeader'
+import { Button } from '../components/common/Button'
 import type { KnowledgeBase, ConversationSettings, Document } from '../types/index'
 
 export function ChatPage() {
@@ -671,12 +674,9 @@ export function ChatPage() {
               </div>
             </div>
             <div className="flex items-center space-x-3">
-              <button
-                onClick={handleLogout}
-                className="btn-secondary btn-sm"
-              >
+              <Button onClick={handleLogout} size="sm">
                 Logout
-              </button>
+              </Button>
               <button
                 onClick={() => setShowSettings(!showSettings)}
                 className="text-gray-400 hover:text-white transition-colors px-3 py-2"
@@ -797,28 +797,30 @@ export function ChatPage() {
 
             <section className="min-w-0 h-full min-h-0 flex flex-col">
               <div className="lg:hidden mb-4">
-                <div className="panel p-3 flex items-center justify-between">
-                  <div className="min-w-0">
-                    <div className="text-xs text-gray-400">Chats</div>
-                    <div className="text-sm text-white truncate">{activeConversationTitle}</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => startNewChat()}
-                      className="btn-secondary btn-xs"
-                    >
-                      New
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMobileChatListOpen((prev) => !prev)}
-                      className="btn-secondary btn-xs"
-                    >
-                      {mobileChatListOpen ? 'Hide' : 'Show'}
-                    </button>
-                  </div>
-                </div>
+                <Panel className="p-3">
+                  <PanelHeader
+                    title={(
+                      <div className="min-w-0">
+                        <div className="text-xs text-gray-400">Chats</div>
+                        <div className="text-sm text-white truncate">{activeConversationTitle}</div>
+                      </div>
+                    )}
+                    actions={(
+                      <>
+                        <Button type="button" onClick={() => startNewChat()} size="xs">
+                          New
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => setMobileChatListOpen((prev) => !prev)}
+                          size="xs"
+                        >
+                          {mobileChatListOpen ? 'Hide' : 'Show'}
+                        </Button>
+                      </>
+                    )}
+                  />
+                </Panel>
 
                 {mobileChatListOpen && (
                   <div className="mt-3">

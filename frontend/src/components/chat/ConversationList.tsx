@@ -1,4 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react'
+import { Panel } from '../common/Panel'
+import { PanelHeader } from '../common/PanelHeader'
+import { Button } from '../common/Button'
 import type { ConversationSummary } from '../../types/index'
 
 interface ConversationListProps {
@@ -105,7 +108,7 @@ export function ConversationList({
 
   if (collapsed) {
     return (
-      <aside className="panel h-full flex flex-col items-center py-3">
+      <Panel as="aside" className="h-full flex flex-col items-center py-3">
         <button
           type="button"
           onClick={onToggleCollapsed}
@@ -122,21 +125,21 @@ export function ConversationList({
         >
           ＋
         </button>
-      </aside>
+      </Panel>
     )
   }
 
   return (
-    <aside className="panel p-4 h-full flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-gray-200">Chats</h2>
-        <button
-          onClick={handleStartNewChat}
-          className="btn-secondary btn-xs"
-        >
-          New chat
-        </button>
-      </div>
+    <Panel as="aside" className="p-4 h-full flex flex-col overflow-hidden">
+      <PanelHeader
+        className="mb-3"
+        title={<h2 className="text-sm font-semibold text-gray-200">Chats</h2>}
+        actions={(
+          <Button onClick={handleStartNewChat} size="xs">
+            New chat
+          </Button>
+        )}
+      />
 
       <div className="mb-3 space-y-2">
         <input
@@ -288,6 +291,6 @@ export function ConversationList({
           </button>
         </div>
       )}
-    </aside>
+    </Panel>
   )
 }
