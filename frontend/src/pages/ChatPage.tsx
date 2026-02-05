@@ -26,6 +26,7 @@ export function ChatPage() {
       return false
     }
   })
+  const [mobileChatListOpen, setMobileChatListOpen] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [topK, setTopK] = useState(() => {
     return 5
@@ -795,18 +796,51 @@ export function ChatPage() {
             </aside>
 
             <section className="min-w-0 h-full min-h-0 flex flex-col">
-              <div className="lg:hidden mb-6">
-                <ConversationList
-                  conversations={conversations}
-                  conversationsLoading={conversationsLoading}
-                  activeConversationId={conversationId}
-                  onStartNewChat={startNewChat}
-                  onSelectConversation={selectConversation}
-                  onDeleteConversation={deleteConversation}
-                  onRenameConversation={renameConversation}
-                  collapsed={false}
-                  onToggleCollapsed={toggleChatListCollapsed}
-                />
+              <div className="lg:hidden mb-4">
+                <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 flex items-center justify-between">
+                  <div className="min-w-0">
+                    <div className="text-xs text-gray-400">Chats</div>
+                    <div className="text-sm text-white truncate">{activeConversationTitle}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => startNewChat()}
+                      className="btn-secondary text-xs px-2 py-1"
+                    >
+                      New
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMobileChatListOpen((prev) => !prev)}
+                      className="btn-secondary text-xs px-2 py-1"
+                    >
+                      {mobileChatListOpen ? 'Hide' : 'Show'}
+                    </button>
+                  </div>
+                </div>
+
+                {mobileChatListOpen && (
+                  <div className="mt-3">
+                    <ConversationList
+                      conversations={conversations}
+                      conversationsLoading={conversationsLoading}
+                      activeConversationId={conversationId}
+                      onStartNewChat={() => {
+                        startNewChat()
+                        setMobileChatListOpen(false)
+                      }}
+                      onSelectConversation={(cid) => {
+                        selectConversation(cid)
+                        setMobileChatListOpen(false)
+                      }}
+                      onDeleteConversation={deleteConversation}
+                      onRenameConversation={renameConversation}
+                      collapsed={false}
+                      onToggleCollapsed={toggleChatListCollapsed}
+                    />
+                  </div>
+                )}
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto" ref={messagesScrollRef}>
                 <div className="max-w-4xl mx-auto">
