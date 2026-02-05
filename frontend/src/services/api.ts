@@ -39,6 +39,7 @@ const ACCESS_TOKEN_KEY = 'kb_access_token'
 
 class APIClient {
   private client: AxiosInstance
+  private refreshPromise: Promise<boolean> | null = null
 
   constructor() {
     const baseURL = import.meta.env.VITE_API_BASE_URL || ''
@@ -131,13 +132,23 @@ class APIClient {
   }
 
   async refreshToken(): Promise<boolean> {
-    try {
-      const response = await this.client.post<TokenResponse>('/auth/refresh')
-      this.setAccessToken(response.data.access_token)
-      return true
-    } catch {
-      return false
+    if (this.refreshPromise) {
+      return this.refreshPromise
     }
+
+    this.refreshPromise = (async () => {
+      try {
+        const response = await this.client.post<TokenResponse>('/auth/refresh')
+        this.setAccessToken(response.data.access_token)
+        return true
+      } catch {
+        return false
+      } finally {
+        this.refreshPromise = null
+      }
+    })()
+
+    return this.refreshPromise
   }
 
   async logout(): Promise<void> {
