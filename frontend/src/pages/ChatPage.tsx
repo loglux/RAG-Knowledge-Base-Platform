@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { apiClient } from '../services/api'
@@ -136,6 +136,27 @@ export function ChatPage() {
   const scrollStateKey = useMemo(() => {
     return conversationId ? `chat_scroll_${conversationId}` : null
   }, [conversationId])
+
+  const persistScrollPosition = () => {
+    const container = messagesScrollRef.current
+    if (!container || !scrollStateKey) return
+    const value = String(container.scrollTop)
+    try {
+      sessionStorage.setItem(scrollStateKey, value)
+    } catch {
+      // ignore storage errors
+    }
+    try {
+      localStorage.setItem(scrollStateKey, value)
+    } catch {
+      // ignore storage errors
+    }
+  }
+
+  const handleMessagesScroll = useCallback(() => {
+    if (restoringScrollRef.current) return
+    persistScrollPosition()
+  }, [scrollStateKey])
 
   const handleLogout = async () => {
     await logout()
@@ -525,7 +546,7 @@ export function ChatPage() {
   }, [messages])
 
   // Restore scroll position per conversation once messages are ready.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!conversationId || messages.length === 0) return
     if (restoredConversationRef.current === conversationId) return
 
@@ -538,6 +559,13 @@ export function ChatPage() {
     } catch {
       saved = null
     }
+    if (saved === null) {
+      try {
+        saved = localStorage.getItem(scrollStateKey)
+      } catch {
+        saved = null
+      }
+    }
 
     if (saved !== null) {
       const next = Number(saved)
@@ -546,6 +574,7 @@ export function ChatPage() {
         requestAnimationFrame(() => {
           container.scrollTop = next
           requestAnimationFrame(() => {
+            container.scrollTop = next
             restoringScrollRef.current = false
           })
         })
@@ -557,26 +586,18 @@ export function ChatPage() {
 
   // Persist scroll position for the active conversation.
   useEffect(() => {
-    const container = messagesScrollRef.current
-    if (!container || !scrollStateKey) return
-
-    let ticking = false
-    const handleScroll = () => {
-      if (ticking) return
-      ticking = true
-      requestAnimationFrame(() => {
-        try {
-          sessionStorage.setItem(scrollStateKey, String(container.scrollTop))
-        } catch {
-          // ignore storage errors
-        }
-        ticking = false
-      })
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        persistScrollPosition()
+      }
     }
 
-    container.addEventListener('scroll', handleScroll)
+    window.addEventListener('pagehide', persistScrollPosition)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => {
-      container.removeEventListener('scroll', handleScroll)
+      window.removeEventListener('pagehide', persistScrollPosition)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      persistScrollPosition()
     }
   }, [scrollStateKey])
 
@@ -906,7 +927,7 @@ export function ChatPage() {
                   </div>
                 )}
               </div>
-              <div className="flex-1 min-h-0 overflow-y-auto" ref={messagesScrollRef}>
+              <div className="flex-1 min-h-0 overflow-y-auto" ref={messagesScrollRef} onScroll={handleMessagesScroll}>
                 <div className="max-w-4xl mx-auto">
                 {/* Error Display */}
                 {error && (
