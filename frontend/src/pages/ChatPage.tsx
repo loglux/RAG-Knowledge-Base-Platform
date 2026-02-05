@@ -110,6 +110,8 @@ export function ChatPage() {
 
   const messagesScrollRef = useRef<HTMLDivElement>(null)
   const headerRef = useRef<HTMLElement>(null)
+  const restoredConversationRef = useRef<string | null>(null)
+  const restoringScrollRef = useRef(false)
 
   const {
     conversations,
@@ -131,6 +133,9 @@ export function ChatPage() {
     return conversations.find((conversation) => conversation.id === conversationId) ?? null
   }, [conversations, conversationId])
   const activeConversationTitle = (activeConversation?.title ?? '').trim() || 'Untitled chat'
+  const scrollStateKey = useMemo(() => {
+    return conversationId ? `chat_scroll_${conversationId}` : null
+  }, [conversationId])
 
   const handleLogout = async () => {
     await logout()
@@ -509,6 +514,7 @@ export function ChatPage() {
   useEffect(() => {
     const container = messagesScrollRef.current
     if (!container) return
+    if (restoringScrollRef.current) return
 
     const nearBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 120
     if (!nearBottom && messages.length > 0) return
@@ -517,6 +523,62 @@ export function ChatPage() {
       container.scrollTop = container.scrollHeight
     })
   }, [messages])
+
+  // Restore scroll position per conversation once messages are ready.
+  useEffect(() => {
+    if (!conversationId || messages.length === 0) return
+    if (restoredConversationRef.current === conversationId) return
+
+    const container = messagesScrollRef.current
+    if (!container || !scrollStateKey) return
+
+    let saved: string | null = null
+    try {
+      saved = sessionStorage.getItem(scrollStateKey)
+    } catch {
+      saved = null
+    }
+
+    if (saved !== null) {
+      const next = Number(saved)
+      if (Number.isFinite(next)) {
+        restoringScrollRef.current = true
+        requestAnimationFrame(() => {
+          container.scrollTop = next
+          requestAnimationFrame(() => {
+            restoringScrollRef.current = false
+          })
+        })
+      }
+    }
+
+    restoredConversationRef.current = conversationId
+  }, [conversationId, messages.length, scrollStateKey])
+
+  // Persist scroll position for the active conversation.
+  useEffect(() => {
+    const container = messagesScrollRef.current
+    if (!container || !scrollStateKey) return
+
+    let ticking = false
+    const handleScroll = () => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(() => {
+        try {
+          sessionStorage.setItem(scrollStateKey, String(container.scrollTop))
+        } catch {
+          // ignore storage errors
+        }
+        ticking = false
+      })
+    }
+
+    container.addEventListener('scroll', handleScroll)
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+    }
+  }, [scrollStateKey])
 
   const handleSendMessage = (question: string) => {
     const safeHistoryLimit = Number.isFinite(conversationHistoryLimit)
