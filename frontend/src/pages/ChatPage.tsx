@@ -103,7 +103,7 @@ export function ChatPage() {
   const [bm25Analyzers, setBm25Analyzers] = useState<string[] | null>(null)
   const [showPromptVersions, setShowPromptVersions] = useState(false)
 
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesScrollRef = useRef<HTMLDivElement>(null)
 
   const {
     conversations,
@@ -472,9 +472,17 @@ export function ChatPage() {
     setKbDefaultsApplied(true)
   }, [kb, conversationId, kbDefaultsApplied])
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages arrive without jumping the window.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = messagesScrollRef.current
+    if (!container) return
+
+    const nearBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 120
+    if (!nearBottom && messages.length > 0) return
+
+    requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight
+    })
   }, [messages])
 
   const handleSendMessage = (question: string) => {
@@ -770,7 +778,7 @@ export function ChatPage() {
                   onToggleCollapsed={toggleChatListCollapsed}
                 />
               </div>
-              <div className="flex-1 min-h-0 overflow-y-auto">
+              <div className="flex-1 min-h-0 overflow-y-auto" ref={messagesScrollRef}>
                 <div className="max-w-4xl mx-auto">
                 {/* Error Display */}
                 {error && (
@@ -861,7 +869,7 @@ export function ChatPage() {
                   </div>
                 )}
 
-                <div ref={messagesEndRef} />
+                <div />
                 </div>
               </div>
 
