@@ -76,8 +76,9 @@ class APIClient {
               return this.client(originalRequest)
             }
           } catch {
-            this.clearAccessToken()
+            this.handleAuthFailure()
           }
+          this.handleAuthFailure()
         }
 
         if (error.response?.data) {
@@ -109,6 +110,16 @@ class APIClient {
       localStorage.removeItem(ACCESS_TOKEN_KEY)
     } catch {
       // ignore
+    }
+  }
+
+  private handleAuthFailure() {
+    this.clearAccessToken()
+    if (typeof window !== 'undefined') {
+      const path = window.location?.pathname || ''
+      if (!path.startsWith('/login')) {
+        window.location.href = '/login'
+      }
     }
   }
 
