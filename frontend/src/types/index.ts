@@ -12,6 +12,7 @@ export interface KnowledgeBase {
   bm25_use_phrase?: boolean | null
   bm25_analyzer?: string | null
   structure_llm_model?: string | null
+  use_llm_chat_titles?: boolean | null
   collection_name: string
   document_count: number
   total_chunks: number
@@ -37,6 +38,7 @@ export interface CreateKBRequest {
   bm25_use_phrase?: boolean | null
   bm25_analyzer?: string | null
   structure_llm_model?: string | null
+  use_llm_chat_titles?: boolean | null
 }
 
 export interface EmbeddingModel {
@@ -299,6 +301,10 @@ export interface ConversationDetail {
   updated_at: string
 }
 
+export interface ConversationTitleUpdate {
+  title: string | null
+}
+
 export interface ChatMessageResponse {
   id: string
   role: 'user' | 'assistant'
@@ -331,6 +337,7 @@ export interface AppSettings {
   kb_chunk_size: number | null
   kb_chunk_overlap: number | null
   kb_upsert_batch_size: number | null
+  use_llm_chat_titles: boolean | null
   created_at: string
   updated_at: string
 }
@@ -355,6 +362,7 @@ export interface AppSettingsUpdate {
   kb_chunk_size?: number | null
   kb_chunk_overlap?: number | null
   kb_upsert_batch_size?: number | null
+  use_llm_chat_titles?: boolean | null
 }
 
 export interface ApiInfo {

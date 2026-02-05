@@ -1,5 +1,7 @@
 """Knowledge Base CRUD endpoints."""
 import logging
+import json
+from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
@@ -8,18 +10,27 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.models.database import KnowledgeBase as KnowledgeBaseModel, AppSettings as AppSettingsModel, Document as DocumentModel
+from app.models.database import (
+    KnowledgeBase as KnowledgeBaseModel,
+    AppSettings as AppSettingsModel,
+    Document as DocumentModel,
+    Conversation as ConversationModel,
+    ChatMessage as ChatMessageModel,
+)
 from app.models.enums import DocumentStatus
 from app.models.schemas import (
     KnowledgeBaseCreate,
     KnowledgeBaseUpdate,
     KnowledgeBaseResponse,
     KnowledgeBaseList,
+    RegenerateChatTitlesRequest,
+    RegenerateChatTitlesResponse,
 )
 from app.dependencies import get_current_user_id
 from app.core.embeddings_base import EMBEDDING_MODELS
 from app.core.vector_store import get_vector_store
 from app.core.lexical_store import get_lexical_store
+from app.services.chat_titles import build_conversation_title
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +84,7 @@ async def create_knowledge_base(
     default_chunk_size = 1000
     default_chunk_overlap = 200
     default_upsert_batch_size = 256
+    default_use_llm_chat_titles = True
 
     settings_result = await db.execute(select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1))
     settings_row = settings_result.scalar_one_or_none()
@@ -83,6 +95,8 @@ async def create_knowledge_base(
             default_chunk_overlap = settings_row.kb_chunk_overlap
         if settings_row.kb_upsert_batch_size is not None:
             default_upsert_batch_size = settings_row.kb_upsert_batch_size
+        if settings_row.use_llm_chat_titles is not None:
+            default_use_llm_chat_titles = settings_row.use_llm_chat_titles
 
     # Create KB
     kb_model = KnowledgeBaseModel(
@@ -97,6 +111,9 @@ async def create_knowledge_base(
         chunk_overlap=kb.chunk_overlap if kb.chunk_overlap is not None else default_chunk_overlap,
         chunking_strategy=kb.chunking_strategy,
         upsert_batch_size=kb.upsert_batch_size if kb.upsert_batch_size is not None else default_upsert_batch_size,
+        use_llm_chat_titles=kb.use_llm_chat_titles
+        if kb.use_llm_chat_titles is not None
+        else default_use_llm_chat_titles,
         user_id=user_id,
     )
 
@@ -273,6 +290,95 @@ async def update_knowledge_base(
     await db.refresh(kb)
 
     return kb
+
+
+@router.post("/{kb_id}/regenerate_chat_titles", response_model=RegenerateChatTitlesResponse)
+async def regenerate_chat_titles(
+    kb_id: UUID,
+    payload: RegenerateChatTitlesRequest,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """Regenerate chat titles for conversations in a knowledge base."""
+    kb_query = select(KnowledgeBaseModel).where(
+        KnowledgeBaseModel.id == kb_id,
+        KnowledgeBaseModel.is_deleted == False,
+    )
+    kb_result = await db.execute(kb_query)
+    kb = kb_result.scalar_one_or_none()
+    if not kb:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Knowledge base {kb_id} not found"
+        )
+
+    convo_query = select(ConversationModel).where(
+        ConversationModel.knowledge_base_id == kb_id,
+        ConversationModel.is_deleted == False,
+    )
+    if not payload.include_existing:
+        convo_query = convo_query.where(ConversationModel.title.is_(None))
+    convo_query = convo_query.order_by(ConversationModel.updated_at.desc())
+    if payload.limit:
+        convo_query = convo_query.limit(payload.limit)
+
+    convo_result = await db.execute(convo_query)
+    conversations = convo_result.scalars().all()
+
+    updated = 0
+    skipped = 0
+    for conversation in conversations:
+        msg_query = (
+            select(ChatMessageModel)
+            .where(ChatMessageModel.conversation_id == conversation.id)
+            .order_by(ChatMessageModel.message_index)
+        )
+        msg_result = await db.execute(msg_query)
+        messages = msg_result.scalars().all()
+
+        question = None
+        answer = None
+        for msg in messages:
+            if msg.role == "user" and question is None:
+                question = msg.content
+            elif msg.role == "assistant" and answer is None:
+                answer = msg.content
+            if question and answer:
+                break
+
+        if not question:
+            skipped += 1
+            continue
+
+        llm_model = None
+        llm_provider = None
+        if conversation.settings_json:
+            try:
+                settings = json.loads(conversation.settings_json)
+                llm_model = settings.get("llm_model") or None
+                llm_provider = settings.get("llm_provider") or None
+            except Exception:
+                llm_model = None
+                llm_provider = None
+
+        conversation.title = await build_conversation_title(
+            db=db,
+            kb_id=kb_id,
+            question=question,
+            answer=answer,
+            llm_model=llm_model,
+            llm_provider=llm_provider,
+        )
+        conversation.updated_at = datetime.utcnow()
+        updated += 1
+
+    await db.commit()
+
+    return RegenerateChatTitlesResponse(
+        updated=updated,
+        skipped=skipped,
+        total=len(conversations),
+    )
 
 
 @router.delete("/{kb_id}", status_code=status.HTTP_204_NO_CONTENT)

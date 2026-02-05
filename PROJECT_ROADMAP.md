@@ -16,6 +16,14 @@ Transform the Knowledge Base Platform from MVP to production-ready, enterprise-g
 
 ---
 
+## Backlog
+
+- Chat titles regeneration options
+- Background (async) regeneration for large KBs to avoid blocking UI
+- Smart regeneration mode: update only missing/auto-fallback titles to preserve manual names and reduce cost
+
+---
+
 ## Development Phases
 
 ### ✅ Phase 0: Core MVP (COMPLETED)

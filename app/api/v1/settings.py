@@ -32,6 +32,7 @@ def _default_app_settings() -> dict:
         "kb_chunk_size": 1000,
         "kb_chunk_overlap": 200,
         "kb_upsert_batch_size": 256,
+        "use_llm_chat_titles": True,
     }
 
 
@@ -76,6 +77,7 @@ async def get_app_settings(db: AsyncSession = Depends(get_db)):
         kb_chunk_size=row.kb_chunk_size,
         kb_chunk_overlap=row.kb_chunk_overlap,
         kb_upsert_batch_size=row.kb_upsert_batch_size,
+        use_llm_chat_titles=row.use_llm_chat_titles,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -119,6 +121,7 @@ async def update_app_settings(
         kb_chunk_size=row.kb_chunk_size,
         kb_chunk_overlap=row.kb_chunk_overlap,
         kb_upsert_batch_size=row.kb_upsert_batch_size,
+        use_llm_chat_titles=row.use_llm_chat_titles,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -160,6 +163,7 @@ async def reset_app_settings(db: AsyncSession = Depends(get_db)):
         kb_chunk_size=row.kb_chunk_size,
         kb_chunk_overlap=row.kb_chunk_overlap,
         kb_upsert_batch_size=row.kb_upsert_batch_size,
+        use_llm_chat_titles=row.use_llm_chat_titles,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )

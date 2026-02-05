@@ -36,6 +36,7 @@ export function SettingsPage() {
   const [bm25Analyzer, setBm25Analyzer] = useState('mixed')
   const [useStructure, setUseStructure] = useState(false)
   const [structureRequestsPerMinute, setStructureRequestsPerMinute] = useState(10)
+  const [useLlmChatTitles, setUseLlmChatTitles] = useState(true)
   const [opensearchAvailable, setOpensearchAvailable] = useState<boolean | null>(null)
   const clamp01 = (value: number) => Math.min(1, Math.max(0, value))
   const handleDenseWeightChange = (value: number) => {
@@ -111,6 +112,9 @@ export function SettingsPage() {
       if (appSettings.structure_requests_per_minute !== null) {
         setStructureRequestsPerMinute(appSettings.structure_requests_per_minute)
       }
+      if (appSettings.use_llm_chat_titles !== null) {
+        setUseLlmChatTitles(appSettings.use_llm_chat_titles)
+      }
       if (appSettings.kb_chunk_size !== null) setKbChunkSize(appSettings.kb_chunk_size)
       if (appSettings.kb_chunk_overlap !== null) setKbChunkOverlap(appSettings.kb_chunk_overlap)
       if (appSettings.kb_upsert_batch_size !== null) setKbUpsertBatchSize(appSettings.kb_upsert_batch_size)
@@ -168,6 +172,7 @@ export function SettingsPage() {
         bm25_use_phrase: bm25UsePhrase,
         bm25_analyzer: bm25Analyzer,
         structure_requests_per_minute: structureRequestsPerMinute,
+        use_llm_chat_titles: useLlmChatTitles,
       })
 
       setSuccess('Query defaults saved successfully!')
@@ -430,6 +435,8 @@ export function SettingsPage() {
             setUseStructure={setUseStructure}
             structureRequestsPerMinute={structureRequestsPerMinute}
             setStructureRequestsPerMinute={setStructureRequestsPerMinute}
+            useLlmChatTitles={useLlmChatTitles}
+            setUseLlmChatTitles={setUseLlmChatTitles}
             opensearchAvailable={opensearchAvailable}
             onSave={handleSaveQueryDefaults}
             saving={saving}
@@ -540,6 +547,8 @@ type QueryDefaultsTabProps = {
   setUseStructure: (value: boolean) => void
   structureRequestsPerMinute: number
   setStructureRequestsPerMinute: (value: number) => void
+  useLlmChatTitles: boolean
+  setUseLlmChatTitles: (value: boolean) => void
   opensearchAvailable: boolean | null
   onSave: () => void
   saving: boolean
@@ -564,6 +573,7 @@ function QueryDefaultsTab({
   bm25Analyzer, setBm25Analyzer,
   useStructure, setUseStructure,
   structureRequestsPerMinute, setStructureRequestsPerMinute,
+  useLlmChatTitles, setUseLlmChatTitles,
   opensearchAvailable,
   onSave, saving
 }: QueryDefaultsTabProps) {
@@ -654,6 +664,27 @@ function QueryDefaultsTab({
           />
           <p className="text-xs text-gray-400 mt-1">Max total context length (0 = unlimited)</p>
         </div>
+      </div>
+
+      {/* Chat Titles */}
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-100 mb-4">Chat Titles</h3>
+        <div className="flex items-center gap-3">
+          <input
+            id="use-llm-chat-titles"
+            type="checkbox"
+            checked={useLlmChatTitles}
+            onChange={(e) => setUseLlmChatTitles(e.target.checked)}
+            className="rounded border-gray-600 bg-gray-800"
+          />
+          <label htmlFor="use-llm-chat-titles" className="text-sm text-gray-300">
+            Generate chat titles with LLM
+          </label>
+        </div>
+        <p className="text-xs text-gray-400 mt-2">
+          When enabled, new chat titles are generated from the first Q&amp;A. Otherwise, the
+          title falls back to the first user question.
+        </p>
       </div>
 
       {/* Retrieval Mode */}

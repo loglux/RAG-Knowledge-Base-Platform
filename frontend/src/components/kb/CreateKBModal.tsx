@@ -18,6 +18,7 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
     chunk_overlap: 200,
     upsert_batch_size: 256,
     chunking_strategy: 'smart',
+    use_llm_chat_titles: null,
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -27,6 +28,7 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
     chunk_size: 1000,
     chunk_overlap: 200,
     upsert_batch_size: 256,
+    use_llm_chat_titles: null as boolean | null,
   })
 
   // Fetch available embedding models
@@ -54,6 +56,7 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
           chunk_size: settings.kb_chunk_size ?? 1000,
           chunk_overlap: settings.kb_chunk_overlap ?? 200,
           upsert_batch_size: settings.kb_upsert_batch_size ?? 256,
+          use_llm_chat_titles: settings.use_llm_chat_titles ?? null,
         }
         setKbDefaults(defaults)
         setFormData((prev) => ({
@@ -61,6 +64,7 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
           chunk_size: defaults.chunk_size,
           chunk_overlap: defaults.chunk_overlap,
           upsert_batch_size: defaults.upsert_batch_size,
+          use_llm_chat_titles: defaults.use_llm_chat_titles,
         }))
       } catch (error) {
         console.error('Failed to load KB defaults:', error)
@@ -126,6 +130,7 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
           chunk_overlap: kbDefaults.chunk_overlap,
           upsert_batch_size: kbDefaults.upsert_batch_size,
           chunking_strategy: 'smart',
+          use_llm_chat_titles: kbDefaults.use_llm_chat_titles,
         })
       setErrors({})
       onClose()
@@ -146,6 +151,7 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
         chunk_overlap: kbDefaults.chunk_overlap,
         upsert_batch_size: kbDefaults.upsert_batch_size,
         chunking_strategy: 'fixed_size',
+        use_llm_chat_titles: kbDefaults.use_llm_chat_titles,
       })
       setErrors({})
       onClose()
@@ -232,6 +238,45 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
             disabled={isSubmitting}
           />
           {errors.description && <p className="mt-1 text-sm text-red-500">{errors.description}</p>}
+        </div>
+
+        {/* Chat Title Generation */}
+        <div>
+          <label htmlFor="kb-chat-title-mode" className="block text-sm font-medium text-gray-300 mb-2">
+            Chat Title Generation
+          </label>
+          <select
+            id="kb-chat-title-mode"
+            value={
+              formData.use_llm_chat_titles === null || formData.use_llm_chat_titles === undefined
+                ? 'default'
+                : formData.use_llm_chat_titles ? 'enabled' : 'disabled'
+            }
+            onChange={(e) => {
+              const value = e.target.value
+              const mapped = value === 'default' ? null : value === 'enabled'
+              setFormData({ ...formData, use_llm_chat_titles: mapped })
+            }}
+            className="input w-full"
+            disabled={isSubmitting}
+          >
+            <option value="default">Use global default</option>
+            <option value="enabled">Enabled (LLM)</option>
+            <option value="disabled">Disabled (fallback)</option>
+          </select>
+          <p className="mt-1 text-xs text-gray-400">
+            {formData.use_llm_chat_titles === null || formData.use_llm_chat_titles === undefined
+              ? `Using global default: ${
+                kbDefaults.use_llm_chat_titles === true
+                  ? 'Enabled'
+                  : kbDefaults.use_llm_chat_titles === false
+                    ? 'Disabled'
+                    : 'Unknown'
+              }`
+              : formData.use_llm_chat_titles
+                ? 'LLM generates short titles from the first Q&A'
+                : 'Title falls back to the first user question'}
+          </p>
         </div>
 
         {/* Embedding Model Selector */}

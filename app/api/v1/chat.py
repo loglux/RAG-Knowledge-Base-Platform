@@ -27,8 +27,10 @@ from app.models.schemas import (
     ChatMessageResponse,
     ConversationDetail,
     ConversationSettings,
+    ConversationTitleUpdate,
 )
 from app.services.rag import get_rag_service, RAGService
+from app.services.chat_titles import build_conversation_title
 from app.dependencies import get_current_user_id
 
 
@@ -67,6 +69,8 @@ def _format_chat_error(exc: Exception) -> tuple[int, str]:
         status.HTTP_500_INTERNAL_SERVER_ERROR,
         "Query failed. Please try again."
     )
+
+
 
 
 @router.post("/", response_model=ChatResponse)
@@ -242,7 +246,6 @@ async def chat_query(
 
         # 5. Ensure conversation exists (create if needed)
         if conversation is None:
-            title = request.question.strip()[:120] if request.question else "New conversation"
             settings_payload = {
                 "top_k": request.top_k,
                 "temperature": request.temperature,
@@ -267,7 +270,7 @@ async def chat_query(
             }
             conversation = ConversationModel(
                 knowledge_base_id=request.knowledge_base_id,
-                title=title,
+                title=None,
                 user_id=user_id,
                 settings_json=json.dumps(settings_payload),
             )
@@ -350,6 +353,17 @@ async def chat_query(
         db.add(assistant_message)
         await db.flush()
         conversation.updated_at = datetime.utcnow()
+
+        if conversation.title is None:
+            conversation.title = await build_conversation_title(
+                db=db,
+                kb_id=request.knowledge_base_id,
+                question=request.question,
+                answer=rag_response.answer,
+                llm_model=request.llm_model,
+                llm_provider=request.llm_provider,
+            )
+            conversation.updated_at = datetime.utcnow()
 
         # 7. Convert to API response format
         sources = [
@@ -534,6 +548,47 @@ async def update_conversation_settings(
         knowledge_base_id=conversation.knowledge_base_id,
         title=conversation.title,
         settings=payload,
+        created_at=conversation.created_at,
+        updated_at=conversation.updated_at,
+    )
+
+
+@router.patch("/conversations/{conversation_id}", response_model=ConversationDetail)
+async def update_conversation(
+    conversation_id: UUID,
+    payload: ConversationTitleUpdate,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """Update conversation metadata (title)."""
+    convo_query = select(ConversationModel).where(
+        ConversationModel.id == conversation_id,
+        ConversationModel.is_deleted == False,
+    )
+    convo_result = await db.execute(convo_query)
+    conversation = convo_result.scalar_one_or_none()
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Conversation {conversation_id} not found"
+        )
+
+    title = payload.title.strip() if payload.title else None
+    conversation.title = title if title else None
+    conversation.updated_at = datetime.utcnow()
+
+    settings = None
+    if conversation.settings_json:
+        try:
+            settings = ConversationSettings(**json.loads(conversation.settings_json))
+        except Exception:
+            settings = None
+
+    return ConversationDetail(
+        id=conversation.id,
+        knowledge_base_id=conversation.knowledge_base_id,
+        title=conversation.title,
+        settings=settings,
         created_at=conversation.created_at,
         updated_at=conversation.updated_at,
     )

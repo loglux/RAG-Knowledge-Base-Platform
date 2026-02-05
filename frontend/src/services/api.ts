@@ -13,6 +13,7 @@ import type {
   ChatMessageResponse,
   ConversationDetail,
   ConversationSettings,
+  ConversationTitleUpdate,
   EmbeddingModel,
   AppSettings,
   AppSettingsUpdate,
@@ -328,6 +329,17 @@ class APIClient {
     return response.data
   }
 
+  async updateConversationTitle(
+    conversationId: string,
+    payload: ConversationTitleUpdate
+  ): Promise<ConversationDetail> {
+    const response = await this.client.patch<ConversationDetail>(
+      `/chat/conversations/${conversationId}`,
+      payload
+    )
+    return response.data
+  }
+
   async deleteConversation(conversationId: string): Promise<{ status: string; id: string }> {
     const response = await this.client.delete(`/chat/conversations/${conversationId}`)
     return response.data
@@ -341,6 +353,18 @@ class APIClient {
     const response = await this.client.delete(
       `/chat/conversations/${conversationId}/messages/${messageId}`,
       { params: { pair } }
+    )
+    return response.data
+  }
+
+  async regenerateChatTitles(
+    knowledgeBaseId: string,
+    includeExisting = false,
+    limit?: number
+  ): Promise<{ updated: number; skipped: number; total: number }> {
+    const response = await this.client.post(
+      `/knowledge_bases/${knowledgeBaseId}/regenerate_chat_titles`,
+      { include_existing: includeExisting, limit }
     )
     return response.data
   }

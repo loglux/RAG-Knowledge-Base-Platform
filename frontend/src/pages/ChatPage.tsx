@@ -7,6 +7,7 @@ import { MessageBubble } from '../components/chat/MessageBubble'
 import { SourceCard } from '../components/chat/SourceCard'
 import { ChatInput } from '../components/chat/ChatInput'
 import { ChatSettings } from '../components/chat/ChatSettings'
+import { ConversationList } from '../components/chat/ConversationList'
 import type { KnowledgeBase, ConversationSettings, Document } from '../types/index'
 
 export function ChatPage() {
@@ -98,12 +99,18 @@ export function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const {
+    conversations,
+    conversationsLoading,
     messages,
     isLoading,
     error,
+    setError,
     sendMessage,
     deleteMessagePair,
-    clearMessages,
+    startNewChat,
+    deleteConversation,
+    renameConversation,
+    selectConversation,
     conversationId,
   } = useChat(id!)
 
@@ -597,13 +604,6 @@ export function ChatPage() {
               >
                 ⚙️
               </button>
-              <button
-                onClick={clearMessages}
-                className="text-gray-400 hover:text-red-500 transition-colors px-3 py-2"
-                aria-label="Clear chat"
-              >
-                🗑️
-              </button>
             </div>
           </div>
 
@@ -679,93 +679,109 @@ export function ChatPage() {
 
       {/* Main Content */}
       <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="max-w-4xl mx-auto">
-          {/* Error Display */}
-          {error && (
-            <div className="mb-4 p-4 bg-red-500 bg-opacity-10 border border-red-500 rounded-lg text-red-500">
-              {error}
-            </div>
-          )}
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-[280px,1fr] gap-6">
+            <ConversationList
+              conversations={conversations}
+              conversationsLoading={conversationsLoading}
+              activeConversationId={conversationId}
+              onStartNewChat={startNewChat}
+              onSelectConversation={selectConversation}
+              onDeleteConversation={deleteConversation}
+              onRenameConversation={renameConversation}
+            />
 
-          {/* Empty State */}
-          {messages.length === 0 && (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">💭</div>
-              <h3 className="text-xl font-semibold text-white mb-2">Start a conversation</h3>
-              <p className="text-gray-400 mb-6">
-                Ask questions about the documents in this knowledge base
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto text-left">
-                <div className="card p-4">
-                  <p className="text-sm text-gray-300">Example: "What is the main topic?"</p>
-                </div>
-                <div className="card p-4">
-                  <p className="text-sm text-gray-300">Example: "Summarize the key points"</p>
-                </div>
-                <div className="card p-4">
-                  <p className="text-sm text-gray-300">Example: "Explain in detail..."</p>
-                </div>
-                <div className="card p-4">
-                  <p className="text-sm text-gray-300">Example: "Compare and contrast..."</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Messages */}
-          <div className="space-y-6">
-            {messages.map((message, index) => {
-              const previous = messages[index - 1]
-              const canDeletePair = (
-                message.role === 'assistant' &&
-                previous?.role === 'user' &&
-                message.id &&
-                previous.id
-              )
-              const handleDelete = canDeletePair
-                ? () => {
-                    if (!message.id) return
-                    const ok = window.confirm('Delete this Q&A pair from the chat history?')
-                    if (ok) {
-                      deleteMessagePair(message.id, true)
-                    }
-                  }
-                : undefined
-              return (
-                <div key={message.id ?? index}>
-                  <MessageBubble message={message} onDelete={handleDelete} />
-                {message.sources && message.sources.length > 0 && (
-                  <details className="mt-4 space-y-2">
-                    <summary className="text-xs text-gray-500 font-medium cursor-pointer select-none sources-summary">
-                      <span>SOURCES ({message.sources.length})</span>
-                      {message.use_mmr && (
-                        <span className="ml-2 px-2 py-0.5 text-[10px] bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded">
-                          MMR {message.mmr_diversity?.toFixed(1)}
-                        </span>
-                      )}
-                      <span className="sources-caret ml-2">▸</span>
-                    </summary>
-                    <div className="grid grid-cols-1 gap-2 mt-2">
-                      {message.sources.map((source, idx) => (
-                        <SourceCard key={idx} source={source} />
-                      ))}
-                    </div>
-                  </details>
+            <section className="min-w-0">
+              <div className="max-w-4xl mx-auto">
+                {/* Error Display */}
+                {error && (
+                  <div className="mb-4 p-4 bg-red-500 bg-opacity-10 border border-red-500 rounded-lg text-red-500">
+                    {error}
+                  </div>
                 )}
+
+                {/* Empty State */}
+                {messages.length === 0 && (
+                  <div className="text-center py-12">
+                    <div className="text-6xl mb-4">💭</div>
+                    <h3 className="text-xl font-semibold text-white mb-2">Start a conversation</h3>
+                    <p className="text-gray-400 mb-6">
+                      Ask questions about the documents in this knowledge base
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto text-left">
+                      <div className="card p-4">
+                        <p className="text-sm text-gray-300">Example: &quot;What is the main topic?&quot;</p>
+                      </div>
+                      <div className="card p-4">
+                        <p className="text-sm text-gray-300">Example: &quot;Summarize the key points&quot;</p>
+                      </div>
+                      <div className="card p-4">
+                        <p className="text-sm text-gray-300">Example: &quot;Explain in detail...&quot;</p>
+                      </div>
+                      <div className="card p-4">
+                        <p className="text-sm text-gray-300">Example: &quot;Compare and contrast...&quot;</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Messages */}
+                <div className="space-y-6">
+                  {messages.map((message, index) => {
+                    const previous = messages[index - 1]
+                    const canDeletePair = (
+                      message.role === 'assistant' &&
+                      previous?.role === 'user' &&
+                      message.id &&
+                      previous.id
+                    )
+                    const handleDelete = canDeletePair
+                      ? () => {
+                          if (!message.id) return
+                          const ok = window.confirm('Delete this Q&A pair from the chat history?')
+                          if (ok) {
+                            deleteMessagePair(message.id, true)
+                          }
+                        }
+                      : undefined
+                    return (
+                      <div key={message.id ?? index}>
+                        <MessageBubble message={message} onDelete={handleDelete} />
+                      {message.sources && message.sources.length > 0 && (
+                        <details className="mt-4 space-y-2">
+                          <summary className="text-xs text-gray-500 font-medium cursor-pointer select-none sources-summary">
+                            <span>SOURCES ({message.sources.length})</span>
+                            {message.use_mmr && (
+                              <span className="ml-2 px-2 py-0.5 text-[10px] bg-purple-500/20 text-purple-400 border border-purple-500/30 rounded">
+                                MMR {message.mmr_diversity?.toFixed(1)}
+                              </span>
+                            )}
+                            <span className="sources-caret ml-2">▸</span>
+                          </summary>
+                          <div className="grid grid-cols-1 gap-2 mt-2">
+                            {message.sources.map((source, idx) => (
+                              <SourceCard key={idx} source={source} />
+                            ))}
+                          </div>
+                        </details>
+                      )}
+                      </div>
+                    )
+                  })}
                 </div>
-              )
-            })}
+
+                {/* Loading Indicator */}
+                {isLoading && (
+                  <div className="flex items-center space-x-3 text-gray-400 mt-6">
+                    <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-primary-500"></div>
+                    <span className="text-sm">Thinking...</span>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
+            </section>
           </div>
-
-          {/* Loading Indicator */}
-          {isLoading && (
-            <div className="flex items-center space-x-3 text-gray-400 mt-6">
-              <div className="inline-block animate-spin rounded-full h-5 w-5 border-b-2 border-primary-500"></div>
-              <span className="text-sm">Thinking...</span>
-            </div>
-          )}
-
-          <div ref={messagesEndRef} />
         </div>
       </main>
 

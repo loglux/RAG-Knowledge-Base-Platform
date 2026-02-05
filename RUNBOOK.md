@@ -111,12 +111,47 @@ docker exec kb-platform-api printenv CORS_ORIGINS
 
 ## 8) Migrations
 
-If you pull backend changes, run migrations inside the API container:
+Migrations are run automatically on API container start (see `docker/entrypoint.sh`).
+If the API is already running, you can apply migrations manually inside the container:
 ```bash
-docker exec kb-platform-api alembic upgrade head
+docker compose exec api alembic upgrade head
 ```
 
 Note: Alembic revision IDs in this repo use numeric IDs (e.g., `012`, `013`). Ensure `revision` and `down_revision` follow this scheme to avoid resolution errors.
+
+---
+
+## 8.1) Update After `git pull` (Local Docker)
+
+Recommended quick update:
+```bash
+git pull
+docker compose down
+docker compose up -d --build
+```
+
+Notes:
+- Avoid deleting volumes unless you want to reset data.
+- If builds are slow, you can skip cache pruning. Use `docker builder prune -f` only when needed.
+- `docker-compose` (v1) is legacy; prefer `docker compose`.
+- Ensure `./secrets/db_password` exists and matches the current DB password.
+
+Example update script:
+```bash
+#!/bin/bash
+set -e
+
+echo ">>> Pulling latest changes..."
+git pull
+
+echo ">>> Stopping containers..."
+docker compose down
+
+echo ">>> Rebuilding and starting containers..."
+docker compose up -d --build
+
+echo ">>> Done!"
+```
 
 ---
 

@@ -94,6 +94,11 @@ class KnowledgeBase(Base):
         nullable=True,
         comment="LLM model for document structure (TOC) analysis"
     )
+    use_llm_chat_titles: Mapped[Optional[bool]] = mapped_column(
+        Boolean,
+        nullable=True,
+        comment="Override for LLM-generated chat titles (True/False), None = use app default"
+    )
 
     # Statistics
     document_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -446,6 +451,7 @@ class AppSettings(Base):
     kb_chunk_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     kb_chunk_overlap: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     kb_upsert_batch_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    use_llm_chat_titles: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime,

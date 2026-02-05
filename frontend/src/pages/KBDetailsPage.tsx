@@ -75,12 +75,17 @@ export function KBDetailsPage() {
     bm25_use_phrase: true,
     bm25_analyzer: '',
     structure_llm_model: '',
+    chat_title_mode: 'default' as 'default' | 'enabled' | 'disabled',
   })
   const [settingsErrors, setSettingsErrors] = useState<Record<string, string>>({})
   const [settingsSaving, setSettingsSaving] = useState(false)
   const [structureModelOverride, setStructureModelOverride] = useState(false)
   const [reindexing, setReindexing] = useState(false)
   const [reindexMessage, setReindexMessage] = useState<string | null>(null)
+  const [regenTitlesLoading, setRegenTitlesLoading] = useState(false)
+  const [regenTitlesMessage, setRegenTitlesMessage] = useState<string | null>(null)
+  const [regenIncludeExisting, setRegenIncludeExisting] = useState(false)
+  const [regenLimit, setRegenLimit] = useState('')
   const [bm25MatchModes, setBm25MatchModes] = useState<string[] | null>(null)
   const [bm25Analyzers, setBm25Analyzers] = useState<string[] | null>(null)
   const [appDefaults, setAppDefaults] = useState<AppSettings | null>(null)
@@ -125,6 +130,9 @@ export function KBDetailsPage() {
       bm25_use_phrase: kbData.bm25_use_phrase ?? defaults?.bm25_use_phrase ?? true,
       bm25_analyzer: kbData.bm25_analyzer ?? defaults?.bm25_analyzer ?? '',
       structure_llm_model: kbData.structure_llm_model ?? '',
+      chat_title_mode: kbData.use_llm_chat_titles === null || kbData.use_llm_chat_titles === undefined
+        ? 'default'
+        : (kbData.use_llm_chat_titles ? 'enabled' : 'disabled'),
     }
   }
 
@@ -398,6 +406,11 @@ export function KBDetailsPage() {
 
     setSettingsSaving(true)
     try {
+      const chatTitleValue = settingsData.chat_title_mode === 'default'
+        ? null
+        : settingsData.chat_title_mode === 'enabled'
+          ? true
+          : false
       const updated = await apiClient.updateKnowledgeBase(kb.id, {
         chunk_size: settingsData.chunk_size,
         chunk_overlap: settingsData.chunk_overlap,
@@ -408,6 +421,7 @@ export function KBDetailsPage() {
         bm25_use_phrase: settingsData.bm25_override ? settingsData.bm25_use_phrase : null,
         bm25_analyzer: settingsData.bm25_override ? settingsData.bm25_analyzer : null,
         structure_llm_model: structureModelOverride ? (settingsData.structure_llm_model || null) : null,
+        use_llm_chat_titles: chatTitleValue,
       })
       setKb(updated)
       setIsEditingSettings(false)
@@ -437,6 +451,7 @@ export function KBDetailsPage() {
     if (!confirmed) return
 
     try {
+      setRegenTitlesMessage(null)
       setReindexing(true)
       setReindexMessage(null)
       const result = await apiClient.reprocessKnowledgeBase(kb.id)
@@ -445,6 +460,25 @@ export function KBDetailsPage() {
       setReindexMessage(error instanceof Error ? error.message : 'Failed to reprocess documents')
     } finally {
       setReindexing(false)
+    }
+  }
+
+  const handleRegenerateTitles = async () => {
+    if (!kb) return
+    const limitValue = regenLimit.trim().length > 0 ? Number(regenLimit) : undefined
+    if (limitValue !== undefined && (!Number.isFinite(limitValue) || limitValue <= 0)) {
+      setRegenTitlesMessage('Limit must be a positive number')
+      return
+    }
+    setRegenTitlesLoading(true)
+    setRegenTitlesMessage(null)
+    try {
+      const result = await apiClient.regenerateChatTitles(kb.id, regenIncludeExisting, limitValue)
+      setRegenTitlesMessage(`Updated ${result.updated} chats (skipped ${result.skipped}, total ${result.total})`)
+    } catch (error) {
+      setRegenTitlesMessage(error instanceof Error ? error.message : 'Failed to regenerate titles')
+    } finally {
+      setRegenTitlesLoading(false)
     }
   }
 
@@ -1255,6 +1289,38 @@ export function KBDetailsPage() {
                 )}
               </div>
 
+              <div>
+                <label className="block text-gray-400 mb-2">
+                  Chat title generation
+                </label>
+                <select
+                  value={settingsData.chat_title_mode}
+                  onChange={(e) => setSettingsData({
+                    ...settingsData,
+                    chat_title_mode: e.target.value as 'default' | 'enabled' | 'disabled',
+                  })}
+                  className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100"
+                  disabled={settingsSaving}
+                >
+                  <option value="default">Use global default</option>
+                  <option value="enabled">Enabled (LLM)</option>
+                  <option value="disabled">Disabled (fallback)</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {settingsData.chat_title_mode === 'default'
+                    ? `Using global default: ${
+                      appDefaults?.use_llm_chat_titles === true
+                        ? 'Enabled'
+                        : appDefaults?.use_llm_chat_titles === false
+                          ? 'Disabled'
+                          : 'Unknown'
+                    }`
+                    : settingsData.chat_title_mode === 'enabled'
+                      ? 'LLM generates short titles from the first Q&A'
+                      : 'Title falls back to the first user question'}
+                </p>
+              </div>
+
               <div className="border-t border-gray-700 pt-4">
                 <div className="flex items-center justify-between mb-3">
                   <h4 className="text-sm font-semibold text-white">BM25 Overrides</h4>
@@ -1402,6 +1468,14 @@ export function KBDetailsPage() {
                   {kb.structure_llm_model || 'Default'}
                 </span>
               </div>
+              <div>
+                <span className="text-gray-400">Chat titles:</span>
+                <span className="text-white ml-2 font-medium">
+                  {kb.use_llm_chat_titles === null || kb.use_llm_chat_titles === undefined
+                    ? 'Default'
+                    : kb.use_llm_chat_titles ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
               <div className="md:col-span-2">
                 <span className="text-gray-400">Chunking Strategy:</span>
                 <div className="mt-2 p-3 bg-gray-800 border border-gray-700 rounded-lg">
@@ -1449,6 +1523,45 @@ export function KBDetailsPage() {
             >
               {reindexing ? 'Reprocessing…' : 'Reprocess All Documents'}
             </button>
+          </div>
+
+          <div className="mt-4 border-t border-gray-700 pt-4 space-y-3">
+            <div className="text-xs text-gray-400">
+              Regenerate chat titles for this KB (uses the first Q&amp;A per conversation).
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <label className="flex items-center gap-2 text-xs text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={regenIncludeExisting}
+                  onChange={(e) => setRegenIncludeExisting(e.target.checked)}
+                  className="rounded border-gray-600 bg-gray-800"
+                  disabled={regenTitlesLoading}
+                />
+                Regenerate existing titles
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  placeholder="Limit (optional)"
+                  value={regenLimit}
+                  onChange={(e) => setRegenLimit(e.target.value)}
+                  className="w-40 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-100"
+                  disabled={regenTitlesLoading}
+                />
+                <button
+                  onClick={handleRegenerateTitles}
+                  className="btn-secondary text-xs px-3 py-1.5"
+                  disabled={regenTitlesLoading}
+                >
+                  {regenTitlesLoading ? 'Regenerating…' : 'Regenerate Chat Titles'}
+                </button>
+              </div>
+            </div>
+            {regenTitlesMessage && (
+              <div className="text-xs text-gray-400">{regenTitlesMessage}</div>
+            )}
           </div>
 
           {reindexMessage && (

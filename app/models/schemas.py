@@ -61,6 +61,10 @@ class KnowledgeBaseBase(BaseModel):
         default=None,
         description="LLM model for document structure (TOC) analysis"
     )
+    use_llm_chat_titles: Optional[bool] = Field(
+        default=None,
+        description="Override for LLM-generated chat titles (None = use app default)"
+    )
 
     @field_validator("chunk_overlap")
     @classmethod
@@ -86,6 +90,7 @@ class KnowledgeBaseCreate(KnowledgeBaseBase):
     bm25_use_phrase: Optional[bool] = None
     bm25_analyzer: Optional[str] = None
     structure_llm_model: Optional[str] = None
+    use_llm_chat_titles: Optional[bool] = None
 
 
 class KnowledgeBaseUpdate(BaseModel):
@@ -102,6 +107,7 @@ class KnowledgeBaseUpdate(BaseModel):
     bm25_use_phrase: Optional[bool] = None
     bm25_analyzer: Optional[str] = None
     structure_llm_model: Optional[str] = None
+    use_llm_chat_titles: Optional[bool] = None
 
 
 class KnowledgeBaseResponse(KnowledgeBaseBase):
@@ -339,6 +345,24 @@ class ConversationSettings(BaseModel):
     context_window: Optional[int] = Field(default=None, ge=0, le=5)
 
 
+class ConversationTitleUpdate(BaseModel):
+    """Conversation title update payload."""
+    title: Optional[str] = Field(default=None, max_length=255)
+
+
+class RegenerateChatTitlesRequest(BaseModel):
+    """Request to regenerate chat titles for a KB."""
+    include_existing: bool = Field(default=False, description="Regenerate titles even if they already exist")
+    limit: Optional[int] = Field(default=None, ge=1, description="Max number of conversations to process")
+
+
+class RegenerateChatTitlesResponse(BaseModel):
+    """Response for chat title regeneration."""
+    updated: int
+    skipped: int
+    total: int
+
+
 class AppSettingsBase(BaseModel):
     """Global app defaults for chat settings."""
     llm_model: Optional[str] = Field(default=None)
@@ -360,6 +384,7 @@ class AppSettingsBase(BaseModel):
     kb_chunk_size: Optional[int] = Field(default=None, ge=100, le=2000)
     kb_chunk_overlap: Optional[int] = Field(default=None, ge=0, le=500)
     kb_upsert_batch_size: Optional[int] = Field(default=None, ge=64, le=1024)
+    use_llm_chat_titles: Optional[bool] = Field(default=None)
 
 
 class AppSettingsResponse(AppSettingsBase):

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { apiClient } from '../services/api'
-import type { ChatMessage, ChatRequest } from '../types/index'
+import type { ChatMessage, ChatRequest, ConversationSummary } from '../types/index'
 
 const CONVERSATION_KEY_PREFIX = 'chat_conversation_'
 export function useChat(kbId: string) {
@@ -14,46 +14,88 @@ export function useChat(kbId: string) {
       return null
     }
   })
+  const [conversations, setConversations] = useState<ConversationSummary[]>([])
+  const [conversationsLoading, setConversationsLoading] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [forceNewChat, setForceNewChat] = useState(false)
 
   useEffect(() => {
     let isMounted = true
 
-    const loadConversation = async () => {
+    const loadConversations = async () => {
+      if (!kbId) return
+      setConversationsLoading(true)
       try {
+        const list = await apiClient.listConversations(kbId)
+        if (!isMounted) return
+        setConversations(list)
+
         if (conversationId) {
-          const history = await apiClient.getConversationMessages(conversationId)
-          if (!isMounted) return
-          setMessages(history.map(msg => ({
-            id: msg.id,
-            role: msg.role,
-            content: msg.content,
-            sources: msg.sources,
-            timestamp: msg.timestamp,
-            message_index: msg.message_index,
-            model: msg.model,
-            use_self_check: msg.use_self_check,
-          })))
+          const stillExists = list.some((convo) => convo.id === conversationId)
+          if (!stillExists) {
+            setConversationId(null)
+            setMessages([])
+            try {
+              localStorage.removeItem(conversationKey)
+            } catch (removeError) {
+              console.error('Failed to clear conversation id:', removeError)
+            }
+          }
           return
         }
 
-        const conversations = await apiClient.listConversations(kbId)
-        if (!isMounted) return
-        if (conversations.length === 0) {
+        if (forceNewChat) {
+          return
+        }
+
+        let storedId: string | null = null
+        try {
+          storedId = localStorage.getItem(conversationKey)
+        } catch {
+          storedId = null
+        }
+
+        const preferred = list.find((convo) => convo.id === storedId) ?? list[0]
+        if (!preferred) {
           setMessages([])
           return
         }
 
-        const latest = conversations[0]
-        setConversationId(latest.id)
+        setConversationId(preferred.id)
         try {
-          localStorage.setItem(conversationKey, latest.id)
+          localStorage.setItem(conversationKey, preferred.id)
         } catch (e) {
           console.error('Failed to persist conversation id:', e)
         }
+      } catch (e) {
+        console.error('Failed to load conversations:', e)
+      } finally {
+        if (isMounted) {
+          setConversationsLoading(false)
+        }
+      }
+    }
 
-        const history = await apiClient.getConversationMessages(latest.id)
+    if (kbId) {
+      loadConversations()
+    }
+
+    return () => {
+      isMounted = false
+    }
+  }, [kbId, conversationId, conversationKey, forceNewChat])
+
+  useEffect(() => {
+    let isMounted = true
+
+    const loadConversationMessages = async () => {
+      if (!conversationId) {
+        setMessages([])
+        return
+      }
+      try {
+        const history = await apiClient.getConversationMessages(conversationId)
         if (!isMounted) return
         setMessages(history.map(msg => ({
           id: msg.id,
@@ -78,14 +120,32 @@ export function useChat(kbId: string) {
       }
     }
 
-    if (kbId) {
-      loadConversation()
-    }
+    loadConversationMessages()
 
     return () => {
       isMounted = false
     }
-  }, [kbId, conversationId, conversationKey])
+  }, [conversationId, conversationKey])
+
+  const refreshConversations = useCallback(async () => {
+    if (!kbId) return
+    try {
+      const list = await apiClient.listConversations(kbId)
+      setConversations(list)
+    } catch (e) {
+      console.error('Failed to refresh conversations:', e)
+    }
+  }, [kbId])
+
+  const selectConversation = useCallback((id: string) => {
+    setForceNewChat(false)
+    setConversationId(id)
+    try {
+      localStorage.setItem(conversationKey, id)
+    } catch (e) {
+      console.error('Failed to persist conversation id:', e)
+    }
+  }, [conversationKey])
 
   const sendMessage = useCallback(
     async (
@@ -128,6 +188,7 @@ export function useChat(kbId: string) {
       setError(null)
 
       try {
+        const wasNewConversation = !conversationId
         const request: ChatRequest = {
           question,
           knowledge_base_id: kbId,
@@ -161,12 +222,17 @@ export function useChat(kbId: string) {
         const response = await apiClient.chat(request)
 
         if (response.conversation_id && response.conversation_id !== conversationId) {
+          setForceNewChat(false)
           setConversationId(response.conversation_id)
           try {
             localStorage.setItem(conversationKey, response.conversation_id)
           } catch (e) {
             console.error('Failed to persist conversation id:', e)
           }
+        }
+        refreshConversations()
+        if (wasNewConversation) {
+          refreshConversations()
         }
 
         const assistantMessage: ChatMessage = {
@@ -209,7 +275,7 @@ export function useChat(kbId: string) {
         setIsLoading(false)
       }
     },
-    [kbId, conversationId, conversationKey]
+    [kbId, conversationId, conversationKey, refreshConversations]
   )
 
   const deleteMessagePair = useCallback(async (messageId: string, pair = true) => {
@@ -223,29 +289,58 @@ export function useChat(kbId: string) {
     }
   }, [conversationId])
 
-  const clearMessages = useCallback(() => {
+  const startNewChat = useCallback(() => {
     setMessages([])
     setError(null)
+    setForceNewChat(true)
     try {
-      if (conversationId) {
-        apiClient.deleteConversation(conversationId).catch((e) => {
-          console.error('Failed to delete conversation:', e)
-        })
-      }
       localStorage.removeItem(conversationKey)
       setConversationId(null)
     } catch (e) {
       console.error('Failed to clear chat history:', e)
     }
-  }, [conversationId, conversationKey])
+  }, [conversationKey])
+
+  const deleteConversation = useCallback(async (id: string) => {
+    try {
+      await apiClient.deleteConversation(id)
+      if (id === conversationId) {
+        setConversationId(null)
+        setMessages([])
+        try {
+          localStorage.removeItem(conversationKey)
+        } catch (e) {
+          console.error('Failed to clear conversation id:', e)
+        }
+      }
+      refreshConversations()
+    } catch (e) {
+      console.error('Failed to delete conversation:', e)
+    }
+  }, [conversationId, conversationKey, refreshConversations])
+
+  const renameConversation = useCallback(async (id: string, title: string | null) => {
+    try {
+      await apiClient.updateConversationTitle(id, { title })
+      refreshConversations()
+    } catch (e) {
+      console.error('Failed to rename conversation:', e)
+    }
+  }, [refreshConversations])
 
   return {
+    conversations,
+    conversationsLoading,
     messages,
     isLoading,
     error,
+    setError,
     sendMessage,
     deleteMessagePair,
-    clearMessages,
+    startNewChat,
+    deleteConversation,
+    renameConversation,
+    selectConversation,
     conversationId,
   }
 }

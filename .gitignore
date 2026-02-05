@@ -192,3 +192,6 @@ test_semantic_chunking.py
 test_semantic_chunking_integration.py
 test_texts.py
 check_documents.py
+# Local secrets and uploads
+secrets/
+uploads/
