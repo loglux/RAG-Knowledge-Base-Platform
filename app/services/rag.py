@@ -18,6 +18,7 @@ from app.core.llm_factory import create_llm_service
 from app.core.llm_base import BaseLLMService, Message
 from app.services.query_intent import get_query_intent_extractor, QueryIntent
 from app.services.document_analyzer import get_document_analyzer
+from app.services.prompts import get_active_chat_prompt, get_active_self_check_prompt
 from app.models.database import Document as DocumentModel
 
 
@@ -32,6 +33,7 @@ class RAGResponse(BaseModel):
     query: str = Field(..., description="Original query")
     context_used: str = Field(..., description="Context provided to LLM")
     model: str = Field(..., description="Model used for generation")
+    prompt_version_id: Optional[UUID] = Field(default=None, description="Prompt version used")
 
     @property
     def source_documents(self) -> List[str]:
@@ -57,7 +59,7 @@ class RAGService:
     Orchestrates retrieval from vector store and generation with LLM.
     """
 
-    # System prompt for RAG (kept for rollback)
+    # System prompt for RAG (kept for reference)
     SYSTEM_PROMPT_LEGACY = """You are a helpful AI assistant that answers questions based on the provided context from a knowledge base.
 
 Your task:
@@ -78,14 +80,29 @@ Important:
   even if they come from multiple chunks, until the item is complete.
 - Do not invent missing parts or add commentary.
 """
-    # System prompt for RAG (incremental update)
+    # System prompt for RAG (incremental update, no longer used at runtime)
     SYSTEM_PROMPT = """Identity:
 You are a retrieval assistant for a knowledge base. You answer ONLY from the provided context.
 
 """ + SYSTEM_PROMPT_LEGACY + """
 
-Context follows below.
+    Context follows below.
 """
+
+    CHAT_USER_TEMPLATE = """<context>
+{context}
+</context>
+
+<question>{question}{show_question_instructions}</question>
+
+Answer based on the context above:"""
+
+    SELF_CHECK_USER_TEMPLATE = """Question: {question}
+
+Draft Answer: {draft_answer}
+
+Retrieved Context:
+{context}"""
 
     def __init__(
         self,
@@ -301,13 +318,14 @@ Context follows below.
                 )
             logger.debug(f"Generating answer with {len(chunks)} chunks")
             # Generate draft answer
-            draft_answer = await self._generate_answer(
+            draft_answer, prompt_version_id = await self._generate_answer(
                 question=question,
                 context=context,
                 temperature=temperature,
                 max_tokens=max_tokens,
                 llm_service=llm_service,
                 conversation_history=conversation_history,
+                db=db,
             )
 
             # Validate and refine answer with self-check (if enabled)
@@ -319,6 +337,7 @@ Context follows below.
                     draft_answer=draft_answer,
                     context=context,
                     llm_service=llm_service,
+                    db=db,
                 )
             else:
                 logger.info("[SELF-CHECK] Self-check disabled, using draft answer")
@@ -334,6 +353,7 @@ Context follows below.
                 query=question,
                 context_used=context,
                 model=llm_service.model,
+                prompt_version_id=prompt_version_id,
             )
 
         except Exception:
@@ -383,10 +403,11 @@ Context follows below.
                 )
 
             # Generate answer
-            answer = await self._generate_answer(
+            answer, prompt_version_id = await self._generate_answer(
                 question=question,
                 context=retrieval_result.context,
                 llm_service=self.llm_service,
+                db=db,
             )
 
             return RAGResponse(
@@ -395,6 +416,7 @@ Context follows below.
                 query=question,
                 context_used=retrieval_result.context,
                 model=self.llm_service.model,
+                prompt_version_id=prompt_version_id,
             )
 
         except Exception as e:
@@ -409,7 +431,8 @@ Context follows below.
         max_tokens: Optional[int] = None,
         llm_service: Optional[BaseLLMService] = None,
         conversation_history: Optional[List[Dict[str, str]]] = None,
-    ) -> str:
+        db: Optional[AsyncSession] = None,
+    ) -> tuple[str, Optional[UUID]]:
         """
         Generate answer using LLM with context.
 
@@ -422,7 +445,7 @@ Context follows below.
             conversation_history: Previous messages for follow-up
 
         Returns:
-            Generated answer text
+            Tuple of (answer text, prompt_version_id)
 
         Raises:
             Exception: If generation fails
@@ -431,7 +454,13 @@ Context follows below.
 
         try:
             # Build messages list starting with system prompt
-            messages = [Message(role="system", content=self.SYSTEM_PROMPT)]
+            system_content = None
+            prompt_version_id = None
+            if db is not None:
+                system_content, prompt_version_id = await get_active_chat_prompt(db)
+            if not system_content:
+                raise RuntimeError("Active prompt templates are not configured")
+            messages = [Message(role="system", content=system_content)]
 
             # Add conversation history (limit to last 10 messages to avoid token limits)
             if conversation_history:
@@ -462,13 +491,11 @@ Context follows below.
                     "If any subpart is missing from the context, say which parts are missing."
                 )
 
-            user_prompt = f"""<context>
-{context}
-</context>
-
-<question>{question}{show_question_instructions}</question>
-
-Answer based on the context above:"""
+            user_prompt = self.CHAT_USER_TEMPLATE.format(
+                context=context,
+                question=question,
+                show_question_instructions=show_question_instructions,
+            )
 
             # Add current question
             messages.append(Message(role="user", content=user_prompt))
@@ -486,7 +513,7 @@ Answer based on the context above:"""
                 f"(tokens: {response.total_tokens if response.total_tokens else 'N/A'})"
             )
 
-            return answer
+            return answer, prompt_version_id
 
         except Exception:
             logger.exception("Answer generation failed")
@@ -498,6 +525,7 @@ Answer based on the context above:"""
         draft_answer: str,
         context: str,
         llm_service: Optional[BaseLLMService] = None,
+        db: Optional[AsyncSession] = None,
     ) -> str:
         """
         Validate and refine a draft answer against the retrieved context.
@@ -520,25 +548,17 @@ Answer based on the context above:"""
         service = llm_service or self.llm_service
 
         try:
-            system_prompt = """You are validating an answer produced by a Retrieval-Augmented Generation (RAG) system.
+            system_prompt = None
+            if db is not None:
+                system_prompt, _ = await get_active_self_check_prompt(db)
+            if not system_prompt:
+                raise RuntimeError("Active self-check prompt is not configured")
 
-Instructions:
-1. Analyze what the question requires (e.g., single passage, multiple passages, summary, specific information)
-2. Verify that the answer appropriately addresses this requirement
-3. Ensure every factual statement in the answer is explicitly supported by the retrieved context
-4. Check that the answer does not add information not present in the context
-5. If the question asks for a specific passage, the answer must rely on that passage alone and must not incorporate details from later or separate passages
-6. If the answer is satisfactory, return it unchanged
-7. If improvements are needed, rewrite the answer to be more accurate and better grounded in the context
-
-Output only the final answer (do not include explanations or meta-commentary)."""
-
-            user_prompt = f"""Question: {question}
-
-Draft Answer: {draft_answer}
-
-Retrieved Context:
-{context}"""
+            user_prompt = self.SELF_CHECK_USER_TEMPLATE.format(
+                question=question,
+                draft_answer=draft_answer,
+                context=context,
+            )
 
             messages = [
                 Message(role="system", content=system_prompt),

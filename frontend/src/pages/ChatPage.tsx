@@ -95,6 +95,7 @@ export function ChatPage() {
   const [kbDefaultsApplied, setKbDefaultsApplied] = useState(false)
   const [bm25MatchModes, setBm25MatchModes] = useState<string[] | null>(null)
   const [bm25Analyzers, setBm25Analyzers] = useState<string[] | null>(null)
+  const [showPromptVersions, setShowPromptVersions] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -228,6 +229,21 @@ export function ChatPage() {
 
     loadGlobalSettings()
   }, [conversationId])
+
+  useEffect(() => {
+    const loadPromptDisplaySettings = async () => {
+      try {
+        const data = await apiClient.getAppSettings()
+        if (data.show_prompt_versions !== null) {
+          setShowPromptVersions(data.show_prompt_versions)
+        }
+      } catch (err) {
+        console.error('Failed to load prompt display settings:', err)
+      }
+    }
+
+    loadPromptDisplaySettings()
+  }, [])
 
   useEffect(() => {
     if (conversationId) return
@@ -746,7 +762,11 @@ export function ChatPage() {
                       : undefined
                     return (
                       <div key={message.id ?? index}>
-                        <MessageBubble message={message} onDelete={handleDelete} />
+                        <MessageBubble
+                          message={message}
+                          onDelete={handleDelete}
+                          showPromptVersion={showPromptVersions}
+                        />
                       {message.sources && message.sources.length > 0 && (
                         <details className="mt-4 space-y-2">
                           <summary className="text-xs text-gray-500 font-medium cursor-pointer select-none sources-summary">

@@ -106,6 +106,7 @@ export function useChat(kbId: string) {
           message_index: msg.message_index,
           model: msg.model,
           use_self_check: msg.use_self_check,
+          prompt_version_id: msg.prompt_version_id,
         })))
       } catch (e) {
         console.error('Failed to load conversation history:', e)
@@ -245,6 +246,7 @@ export function useChat(kbId: string) {
           use_mmr: response.use_mmr,
           mmr_diversity: response.mmr_diversity,
           use_self_check: response.use_self_check,
+          prompt_version_id: response.prompt_version_id,
         }
 
         setMessages((prev) => {

@@ -8,9 +8,10 @@ import type { ChatMessage } from '../../types/index'
 interface MessageBubbleProps {
   message: ChatMessage
   onDelete?: () => void
+  showPromptVersion?: boolean
 }
 
-export function MessageBubble({ message, onDelete }: MessageBubbleProps) {
+export function MessageBubble({ message, onDelete, showPromptVersion }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const timestamp = new Date(message.timestamp).toLocaleTimeString('en-US', {
     hour: '2-digit',
@@ -74,6 +75,11 @@ export function MessageBubble({ message, onDelete }: MessageBubbleProps) {
             {!isUser && message.use_self_check && (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
                 Self-check
+              </span>
+            )}
+            {!isUser && showPromptVersion && message.prompt_version_id && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-300 border border-sky-500/30">
+                Prompt {message.prompt_version_id.slice(0, 8)}
               </span>
             )}
             <span className="text-xs opacity-50">{timestamp}</span>

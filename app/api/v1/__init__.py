@@ -10,6 +10,7 @@ from app.api.v1 import (
     ollama,
     llm,
     settings,
+    prompts,
     setup,
     system_settings,
     auth,
@@ -31,6 +32,7 @@ protected_router.include_router(knowledge_bases.router, prefix="/knowledge-bases
 protected_router.include_router(documents.router, prefix="/documents", tags=["documents"])
 protected_router.include_router(chat.router, prefix="/chat", tags=["chat"])
 protected_router.include_router(settings.router, prefix="/settings", tags=["settings"])
+protected_router.include_router(prompts.router, prefix="/prompts", tags=["prompts"])
 protected_router.include_router(system_settings.router, prefix="/system-settings", tags=["system-settings"])
 protected_router.include_router(embeddings.router, prefix="/embeddings", tags=["embeddings"])
 protected_router.include_router(ollama.router, prefix="/ollama", tags=["ollama"])

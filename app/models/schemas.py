@@ -304,6 +304,7 @@ class ChatMessageResponse(BaseModel):
     sources: Optional[List[SourceChunk]] = Field(default=None, description="Source chunks for assistant messages")
     model: Optional[str] = Field(default=None, description="LLM model used for assistant messages")
     use_self_check: Optional[bool] = Field(default=None, description="Whether self-check was applied")
+    prompt_version_id: Optional[UUID] = Field(default=None, description="Prompt version used")
     timestamp: datetime
     message_index: int
 
@@ -385,6 +386,9 @@ class AppSettingsBase(BaseModel):
     kb_chunk_overlap: Optional[int] = Field(default=None, ge=0, le=500)
     kb_upsert_batch_size: Optional[int] = Field(default=None, ge=64, le=1024)
     use_llm_chat_titles: Optional[bool] = Field(default=None)
+    active_prompt_version_id: Optional[UUID] = Field(default=None)
+    active_self_check_prompt_version_id: Optional[UUID] = Field(default=None)
+    show_prompt_versions: Optional[bool] = Field(default=None)
 
 
 class AppSettingsResponse(AppSettingsBase):
@@ -405,6 +409,50 @@ class ConversationDetail(BaseModel):
     settings: Optional[ConversationSettings] = None
     created_at: datetime
     updated_at: datetime
+
+
+class PromptVersionSummary(BaseModel):
+    """Prompt version list item."""
+    id: UUID
+    name: Optional[str] = None
+    created_at: datetime
+
+
+class PromptVersionDetail(BaseModel):
+    """Prompt version detail."""
+    id: UUID
+    name: Optional[str] = None
+    system_content: str
+    created_at: datetime
+
+
+class PromptVersionCreate(BaseModel):
+    """Create a new prompt version."""
+    name: Optional[str] = Field(default=None, max_length=255)
+    system_content: str = Field(..., min_length=1)
+    activate: bool = Field(default=False)
+
+
+class SelfCheckPromptVersionSummary(BaseModel):
+    """Self-check prompt version list item."""
+    id: UUID
+    name: Optional[str] = None
+    created_at: datetime
+
+
+class SelfCheckPromptVersionDetail(BaseModel):
+    """Self-check prompt version detail."""
+    id: UUID
+    name: Optional[str] = None
+    system_content: str
+    created_at: datetime
+
+
+class SelfCheckPromptVersionCreate(BaseModel):
+    """Create a new self-check prompt version."""
+    name: Optional[str] = Field(default=None, max_length=255)
+    system_content: str = Field(..., min_length=1)
+    activate: bool = Field(default=False)
 
 
 class ChatRequest(BaseModel):
@@ -564,6 +612,7 @@ class ChatResponse(BaseModel):
     conversation_id: Optional[UUID] = Field(default=None, description="Conversation ID for persistent chat")
     user_message_id: Optional[UUID] = Field(default=None, description="Stored user message ID")
     assistant_message_id: Optional[UUID] = Field(default=None, description="Stored assistant message ID")
+    prompt_version_id: Optional[UUID] = Field(default=None, description="Prompt version used")
     use_mmr: Optional[bool] = Field(default=None, description="Whether MMR was used")
     mmr_diversity: Optional[float] = Field(default=None, description="MMR diversity parameter (0.0-1.0)")
     use_self_check: Optional[bool] = Field(default=None, description="Whether self-check was applied")

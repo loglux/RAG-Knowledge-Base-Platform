@@ -197,6 +197,7 @@ export interface ChatMessage {
   use_self_check?: boolean
   use_conversation_history?: boolean
   conversation_history_limit?: number
+  prompt_version_id?: string | null
 }
 
 export interface SourceChunk {
@@ -252,6 +253,7 @@ export interface ChatResponse {
   conversation_id?: string
   user_message_id?: string
   assistant_message_id?: string
+  prompt_version_id?: string | null
   use_mmr?: boolean
   mmr_diversity?: number
   use_self_check?: boolean
@@ -314,6 +316,7 @@ export interface ChatMessageResponse {
   message_index: number
   model?: string
   use_self_check?: boolean
+  prompt_version_id?: string | null
 }
 
 export interface AppSettings {
@@ -338,6 +341,9 @@ export interface AppSettings {
   kb_chunk_overlap: number | null
   kb_upsert_batch_size: number | null
   use_llm_chat_titles: boolean | null
+  active_prompt_version_id: string | null
+  active_self_check_prompt_version_id: string | null
+  show_prompt_versions: boolean | null
   created_at: string
   updated_at: string
 }
@@ -363,6 +369,47 @@ export interface AppSettingsUpdate {
   kb_chunk_overlap?: number | null
   kb_upsert_batch_size?: number | null
   use_llm_chat_titles?: boolean | null
+  active_prompt_version_id?: string | null
+  active_self_check_prompt_version_id?: string | null
+  show_prompt_versions?: boolean | null
+}
+
+export interface PromptVersionSummary {
+  id: string
+  name: string | null
+  created_at: string
+}
+
+export interface PromptVersionDetail {
+  id: string
+  name: string | null
+  system_content: string
+  created_at: string
+}
+
+export interface PromptVersionCreate {
+  name?: string | null
+  system_content: string
+  activate?: boolean
+}
+
+export interface SelfCheckPromptVersionSummary {
+  id: string
+  name: string | null
+  created_at: string
+}
+
+export interface SelfCheckPromptVersionDetail {
+  id: string
+  name: string | null
+  system_content: string
+  created_at: string
+}
+
+export interface SelfCheckPromptVersionCreate {
+  name?: string | null
+  system_content: string
+  activate?: boolean
 }
 
 export interface ApiInfo {

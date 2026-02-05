@@ -31,6 +31,7 @@ from app.models.schemas import (
 )
 from app.services.rag import get_rag_service, RAGService
 from app.services.chat_titles import build_conversation_title
+from app.services.prompts import get_active_chat_prompt
 from app.dependencies import get_current_user_id
 
 
@@ -146,6 +147,14 @@ async def chat_query(
 
         # 4. Perform RAG query
         logger.debug(f"Querying collection: {kb.collection_name}")
+
+        # Ensure prompt templates are configured
+        system_content, _ = await get_active_chat_prompt(db)
+        if not system_content:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Prompt templates are not configured. Please set an active prompt.",
+            )
 
         # Convert conversation history to dict format
         history_dicts = None
@@ -348,6 +357,7 @@ async def chat_query(
             sources_json=json.dumps(sources_payload),
             model=rag_response.model,
             use_self_check=request.use_self_check if request.use_self_check else None,
+            prompt_version_id=rag_response.prompt_version_id,
             message_index=assistant_index,
         )
         db.add(assistant_message)
@@ -388,6 +398,7 @@ async def chat_query(
             conversation_id=conversation.id,
             user_message_id=user_message.id,
             assistant_message_id=assistant_message.id,
+            prompt_version_id=rag_response.prompt_version_id,
             use_mmr=request.use_mmr if request.use_mmr else None,
             mmr_diversity=request.mmr_diversity if request.use_mmr else None,
             use_self_check=request.use_self_check if request.use_self_check else None,
@@ -637,6 +648,7 @@ async def get_conversation_messages(
             sources=sources,
             model=msg.model,
             use_self_check=msg.use_self_check,
+            prompt_version_id=msg.prompt_version_id,
             timestamp=msg.created_at,
             message_index=msg.message_index,
         ))

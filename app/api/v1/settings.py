@@ -1,11 +1,15 @@
 """Global application settings endpoints."""
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings as app_settings
 from app.db.session import get_db
-from app.models.database import AppSettings as AppSettingsModel
+from app.models.database import (
+    AppSettings as AppSettingsModel,
+    PromptVersion as PromptVersionModel,
+    SelfCheckPromptVersion as SelfCheckPromptVersionModel,
+)
 from app.models.schemas import AppSettingsResponse, AppSettingsUpdate
 
 router = APIRouter()
@@ -33,6 +37,7 @@ def _default_app_settings() -> dict:
         "kb_chunk_overlap": 200,
         "kb_upsert_batch_size": 256,
         "use_llm_chat_titles": True,
+        "show_prompt_versions": False,
     }
 
 
@@ -55,6 +60,20 @@ async def get_app_settings(db: AsyncSession = Depends(get_db)):
         row = AppSettingsModel(**defaults)
         db.add(row)
         await db.flush()
+    if row.active_prompt_version_id is None:
+        prompt_result = await db.execute(
+            select(PromptVersionModel).order_by(desc(PromptVersionModel.created_at)).limit(1)
+        )
+        prompt = prompt_result.scalar_one_or_none()
+        if prompt:
+            row.active_prompt_version_id = prompt.id
+    if row.active_self_check_prompt_version_id is None:
+        prompt_result = await db.execute(
+            select(SelfCheckPromptVersionModel).order_by(desc(SelfCheckPromptVersionModel.created_at)).limit(1)
+        )
+        prompt = prompt_result.scalar_one_or_none()
+        if prompt:
+            row.active_self_check_prompt_version_id = prompt.id
 
     return AppSettingsResponse(
         id=row.id,
@@ -78,6 +97,9 @@ async def get_app_settings(db: AsyncSession = Depends(get_db)):
         kb_chunk_overlap=row.kb_chunk_overlap,
         kb_upsert_batch_size=row.kb_upsert_batch_size,
         use_llm_chat_titles=row.use_llm_chat_titles,
+        active_prompt_version_id=row.active_prompt_version_id,
+        active_self_check_prompt_version_id=row.active_self_check_prompt_version_id,
+        show_prompt_versions=row.show_prompt_versions,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -99,6 +121,20 @@ async def update_app_settings(
     data = payload.model_dump(exclude_none=True)
     for key, value in data.items():
         setattr(row, key, value)
+    if row.active_prompt_version_id is None:
+        prompt_result = await db.execute(
+            select(PromptVersionModel).order_by(desc(PromptVersionModel.created_at)).limit(1)
+        )
+        prompt = prompt_result.scalar_one_or_none()
+        if prompt:
+            row.active_prompt_version_id = prompt.id
+    if row.active_self_check_prompt_version_id is None:
+        prompt_result = await db.execute(
+            select(SelfCheckPromptVersionModel).order_by(desc(SelfCheckPromptVersionModel.created_at)).limit(1)
+        )
+        prompt = prompt_result.scalar_one_or_none()
+        if prompt:
+            row.active_self_check_prompt_version_id = prompt.id
 
     return AppSettingsResponse(
         id=row.id,
@@ -122,6 +158,9 @@ async def update_app_settings(
         kb_chunk_overlap=row.kb_chunk_overlap,
         kb_upsert_batch_size=row.kb_upsert_batch_size,
         use_llm_chat_titles=row.use_llm_chat_titles,
+        active_prompt_version_id=row.active_prompt_version_id,
+        active_self_check_prompt_version_id=row.active_self_check_prompt_version_id,
+        show_prompt_versions=row.show_prompt_versions,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -140,6 +179,20 @@ async def reset_app_settings(db: AsyncSession = Depends(get_db)):
     else:
         for key, value in defaults.items():
             setattr(row, key, value)
+    if row.active_prompt_version_id is None:
+        prompt_result = await db.execute(
+            select(PromptVersionModel).order_by(desc(PromptVersionModel.created_at)).limit(1)
+        )
+        prompt = prompt_result.scalar_one_or_none()
+        if prompt:
+            row.active_prompt_version_id = prompt.id
+    if row.active_self_check_prompt_version_id is None:
+        prompt_result = await db.execute(
+            select(SelfCheckPromptVersionModel).order_by(desc(SelfCheckPromptVersionModel.created_at)).limit(1)
+        )
+        prompt = prompt_result.scalar_one_or_none()
+        if prompt:
+            row.active_self_check_prompt_version_id = prompt.id
     await db.flush()
 
     return AppSettingsResponse(
@@ -164,6 +217,9 @@ async def reset_app_settings(db: AsyncSession = Depends(get_db)):
         kb_chunk_overlap=row.kb_chunk_overlap,
         kb_upsert_batch_size=row.kb_upsert_batch_size,
         use_llm_chat_titles=row.use_llm_chat_titles,
+        active_prompt_version_id=row.active_prompt_version_id,
+        active_self_check_prompt_version_id=row.active_self_check_prompt_version_id,
+        show_prompt_versions=row.show_prompt_versions,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )

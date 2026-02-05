@@ -3,9 +3,15 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { apiClient } from '../services/api'
 import { LLMSelector } from '../components/chat/LLMSelector'
-import type { AppSettings } from '../types/index'
+import type {
+  AppSettings,
+  PromptVersionDetail,
+  PromptVersionSummary,
+  SelfCheckPromptVersionDetail,
+  SelfCheckPromptVersionSummary
+} from '../types/index'
 
-type TabType = 'query' | 'kb-defaults' | 'ai-providers' | 'databases'
+type TabType = 'query' | 'kb-defaults' | 'ai-providers' | 'databases' | 'prompts'
 
 export function SettingsPage() {
   const navigate = useNavigate()
@@ -59,6 +65,23 @@ export function SettingsPage() {
   const [kbChunkSize, setKbChunkSize] = useState(1000)
   const [kbChunkOverlap, setKbChunkOverlap] = useState(200)
   const [kbUpsertBatchSize, setKbUpsertBatchSize] = useState(256)
+
+  // Prompt Versions
+  const [promptVersions, setPromptVersions] = useState<PromptVersionSummary[]>([])
+  const [promptDraftName, setPromptDraftName] = useState('')
+  const [promptDraftSystemContent, setPromptDraftSystemContent] = useState('')
+  const [promptSelected, setPromptSelected] = useState<PromptVersionDetail | null>(null)
+  const [activePromptVersionId, setActivePromptVersionId] = useState<string | null>(null)
+  const [showPromptVersions, setShowPromptVersions] = useState(false)
+  const [promptsLoading, setPromptsLoading] = useState(false)
+
+  // Self-Check Prompt Versions
+  const [selfCheckPromptVersions, setSelfCheckPromptVersions] = useState<SelfCheckPromptVersionSummary[]>([])
+  const [selfCheckPromptDraftName, setSelfCheckPromptDraftName] = useState('')
+  const [selfCheckPromptDraftSystemContent, setSelfCheckPromptDraftSystemContent] = useState('')
+  const [selfCheckPromptSelected, setSelfCheckPromptSelected] = useState<SelfCheckPromptVersionDetail | null>(null)
+  const [activeSelfCheckPromptVersionId, setActiveSelfCheckPromptVersionId] = useState<string | null>(null)
+  const [selfCheckPromptsLoading, setSelfCheckPromptsLoading] = useState(false)
 
   // System Settings (AI Providers)
   const [openaiApiKey, setOpenaiApiKey] = useState('')
@@ -115,6 +138,15 @@ export function SettingsPage() {
       if (appSettings.use_llm_chat_titles !== null) {
         setUseLlmChatTitles(appSettings.use_llm_chat_titles)
       }
+      if (appSettings.active_prompt_version_id) {
+        setActivePromptVersionId(appSettings.active_prompt_version_id)
+      }
+      if (appSettings.active_self_check_prompt_version_id) {
+        setActiveSelfCheckPromptVersionId(appSettings.active_self_check_prompt_version_id)
+      }
+      if (appSettings.show_prompt_versions !== null) {
+        setShowPromptVersions(appSettings.show_prompt_versions)
+      }
       if (appSettings.kb_chunk_size !== null) setKbChunkSize(appSettings.kb_chunk_size)
       if (appSettings.kb_chunk_overlap !== null) setKbChunkOverlap(appSettings.kb_chunk_overlap)
       if (appSettings.kb_upsert_batch_size !== null) setKbUpsertBatchSize(appSettings.kb_upsert_batch_size)
@@ -136,6 +168,40 @@ export function SettingsPage() {
       // Check OpenSearch availability
       const info = await apiClient.getApiInfo()
       setOpensearchAvailable(info.integrations?.opensearch_available ?? null)
+
+      // Load prompt versions (for prompt editor tab)
+      setPromptsLoading(true)
+      try {
+        const prompts = await apiClient.listPromptVersions()
+        setPromptVersions(prompts)
+        if (appSettings.active_prompt_version_id) {
+          try {
+            const activePrompt = await apiClient.getPromptVersion(appSettings.active_prompt_version_id)
+            setPromptSelected(activePrompt)
+          } catch {
+            setPromptSelected(null)
+          }
+        }
+      } finally {
+        setPromptsLoading(false)
+      }
+
+      // Load self-check prompt versions
+      setSelfCheckPromptsLoading(true)
+      try {
+        const prompts = await apiClient.listSelfCheckPromptVersions()
+        setSelfCheckPromptVersions(prompts)
+        if (appSettings.active_self_check_prompt_version_id) {
+          try {
+            const activePrompt = await apiClient.getSelfCheckPromptVersion(appSettings.active_self_check_prompt_version_id)
+            setSelfCheckPromptSelected(activePrompt)
+          } catch {
+            setSelfCheckPromptSelected(null)
+          }
+        }
+      } finally {
+        setSelfCheckPromptsLoading(false)
+      }
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load settings')
@@ -203,6 +269,185 @@ export function SettingsPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const refreshPromptVersions = async () => {
+    try {
+      setPromptsLoading(true)
+      const prompts = await apiClient.listPromptVersions()
+      setPromptVersions(prompts)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load prompt versions')
+    } finally {
+      setPromptsLoading(false)
+    }
+  }
+
+  const refreshSelfCheckPromptVersions = async () => {
+    try {
+      setSelfCheckPromptsLoading(true)
+      const prompts = await apiClient.listSelfCheckPromptVersions()
+      setSelfCheckPromptVersions(prompts)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load self-check prompt versions')
+    } finally {
+      setSelfCheckPromptsLoading(false)
+    }
+  }
+
+  const handleSavePromptDraft = async (activate: boolean) => {
+    if (!promptDraftSystemContent.trim()) {
+      setError('System prompt content is required')
+      return
+    }
+
+    try {
+      setSaving(true)
+      setError(null)
+      setSuccess(null)
+
+      const created = await apiClient.createPromptVersion({
+        name: promptDraftName?.trim() || null,
+        system_content: promptDraftSystemContent,
+        activate,
+      })
+
+      if (activate) {
+        setActivePromptVersionId(created.id)
+      }
+
+      setPromptDraftName('')
+      setPromptDraftSystemContent('')
+      await refreshPromptVersions()
+      setPromptSelected(created)
+      setSuccess(activate ? 'Prompt activated successfully!' : 'Prompt draft saved successfully!')
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save prompt')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleActivatePromptVersion = async (promptId: string) => {
+    try {
+      setSaving(true)
+      setError(null)
+      setSuccess(null)
+      const activated = await apiClient.activatePromptVersion(promptId)
+      setActivePromptVersionId(activated.id)
+      setPromptSelected(activated)
+      await refreshPromptVersions()
+      setSuccess('Prompt version activated')
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to activate prompt')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSelectPromptVersion = async (promptId: string) => {
+    try {
+      setPromptsLoading(true)
+      const prompt = await apiClient.getPromptVersion(promptId)
+      setPromptSelected(prompt)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load prompt')
+    } finally {
+      setPromptsLoading(false)
+    }
+  }
+
+  const handleLoadPromptToEditor = (prompt: PromptVersionDetail) => {
+    setPromptDraftName(prompt.name || '')
+    setPromptDraftSystemContent(prompt.system_content)
+  }
+
+  const handleSavePromptDisplaySettings = async () => {
+    try {
+      setSaving(true)
+      setError(null)
+      setSuccess(null)
+      await apiClient.updateAppSettings({
+        show_prompt_versions: showPromptVersions,
+      })
+      setSuccess('Prompt display settings saved')
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save prompt settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSaveSelfCheckPromptDraft = async (activate: boolean) => {
+    if (!selfCheckPromptDraftSystemContent.trim()) {
+      setError('System prompt content is required')
+      return
+    }
+
+    try {
+      setSaving(true)
+      setError(null)
+      setSuccess(null)
+
+      const created = await apiClient.createSelfCheckPromptVersion({
+        name: selfCheckPromptDraftName?.trim() || null,
+        system_content: selfCheckPromptDraftSystemContent,
+        activate,
+      })
+
+      if (activate) {
+        setActiveSelfCheckPromptVersionId(created.id)
+      }
+
+      setSelfCheckPromptDraftName('')
+      setSelfCheckPromptDraftSystemContent('')
+      await refreshSelfCheckPromptVersions()
+      setSelfCheckPromptSelected(created)
+      setSuccess(activate ? 'Self-check prompt activated successfully!' : 'Self-check prompt draft saved successfully!')
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save self-check prompt')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleActivateSelfCheckPromptVersion = async (promptId: string) => {
+    try {
+      setSaving(true)
+      setError(null)
+      setSuccess(null)
+      const activated = await apiClient.activateSelfCheckPromptVersion(promptId)
+      setActiveSelfCheckPromptVersionId(activated.id)
+      setSelfCheckPromptSelected(activated)
+      await refreshSelfCheckPromptVersions()
+      setSuccess('Self-check prompt activated')
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to activate self-check prompt')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSelectSelfCheckPromptVersion = async (promptId: string) => {
+    try {
+      setSelfCheckPromptsLoading(true)
+      const prompt = await apiClient.getSelfCheckPromptVersion(promptId)
+      setSelfCheckPromptSelected(prompt)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load self-check prompt')
+    } finally {
+      setSelfCheckPromptsLoading(false)
+    }
+  }
+
+  const handleLoadSelfCheckPromptToEditor = (prompt: SelfCheckPromptVersionDetail) => {
+    setSelfCheckPromptDraftName(prompt.name || '')
+    setSelfCheckPromptDraftSystemContent(prompt.system_content)
   }
 
   const handleSaveAIProviders = async () => {
@@ -381,6 +626,16 @@ export function SettingsPage() {
         >
           Databases
         </button>
+        <button
+          onClick={() => setActiveTab('prompts')}
+          className={`px-6 py-3 font-medium whitespace-nowrap border-b-2 transition-colors ${
+            activeTab === 'prompts'
+              ? 'border-primary-500 text-primary-500'
+              : 'border-transparent text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          Prompts
+        </button>
       </div>
 
       {/* Alerts */}
@@ -503,6 +758,43 @@ export function SettingsPage() {
             setPostgresNewPassword={setPostgresNewPassword}
             onSave={handleSaveDatabases}
             onChangePostgresPassword={handleChangePostgresPassword}
+            saving={saving}
+          />
+        )}
+
+        {activeTab === 'prompts' && (
+          <PromptsTab
+            promptVersions={promptVersions}
+            promptsLoading={promptsLoading}
+            activePromptVersionId={activePromptVersionId}
+            promptSelected={promptSelected}
+            promptDraftName={promptDraftName}
+            setPromptDraftName={setPromptDraftName}
+            promptDraftSystemContent={promptDraftSystemContent}
+            setPromptDraftSystemContent={setPromptDraftSystemContent}
+            selfCheckPromptVersions={selfCheckPromptVersions}
+            selfCheckPromptsLoading={selfCheckPromptsLoading}
+            activeSelfCheckPromptVersionId={activeSelfCheckPromptVersionId}
+            selfCheckPromptSelected={selfCheckPromptSelected}
+            selfCheckPromptDraftName={selfCheckPromptDraftName}
+            setSelfCheckPromptDraftName={setSelfCheckPromptDraftName}
+            selfCheckPromptDraftSystemContent={selfCheckPromptDraftSystemContent}
+            setSelfCheckPromptDraftSystemContent={setSelfCheckPromptDraftSystemContent}
+            showPromptVersions={showPromptVersions}
+            setShowPromptVersions={setShowPromptVersions}
+            onRefreshPrompts={refreshPromptVersions}
+            onSelectPrompt={handleSelectPromptVersion}
+            onActivatePrompt={handleActivatePromptVersion}
+            onSaveDraft={() => handleSavePromptDraft(false)}
+            onActivateDraft={() => handleSavePromptDraft(true)}
+            onSaveDisplaySettings={handleSavePromptDisplaySettings}
+            onLoadToEditor={handleLoadPromptToEditor}
+            onRefreshSelfCheckPrompts={refreshSelfCheckPromptVersions}
+            onSelectSelfCheckPrompt={handleSelectSelfCheckPromptVersion}
+            onActivateSelfCheckPrompt={handleActivateSelfCheckPromptVersion}
+            onSaveSelfCheckDraft={() => handleSaveSelfCheckPromptDraft(false)}
+            onActivateSelfCheckDraft={() => handleSaveSelfCheckPromptDraft(true)}
+            onLoadSelfCheckToEditor={handleLoadSelfCheckPromptToEditor}
             saving={saving}
           />
         )}
@@ -1119,6 +1411,354 @@ function AIProvidersTab(props: any) {
         >
           {saving ? 'Saving...' : 'Save AI Provider Settings'}
         </button>
+      </div>
+    </div>
+  )
+}
+
+function PromptsTab(props: any) {
+  const {
+    promptVersions,
+    promptsLoading,
+    activePromptVersionId,
+    promptSelected,
+    promptDraftName,
+    setPromptDraftName,
+    promptDraftSystemContent,
+    setPromptDraftSystemContent,
+    selfCheckPromptVersions,
+    selfCheckPromptsLoading,
+    activeSelfCheckPromptVersionId,
+    selfCheckPromptSelected,
+    selfCheckPromptDraftName,
+    setSelfCheckPromptDraftName,
+    selfCheckPromptDraftSystemContent,
+    setSelfCheckPromptDraftSystemContent,
+    showPromptVersions,
+    setShowPromptVersions,
+    onRefreshPrompts,
+    onSelectPrompt,
+    onActivatePrompt,
+    onSaveDraft,
+    onActivateDraft,
+    onSaveDisplaySettings,
+    onLoadToEditor,
+    onRefreshSelfCheckPrompts,
+    onSelectSelfCheckPrompt,
+    onActivateSelfCheckPrompt,
+    onSaveSelfCheckDraft,
+    onActivateSelfCheckDraft,
+    onLoadSelfCheckToEditor,
+    saving,
+  } = props
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-white mb-2">KB Chat Prompt</h2>
+        <p className="text-gray-400">
+          Used for Knowledge Base chat (RAG) responses across all KBs.
+        </p>
+        <p className="text-xs text-gray-500 mt-2">
+          One active version at a time. Create a new version to change behavior.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-100 mb-4">Chat Prompt Version</h3>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
+            <input
+              type="text"
+              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+              value={promptDraftName}
+              onChange={(e) => setPromptDraftName(e.target.value)}
+              placeholder="Auto-generated if empty (e.g., KB Chat Prompt — 2026-02-05 14:32 UTC)"
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-300 mb-2">System Prompt</label>
+            <textarea
+              className="w-full min-h-[240px] px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+              value={promptDraftSystemContent}
+              onChange={(e) => setPromptDraftSystemContent(e.target.value)}
+              placeholder="Enter the system prompt..."
+            />
+          </div>
+          <p className="text-xs text-gray-400 mt-2">
+            User template is fixed in code for safety and consistency.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              className="btn-secondary"
+              onClick={onSaveDraft}
+              disabled={saving}
+            >
+              {saving ? 'Saving...' : 'Save Draft'}
+            </button>
+            <button
+              className="btn-primary"
+              onClick={onActivateDraft}
+              disabled={saving}
+            >
+              {saving ? 'Saving...' : 'Activate'}
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-3">
+            Activate sets this prompt for KB chat responses.
+          </p>
+        </div>
+
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-100">Chat Prompt History</h3>
+            <button
+              className="text-sm text-primary-400 hover:text-primary-300"
+              onClick={onRefreshPrompts}
+              disabled={promptsLoading}
+            >
+              {promptsLoading ? 'Loading...' : 'Refresh'}
+            </button>
+          </div>
+          <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+            {promptVersions.length === 0 && (
+              <div className="text-sm text-gray-400">No prompt versions yet.</div>
+            )}
+            {promptVersions.map((prompt: PromptVersionSummary) => {
+              const isActive = prompt.id === activePromptVersionId
+              return (
+                <div
+                  key={prompt.id}
+                  className="flex items-center justify-between bg-gray-900/60 border border-gray-700 rounded-lg px-3 py-2"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-100">
+                        {prompt.name || 'Untitled Prompt'}
+                      </span>
+                      {isActive && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {new Date(prompt.created_at).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="text-xs text-gray-300 hover:text-white"
+                      onClick={() => onSelectPrompt(prompt.id)}
+                    >
+                      View
+                    </button>
+                    <button
+                      className="text-xs text-primary-400 hover:text-primary-300"
+                      onClick={() => onActivatePrompt(prompt.id)}
+                      disabled={saving}
+                    >
+                      Activate
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {promptSelected && (
+            <div className="mt-4 border border-gray-700 rounded-lg p-4 bg-gray-900/60">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-gray-100">
+                    {promptSelected.name || 'Selected Prompt'}
+                  </div>
+                  <div className="text-xs text-gray-500">{promptSelected.id}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {promptSelected.id === activePromptVersionId && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                      Active
+                    </span>
+                  )}
+                  <button
+                    className="text-xs text-primary-400 hover:text-primary-300"
+                    onClick={() => onLoadToEditor(promptSelected)}
+                  >
+                    Load into editor
+                  </button>
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-3 text-xs text-gray-200">
+                <div className="border border-gray-700 rounded-lg p-3 bg-gray-950/60">
+                  <div className="text-sm font-semibold text-gray-100 mb-1">System Prompt</div>
+                  <p className="text-[11px] text-gray-500 mb-2">Controls assistant behavior.</p>
+                  <pre className="whitespace-pre-wrap">{promptSelected.system_content}</pre>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-100 mb-4">Self-Check Prompt Version</h3>
+          <p className="text-xs text-gray-400 mb-4">
+            Used only when self-check is enabled. It validates and can rewrite the draft answer.
+          </p>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
+            <input
+              type="text"
+              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+              value={selfCheckPromptDraftName}
+              onChange={(e) => setSelfCheckPromptDraftName(e.target.value)}
+              placeholder="Auto-generated if empty (e.g., Self-Check Prompt — 2026-02-05 14:32 UTC)"
+            />
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-300 mb-2">System Prompt</label>
+            <textarea
+              className="w-full min-h-[200px] px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+              value={selfCheckPromptDraftSystemContent}
+              onChange={(e) => setSelfCheckPromptDraftSystemContent(e.target.value)}
+              placeholder="Enter the system prompt..."
+            />
+          </div>
+          <p className="text-xs text-gray-400 mt-2">
+            User template is fixed in code for safety and consistency.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              className="btn-secondary"
+              onClick={onSaveSelfCheckDraft}
+              disabled={saving}
+            >
+              {saving ? 'Saving...' : 'Save Draft'}
+            </button>
+            <button
+              className="btn-primary"
+              onClick={onActivateSelfCheckDraft}
+              disabled={saving}
+            >
+              {saving ? 'Saving...' : 'Activate'}
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-100">Self-Check History</h3>
+            <button
+              className="text-sm text-primary-400 hover:text-primary-300"
+              onClick={onRefreshSelfCheckPrompts}
+              disabled={selfCheckPromptsLoading}
+            >
+              {selfCheckPromptsLoading ? 'Loading...' : 'Refresh'}
+            </button>
+          </div>
+          <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
+            {selfCheckPromptVersions.length === 0 && (
+              <div className="text-sm text-gray-400">No self-check prompt versions yet.</div>
+            )}
+            {selfCheckPromptVersions.map((prompt: SelfCheckPromptVersionSummary) => {
+              const isActive = prompt.id === activeSelfCheckPromptVersionId
+              return (
+                <div
+                  key={prompt.id}
+                  className="flex items-center justify-between bg-gray-900/60 border border-gray-700 rounded-lg px-3 py-2"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-100">
+                        {prompt.name || 'Untitled Prompt'}
+                      </span>
+                      {isActive && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {new Date(prompt.created_at).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="text-xs text-gray-300 hover:text-white"
+                      onClick={() => onSelectSelfCheckPrompt(prompt.id)}
+                    >
+                      View
+                    </button>
+                    <button
+                      className="text-xs text-primary-400 hover:text-primary-300"
+                      onClick={() => onActivateSelfCheckPrompt(prompt.id)}
+                      disabled={saving}
+                    >
+                      Activate
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {selfCheckPromptSelected && (
+            <div className="mt-4 border border-gray-700 rounded-lg p-4 bg-gray-900/60">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-gray-100">
+                    {selfCheckPromptSelected.name || 'Selected Prompt'}
+                  </div>
+                  <div className="text-xs text-gray-500">{selfCheckPromptSelected.id}</div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {selfCheckPromptSelected.id === activeSelfCheckPromptVersionId && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+                      Active
+                    </span>
+                  )}
+                  <button
+                    className="text-xs text-primary-400 hover:text-primary-300"
+                    onClick={() => onLoadSelfCheckToEditor(selfCheckPromptSelected)}
+                  >
+                    Load into editor
+                  </button>
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-3 text-xs text-gray-200">
+                <div className="border border-gray-700 rounded-lg p-3 bg-gray-950/60">
+                  <div className="text-sm font-semibold text-gray-100 mb-1">System Prompt</div>
+                  <pre className="whitespace-pre-wrap">{selfCheckPromptSelected.system_content}</pre>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-100 mb-2">Prompt Display</h3>
+        <label className="flex items-center space-x-3">
+          <input
+            type="checkbox"
+            checked={showPromptVersions}
+            onChange={(e) => setShowPromptVersions(e.target.checked)}
+            className="w-4 h-4 text-primary-500 bg-gray-700 border-gray-600 rounded focus:ring-primary-500"
+          />
+          <span className="text-gray-200 text-sm">Show prompt version badges in chat responses</span>
+        </label>
+        <div className="flex justify-end mt-4">
+          <button
+            className="btn-primary"
+            onClick={onSaveDisplaySettings}
+            disabled={saving}
+          >
+            {saving ? 'Saving...' : 'Save Display Settings'}
+          </button>
+        </div>
       </div>
     </div>
   )

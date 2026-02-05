@@ -373,6 +373,64 @@ class Conversation(Base):
         return f"<Conversation(id={self.id}, kb_id={self.knowledge_base_id})>"
 
 
+class PromptVersion(Base):
+    """Prompt version model - stores editable system prompts."""
+
+    __tablename__ = "prompt_versions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        nullable=False
+    )
+    name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    system_content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+        index=True,
+        comment="Creator user ID (nullable for MVP)"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return f"<PromptVersion(id={self.id}, name={self.name})>"
+
+
+class SelfCheckPromptVersion(Base):
+    """Prompt version model for self-check validation."""
+
+    __tablename__ = "self_check_prompt_versions"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        nullable=False
+    )
+    name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    system_content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+        index=True,
+        comment="Creator user ID (nullable for MVP)"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return f"<SelfCheckPromptVersion(id={self.id}, name={self.name})>"
+
+
 class ChatMessage(Base):
     """Chat message model - represents a single message in a conversation."""
 
@@ -408,6 +466,12 @@ class ChatMessage(Base):
         Boolean,
         nullable=True,
         comment="Whether self-check was applied for assistant messages"
+    )
+    prompt_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("prompt_versions.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="Prompt version used to generate this message"
     )
     message_index: Mapped[int] = mapped_column(Integer, nullable=False)
 
@@ -452,6 +516,23 @@ class AppSettings(Base):
     kb_chunk_overlap: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     kb_upsert_batch_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     use_llm_chat_titles: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    active_prompt_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("prompt_versions.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="Active prompt version for RAG system prompt"
+    )
+    active_self_check_prompt_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("self_check_prompt_versions.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="Active prompt version for self-check validation"
+    )
+    show_prompt_versions: Mapped[Optional[bool]] = mapped_column(
+        Boolean,
+        nullable=True,
+        comment="Whether to display prompt version in chat responses"
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime,

@@ -22,6 +22,12 @@ import type {
   LoginRequest,
   TokenResponse,
   MeResponse,
+  PromptVersionSummary,
+  PromptVersionDetail,
+  PromptVersionCreate,
+  SelfCheckPromptVersionSummary,
+  SelfCheckPromptVersionDetail,
+  SelfCheckPromptVersionCreate,
   QASampleUploadResponse,
   QAEvalRun,
   QAEvalRunConfig,
@@ -153,6 +159,58 @@ class APIClient {
 
   async getKnowledgeBase(id: string): Promise<KnowledgeBase> {
     const response = await this.client.get<KnowledgeBase>(`/knowledge-bases/${id}`)
+    return response.data
+  }
+
+  // Prompt Versions
+  async listPromptVersions(): Promise<PromptVersionSummary[]> {
+    const response = await this.client.get<PromptVersionSummary[]>('/prompts/')
+    return response.data
+  }
+
+  async getPromptVersion(id: string): Promise<PromptVersionDetail> {
+    const response = await this.client.get<PromptVersionDetail>(`/prompts/${id}`)
+    return response.data
+  }
+
+  async getActivePromptVersion(): Promise<PromptVersionDetail | null> {
+    const response = await this.client.get<PromptVersionDetail | null>('/prompts/active')
+    return response.data
+  }
+
+  async createPromptVersion(payload: PromptVersionCreate): Promise<PromptVersionDetail> {
+    const response = await this.client.post<PromptVersionDetail>('/prompts/', payload)
+    return response.data
+  }
+
+  async activatePromptVersion(id: string): Promise<PromptVersionDetail> {
+    const response = await this.client.post<PromptVersionDetail>(`/prompts/${id}/activate`)
+    return response.data
+  }
+
+  // Self-Check Prompts
+  async listSelfCheckPromptVersions(): Promise<SelfCheckPromptVersionSummary[]> {
+    const response = await this.client.get<SelfCheckPromptVersionSummary[]>('/prompts/self-check')
+    return response.data
+  }
+
+  async getSelfCheckPromptVersion(id: string): Promise<SelfCheckPromptVersionDetail> {
+    const response = await this.client.get<SelfCheckPromptVersionDetail>(`/prompts/self-check/${id}`)
+    return response.data
+  }
+
+  async getActiveSelfCheckPromptVersion(): Promise<SelfCheckPromptVersionDetail | null> {
+    const response = await this.client.get<SelfCheckPromptVersionDetail | null>('/prompts/self-check/active')
+    return response.data
+  }
+
+  async createSelfCheckPromptVersion(payload: SelfCheckPromptVersionCreate): Promise<SelfCheckPromptVersionDetail> {
+    const response = await this.client.post<SelfCheckPromptVersionDetail>('/prompts/self-check', payload)
+    return response.data
+  }
+
+  async activateSelfCheckPromptVersion(id: string): Promise<SelfCheckPromptVersionDetail> {
+    const response = await this.client.post<SelfCheckPromptVersionDetail>(`/prompts/self-check/${id}/activate`)
     return response.data
   }
 
