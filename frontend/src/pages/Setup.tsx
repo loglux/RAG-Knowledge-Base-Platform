@@ -7,6 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Setup.css';
+import { Button } from '../components/common/Button';
 import {
   getSetupStatus,
   createAdminUser,
@@ -306,12 +307,13 @@ const Setup: React.FC = () => {
             </div>
 
             <div className="setup-actions">
-              <button
-                className="btn btn-primary"
+              <Button
+                variant="primary"
+                className="btn"
                 onClick={() => setCurrentStep('admin')}
               >
                 Get Started →
-              </button>
+              </Button>
             </div>
           </div>
         );
@@ -366,20 +368,21 @@ const Setup: React.FC = () => {
             {error && <div className="alert alert-error">{error}</div>}
 
             <div className="setup-actions">
-              <button
-                className="btn btn-secondary"
+              <Button
+                className="btn"
                 onClick={() => setCurrentStep('welcome')}
                 disabled={loading}
               >
                 ← Back
-              </button>
-              <button
-                className="btn btn-primary"
+              </Button>
+              <Button
+                variant="primary"
+                className="btn"
                 onClick={handleCreateAdmin}
                 disabled={loading || !adminData.username || !adminData.password}
               >
                 {loading ? 'Creating...' : 'Create Admin →'}
-              </button>
+              </Button>
             </div>
           </div>
         );
@@ -425,14 +428,14 @@ const Setup: React.FC = () => {
                   onChange={(e) => setDbSecurityData({ ...dbSecurityData, new_password: e.target.value })}
                   style={{ flex: 1 }}
                 />
-                <button
-                  className="btn btn-secondary"
+                <Button
+                  className="btn"
                   onClick={handleGeneratePassword}
                   disabled={loading}
                   style={{ whiteSpace: 'nowrap' }}
                 >
                   {loading ? 'Generating...' : '🎲 Generate'}
-                </button>
+                </Button>
               </div>
               <small className="form-text">Minimum 8 characters recommended</small>
             </div>
@@ -456,27 +459,28 @@ const Setup: React.FC = () => {
             {error && <div className="alert alert-error">{error}</div>}
 
             <div className="setup-actions">
-              <button
-                className="btn btn-secondary"
+              <Button
+                className="btn"
                 onClick={() => setCurrentStep('admin')}
                 disabled={loading}
               >
                 ← Back
-              </button>
-              <button
-                className="btn btn-secondary"
+              </Button>
+              <Button
+                className="btn"
                 onClick={handleSkipDbSecurity}
                 disabled={loading}
               >
                 Skip (Use Default)
-              </button>
-              <button
-                className="btn btn-primary"
+              </Button>
+              <Button
+                variant="primary"
+                className="btn"
                 onClick={handleChangeDbPassword}
                 disabled={loading || !dbSecurityData.new_password}
               >
                 {loading ? 'Changing...' : 'Change Password →'}
-              </button>
+              </Button>
             </div>
           </div>
         );
@@ -540,15 +544,15 @@ const Setup: React.FC = () => {
                   }}
                   style={{ flex: 1 }}
                 />
-                <button
+                <Button
                   type="button"
-                  className="btn btn-secondary"
+                  className="btn"
                   onClick={handleTestOllamaConnection}
                   disabled={!apiKeysData.ollama_base_url || ollamaTestStatus === 'testing'}
                   style={{ whiteSpace: 'nowrap' }}
                 >
                   {ollamaTestStatus === 'testing' ? 'Testing...' : 'Test Connection'}
-                </button>
+                </Button>
               </div>
               <small className="form-text">Local or cloud Ollama server (include port, e.g., :11434)</small>
               {ollamaTestMessage && (
@@ -569,20 +573,21 @@ const Setup: React.FC = () => {
             {error && <div className="alert alert-error">{error}</div>}
 
             <div className="setup-actions">
-              <button
-                className="btn btn-secondary"
+              <Button
+                className="btn"
                 onClick={() => setCurrentStep('admin')}
                 disabled={loading}
               >
                 ← Back
-              </button>
-              <button
-                className="btn btn-primary"
+              </Button>
+              <Button
+                variant="primary"
+                className="btn"
                 onClick={handleSaveAPIKeys}
                 disabled={loading}
               >
                 {loading ? 'Saving...' : 'Save & Continue →'}
-              </button>
+              </Button>
             </div>
           </div>
         );
@@ -659,27 +664,28 @@ const Setup: React.FC = () => {
             {error && <div className="alert alert-error">{error}</div>}
 
             <div className="setup-actions">
-              <button
-                className="btn btn-secondary"
+              <Button
+                className="btn"
                 onClick={() => setCurrentStep('api-keys')}
                 disabled={loading}
               >
                 ← Back
-              </button>
-              <button
-                className="btn btn-secondary"
+              </Button>
+              <Button
+                className="btn"
                 onClick={() => setCurrentStep('system')}
                 disabled={loading}
               >
                 Skip
-              </button>
-              <button
-                className="btn btn-primary"
+              </Button>
+              <Button
+                variant="primary"
+                className="btn"
                 onClick={handleSaveDatabaseSettings}
                 disabled={loading}
               >
                 {loading ? 'Saving...' : 'Save & Continue →'}
-              </button>
+              </Button>
             </div>
           </div>
         );
@@ -748,27 +754,28 @@ const Setup: React.FC = () => {
             {error && <div className="alert alert-error">{error}</div>}
 
             <div className="setup-actions">
-              <button
-                className="btn btn-secondary"
+              <Button
+                className="btn"
                 onClick={() => setCurrentStep('database')}
                 disabled={loading}
               >
                 ← Back
-              </button>
-              <button
-                className="btn btn-secondary"
+              </Button>
+              <Button
+                className="btn"
                 onClick={() => setCurrentStep('complete')}
                 disabled={loading}
               >
                 Skip
-              </button>
-              <button
-                className="btn btn-primary"
+              </Button>
+              <Button
+                variant="primary"
+                className="btn"
                 onClick={handleSaveSystemSettings}
                 disabled={loading}
               >
                 {loading ? 'Saving...' : 'Save & Continue →'}
-              </button>
+              </Button>
             </div>
           </div>
         );
@@ -793,13 +800,14 @@ const Setup: React.FC = () => {
             {error && <div className="alert alert-error">{error}</div>}
 
             <div className="setup-actions">
-              <button
-                className="btn btn-primary btn-large"
+              <Button
+                variant="primary"
+                className="btn btn-large"
                 onClick={handleCompleteSetup}
                 disabled={loading}
               >
                 {loading ? 'Finalizing...' : 'Launch Platform →'}
-              </button>
+              </Button>
             </div>
           </div>
         );
@@ -827,13 +835,13 @@ const Setup: React.FC = () => {
               <h1>Knowledge Base Platform</h1>
               <p className="setup-subtitle">Initial Setup Wizard</p>
             </div>
-            <button
-              className="btn btn-secondary"
+            <Button
+              className="btn"
               onClick={() => navigate('/')}
               style={{ alignSelf: 'flex-start' }}
             >
               ← Exit Setup
-            </button>
+            </Button>
           </div>
         </div>
 
