@@ -187,271 +187,294 @@ export function ChatSettings({
           </div>
         </div>
 
-        {/* Structure-based Search Toggle */}
-        <div className="mb-6 p-4 bg-gray-900 rounded-lg border border-gray-700">
-          <label className="flex items-center space-x-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={useStructure}
-              onChange={(e) => onUseStructureChange(e.target.checked)}
-              className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
-            />
-            <div className="flex-1">
-              <span className="text-sm font-medium text-white">
-                Use Document Structure for Search
-              </span>
-              <span className="ml-2 text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded">
-                Experimental
-              </span>
-              <p className="text-xs text-gray-400 mt-1">
-                Enable AI-powered structure analysis to find specific questions, sections, and chapters.
-                Works best with queries like "show me question 2" or "section 3.1".
-              </p>
-            </div>
-          </label>
-        </div>
-
-        {/* MMR (Diversity-Aware Search) */}
-        <div className="mb-6 p-4 bg-gray-900 rounded-lg border border-gray-700">
-          <label className="flex items-center space-x-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={useMmr}
-              onChange={(e) => onUseMmrChange(e.target.checked)}
-              className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
-            />
-            <div className="flex-1">
-              <span className="text-sm font-medium text-white">
-                Enable MMR (Diversity-Aware Search)
-              </span>
-              <p className="text-xs text-gray-400 mt-1">
-                Balances relevance and diversity to avoid too many similar chunks from the same section.
-              </p>
-              <div className="mt-2 p-2 bg-gray-800 rounded text-xs text-gray-400 space-y-1">
-                <p className="font-medium text-gray-300">💡 When to use:</p>
-                <p>• <span className="text-blue-400">0.3-0.4</span> — Precision focus (legal docs, technical specs)</p>
-                <p>• <span className="text-green-400">0.5-0.6</span> — Balanced (recommended default) ⭐</p>
-                <p>• <span className="text-purple-400">0.7-0.8</span> — Broad exploration (research, brainstorming)</p>
-                <p className="mt-1 pt-1 border-t border-gray-700 text-gray-500">
-                  Higher diversity = more varied sources, lower avg relevance score
-                </p>
-              </div>
-            </div>
-          </label>
-
-          {useMmr && (
-            <div className="mt-4 pl-8">
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Diversity: {mmrDiversity.toFixed(2)}
-                <span className="ml-2 text-xs text-gray-500">
-                  ({mmrDiversity < 0.4 ? 'Focus' : mmrDiversity < 0.7 ? 'Balanced' : 'Explore'})
-                </span>
+        {/* Structure */}
+        <div className="mb-8">
+          <h4 className="text-sm font-semibold text-gray-300 mb-3">Structure</h4>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="p-4 bg-gray-900 rounded-lg border border-gray-700">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useStructure}
+                  onChange={(e) => onUseStructureChange(e.target.checked)}
+                  className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
+                />
+                <div className="flex-1">
+                  <span className="text-sm font-medium text-white">
+                    Use Document Structure for Search
+                  </span>
+                  <span className="ml-2 text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded">
+                    Experimental
+                  </span>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Enable AI-powered structure analysis to find specific questions, sections, and chapters.
+                    Works best with queries like "show me question 2" or "section 3.1".
+                  </p>
+                </div>
               </label>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.1"
-                value={mmrDiversity}
-                onChange={(e) => onMmrDiversityChange(Number(e.target.value))}
-                className="slider w-full"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>0.0 - Pure relevance</span>
-                <span>0.5 - Balanced</span>
-                <span>1.0 - Max diversity</span>
-              </div>
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Context Expansion */}
-        <div className="mb-6 p-4 bg-gray-900 rounded-lg border border-gray-700">
-          <label className="flex items-center space-x-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={windowEnabled}
-              onChange={(e) => handleWindowToggle(e.target.checked)}
-              className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
-            />
-            <div className="flex-1">
-              <span className="text-sm font-medium text-white">
-                Windowed Retrieval (Context Expansion)
-              </span>
-              <p className="text-xs text-gray-400 mt-1">
-                Adds neighboring chunks around each match to avoid truncated citations and missing continuations.
-              </p>
-            </div>
-          </label>
-
-          {windowEnabled && (
-            <div className="mt-4 pl-8">
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Window size (chunks on each side)
+        {/* Retrieval */}
+        <div className="mb-8">
+          <h4 className="text-sm font-semibold text-gray-300 mb-3">Retrieval</h4>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Document scope */}
+            <div className="p-4 bg-gray-900 rounded-lg border border-gray-700">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useDocumentFilter}
+                  onChange={(e) => onUseDocumentFilterChange(e.target.checked)}
+                  className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
+                />
+                <div className="flex-1">
+                  <span className="text-sm font-medium text-white">
+                    Limit to Selected Documents
+                  </span>
+                  <p className="text-xs text-gray-400 mt-1">
+                    When enabled, retrieval will only use the documents you choose below.
+                  </p>
+                </div>
               </label>
-              <select
-                value={safeContextWindow}
-                onChange={(e) => onContextWindowChange(Number(e.target.value))}
-                className="w-40 px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white focus:ring-primary-500 focus:border-primary-500"
-              >
-                <option value={1}>1 chunk</option>
-                <option value={2}>2 chunks</option>
-                <option value={3}>3 chunks</option>
-              </select>
-              <p className="text-xs text-gray-500 mt-2">
-                Use 1 for tight continuity, 2-3 for longer lists or multi-step questions.
-              </p>
-            </div>
-          )}
-        </div>
 
-      {/* Self-Check Validation Toggle */}
-      <div className="mb-6 p-4 bg-gray-900 rounded-lg border border-gray-700">
-        <label className="flex items-center space-x-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={useSelfCheck}
-            onChange={(e) => onUseSelfCheckChange(e.target.checked)}
-            className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
-          />
-          <div className="flex-1">
-            <span className="text-sm font-medium text-white">
-              Enable Self-Check Validation
-            </span>
-            <p className="text-xs text-gray-400 mt-1">
-              Validates generated answers against retrieved context to ensure accuracy and prevent hallucinations.
-              The system generates a draft answer, then validates it for factual grounding before returning.
-            </p>
-          </div>
-        </label>
-      </div>
-
-      {/* Conversation History */}
-      <div className="mb-6 p-4 bg-gray-900 rounded-lg border border-gray-700">
-        <label className="flex items-center space-x-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={useConversationHistory}
-            onChange={(e) => onUseConversationHistoryChange(e.target.checked)}
-            className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
-          />
-          <div className="flex-1">
-            <span className="text-sm font-medium text-white">
-              Use Conversation History
-            </span>
-            <p className="text-xs text-gray-400 mt-1">
-              Include recent messages to preserve context across turns.
-            </p>
-          </div>
-        </label>
-        <div className="mt-3 flex items-center gap-3 text-xs text-gray-300">
-          <span>History limit</span>
-          <input
-            type="number"
-            min="0"
-            max="100"
-            step="1"
-            value={conversationHistoryLimit}
-            onChange={(e) => onConversationHistoryLimitChange(Number(e.target.value))}
-            disabled={!useConversationHistory}
-            className="w-20 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-gray-100 disabled:opacity-50"
-          />
-          <span className="text-gray-500">messages</span>
-        </div>
-      </div>
-
-      {/* Document scope */}
-      <div className="mb-6 p-4 bg-gray-900 rounded-lg border border-gray-700">
-        <label className="flex items-center space-x-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={useDocumentFilter}
-            onChange={(e) => onUseDocumentFilterChange(e.target.checked)}
-            className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
-          />
-          <div className="flex-1">
-            <span className="text-sm font-medium text-white">
-              Limit to Selected Documents
-            </span>
-            <p className="text-xs text-gray-400 mt-1">
-              When enabled, retrieval will only use the documents you choose below.
-            </p>
-          </div>
-        </label>
-
-        <div className="mt-4">
-          <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
-            <span>Documents</span>
-            {useDocumentFilter && documents.length > 0 && (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => onSelectedDocumentIdsChange(documents.map((doc) => doc.id))}
-                  className="text-xs text-primary-300 hover:text-primary-200"
-                >
-                  Select all
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onSelectedDocumentIdsChange([])}
-                  className="text-xs text-gray-400 hover:text-gray-200"
-                >
-                  Clear
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="max-h-48 overflow-y-auto space-y-2 border border-gray-800 rounded p-2 bg-gray-950/40">
-            {documentsLoading && (
-              <div className="text-xs text-gray-500">Loading documents…</div>
-            )}
-            {!documentsLoading && documents.length === 0 && (
-              <div className="text-xs text-gray-500">No documents available.</div>
-            )}
-            {!documentsLoading && documents.map((doc) => {
-              const disabled = !useDocumentFilter
-              const checked = selectedDocumentIds.includes(doc.id)
-              const statusLabel = doc.status === 'completed' ? null : doc.status
-              return (
-                <label key={doc.id} className="flex items-start gap-2 text-xs text-gray-300">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={disabled}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        onSelectedDocumentIdsChange([...selectedDocumentIds, doc.id])
-                      } else {
-                        onSelectedDocumentIdsChange(selectedDocumentIds.filter((id) => id !== doc.id))
-                      }
-                    }}
-                    className="mt-0.5 w-4 h-4 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900 disabled:opacity-50"
-                  />
-                  <div className="flex-1">
+              <div className="mt-4">
+                <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
+                  <span>Documents</span>
+                  {useDocumentFilter && documents.length > 0 && (
                     <div className="flex items-center gap-2">
-                      <span className={doc.status === 'completed' ? 'text-gray-200' : 'text-gray-500'}>
-                        {doc.filename}
-                      </span>
-                      {statusLabel && (
-                        <span className="text-[10px] uppercase text-gray-500">
-                          {statusLabel}
-                        </span>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => onSelectedDocumentIdsChange(documents.map((doc) => doc.id))}
+                        className="text-xs text-primary-300 hover:text-primary-200"
+                      >
+                        Select all
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onSelectedDocumentIdsChange([])}
+                        className="text-xs text-gray-400 hover:text-gray-200"
+                      >
+                        Clear
+                      </button>
                     </div>
-                  </div>
-                </label>
-              )
-            })}
-          </div>
+                  )}
+                </div>
 
-          {useDocumentFilter && selectedDocumentIds.length === 0 && (
-            <p className="text-xs text-yellow-400 mt-2">
-              Select at least one document to apply the filter.
-            </p>
-          )}
+                <div className="max-h-48 overflow-y-auto space-y-2 border border-gray-800 rounded p-2 bg-gray-950/40">
+                  {documentsLoading && (
+                    <div className="text-xs text-gray-500">Loading documents…</div>
+                  )}
+                  {!documentsLoading && documents.length === 0 && (
+                    <div className="text-xs text-gray-500">No documents available.</div>
+                  )}
+                  {!documentsLoading && documents.map((doc) => {
+                    const disabled = !useDocumentFilter
+                    const checked = selectedDocumentIds.includes(doc.id)
+                    const statusLabel = doc.status === 'completed' ? null : doc.status
+                    return (
+                      <label key={doc.id} className="flex items-start gap-2 text-xs text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={disabled}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              onSelectedDocumentIdsChange([...selectedDocumentIds, doc.id])
+                            } else {
+                              onSelectedDocumentIdsChange(selectedDocumentIds.filter((id) => id !== doc.id))
+                            }
+                          }}
+                          className="mt-0.5 w-4 h-4 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900 disabled:opacity-50"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className={doc.status === 'completed' ? 'text-gray-200' : 'text-gray-500'}>
+                              {doc.filename}
+                            </span>
+                            {statusLabel && (
+                              <span className="text-[10px] uppercase text-gray-500">
+                                {statusLabel}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
+
+                {useDocumentFilter && selectedDocumentIds.length === 0 && (
+                  <p className="text-xs text-yellow-400 mt-2">
+                    Select at least one document to apply the filter.
+                  </p>
+                )}
+              </div>
+            </div>
+            {/* Context Expansion */}
+            <div className="p-4 bg-gray-900 rounded-lg border border-gray-700">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={windowEnabled}
+                  onChange={(e) => handleWindowToggle(e.target.checked)}
+                  className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
+                />
+                <div className="flex-1">
+                  <span className="text-sm font-medium text-white">
+                    Windowed Retrieval (Context Expansion)
+                  </span>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Adds neighboring chunks around each match to avoid truncated citations and missing continuations.
+                  </p>
+                </div>
+              </label>
+
+              {windowEnabled && (
+                <div className="mt-4 pl-8">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Window size (chunks on each side)
+                  </label>
+                  <select
+                    value={safeContextWindow}
+                    onChange={(e) => onContextWindowChange(Number(e.target.value))}
+                    className="w-40 px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white focus:ring-primary-500 focus:border-primary-500"
+                  >
+                    <option value={1}>1 chunk</option>
+                    <option value={2}>2 chunks</option>
+                    <option value={3}>3 chunks</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Use 1 for tight continuity, 2-3 for longer lists or multi-step questions.
+                  </p>
+                </div>
+              )}
+            </div>
+
+          </div>
         </div>
-      </div>
+
+        {/* Quality */}
+        <div className="mb-8">
+          <h4 className="text-sm font-semibold text-gray-300 mb-3">Quality</h4>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* MMR (Diversity-Aware Search) */}
+            <div className="p-4 bg-gray-900 rounded-lg border border-gray-700">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useMmr}
+                  onChange={(e) => onUseMmrChange(e.target.checked)}
+                  className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
+                />
+                <div className="flex-1">
+                  <span className="text-sm font-medium text-white">
+                    Enable MMR (Diversity-Aware Search)
+                  </span>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Balances relevance and diversity to avoid too many similar chunks from the same section.
+                  </p>
+                  <div className="mt-2 p-2 bg-gray-800 rounded text-xs text-gray-400 space-y-1">
+                    <p className="font-medium text-gray-300">💡 When to use:</p>
+                    <p>• <span className="text-blue-400">0.3-0.4</span> — Precision focus (legal docs, technical specs)</p>
+                    <p>• <span className="text-green-400">0.5-0.6</span> — Balanced (recommended default) ⭐</p>
+                    <p>• <span className="text-purple-400">0.7-0.8</span> — Broad exploration (research, brainstorming)</p>
+                    <p className="mt-1 pt-1 border-t border-gray-700 text-gray-500">
+                      Higher diversity = more varied sources, lower avg relevance score
+                    </p>
+                  </div>
+                </div>
+              </label>
+
+              {useMmr && (
+                <div className="mt-4 pl-8">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Diversity: {mmrDiversity.toFixed(2)}
+                    <span className="ml-2 text-xs text-gray-500">
+                      ({mmrDiversity < 0.4 ? 'Focus' : mmrDiversity < 0.7 ? 'Balanced' : 'Explore'})
+                    </span>
+                  </label>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={mmrDiversity}
+                    onChange={(e) => onMmrDiversityChange(Number(e.target.value))}
+                    className="slider w-full"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>0.0 - Pure relevance</span>
+                    <span>0.5 - Balanced</span>
+                    <span>1.0 - Max diversity</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Self-Check Validation Toggle */}
+            <div className="p-4 bg-gray-900 rounded-lg border border-gray-700">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useSelfCheck}
+                  onChange={(e) => onUseSelfCheckChange(e.target.checked)}
+                  className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
+                />
+                <div className="flex-1">
+                  <span className="text-sm font-medium text-white">
+                    Enable Self-Check Validation
+                  </span>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Validates generated answers against retrieved context to ensure accuracy and prevent hallucinations.
+                    The system generates a draft answer, then validates it for factual grounding before returning.
+                  </p>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Conversation */}
+        <div className="mb-6">
+          <h4 className="text-sm font-semibold text-gray-300 mb-3">Conversation</h4>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Conversation History */}
+            <div className="p-4 bg-gray-900 rounded-lg border border-gray-700">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useConversationHistory}
+                  onChange={(e) => onUseConversationHistoryChange(e.target.checked)}
+                  className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
+                />
+                <div className="flex-1">
+                  <span className="text-sm font-medium text-white">
+                    Use Conversation History
+                  </span>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Include recent messages to preserve context across turns.
+                  </p>
+                </div>
+              </label>
+              <div className="mt-3 flex items-center gap-3 text-xs text-gray-300">
+                <span>History limit</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={conversationHistoryLimit}
+                  onChange={(e) => onConversationHistoryLimitChange(Number(e.target.value))}
+                  disabled={!useConversationHistory}
+                  className="w-20 bg-gray-800 border border-gray-700 rounded px-2 py-1 text-gray-100 disabled:opacity-50"
+                />
+                <span className="text-gray-500">messages</span>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* LLM Model */}

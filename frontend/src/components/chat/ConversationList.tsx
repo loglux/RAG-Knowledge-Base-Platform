@@ -9,6 +9,8 @@ interface ConversationListProps {
   onSelectConversation: (conversationId: string) => void
   onDeleteConversation: (conversationId: string) => Promise<void> | void
   onRenameConversation: (conversationId: string, title: string | null) => Promise<void> | void
+  collapsed: boolean
+  onToggleCollapsed: () => void
 }
 
 export function ConversationList({
@@ -19,6 +21,8 @@ export function ConversationList({
   onSelectConversation,
   onDeleteConversation,
   onRenameConversation,
+  collapsed,
+  onToggleCollapsed,
 }: ConversationListProps) {
   const [editingConversationId, setEditingConversationId] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState('')
@@ -99,8 +103,31 @@ export function ConversationList({
     setEditingTitle('')
   }
 
+  if (collapsed) {
+    return (
+      <aside className="bg-gray-800 border border-gray-700 rounded-lg h-full flex flex-col items-center py-3">
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          className="text-gray-300 hover:text-white transition-colors mb-4"
+          aria-label="Expand chat list"
+        >
+          ▸
+        </button>
+        <button
+          type="button"
+          onClick={handleStartNewChat}
+          className="text-gray-300 hover:text-white transition-colors text-lg"
+          aria-label="New chat"
+        >
+          ＋
+        </button>
+      </aside>
+    )
+  }
+
   return (
-    <aside className="bg-gray-800 border border-gray-700 rounded-lg p-4 h-fit">
+    <aside className="bg-gray-800 border border-gray-700 rounded-lg p-4 h-full">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-semibold text-gray-200">Chats</h2>
         <button
@@ -156,7 +183,7 @@ export function ConversationList({
                   }`}
                 >
                   <div className="p-3">
-                    <div className="flex items-start gap-2">
+                    <div className="flex flex-col gap-2">
                       {isEditing ? (
                         <div className="flex-1 min-w-0">
                           <input
@@ -173,50 +200,51 @@ export function ConversationList({
                           <p className="text-[11px] text-gray-500 mt-1">{updatedLabel}</p>
                         </div>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleSelectConversation(conversation.id)}
-                          className="flex-1 min-w-0 text-left"
-                        >
-                          <p className="text-sm font-medium text-white truncate">{titleLabel}</p>
-                          <p className="text-[11px] text-gray-500 mt-1">{updatedLabel}</p>
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectConversation(conversation.id)}
+                            className="min-w-0 text-left"
+                          >
+                            <p className="text-sm font-medium text-white truncate">{titleLabel}</p>
+                          </button>
+                          <div className="flex items-center justify-between text-[11px] text-gray-500">
+                            <span>{updatedLabel}</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleEditConversation(conversation.id, conversation.title)}
+                                className="text-xs text-gray-400 hover:text-gray-200"
+                                aria-label="Rename conversation"
+                              >
+                                Rename
+                              </button>
+                              <button
+                                onClick={() => handleDeleteConversation(conversation.id)}
+                                className="text-xs text-red-400 hover:text-red-300"
+                                aria-label="Delete conversation"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        </>
                       )}
-                      <div className="flex items-center gap-1">
-                        {isEditing ? (
-                          <>
-                            <button
-                              onClick={handleSaveEdit}
-                              className="text-xs text-green-400 hover:text-green-300"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={handleCancelEdit}
-                              className="text-xs text-gray-400 hover:text-gray-200"
-                            >
-                              Cancel
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              onClick={() => handleEditConversation(conversation.id, conversation.title)}
-                              className="text-xs text-gray-400 hover:text-gray-200"
-                              aria-label="Rename conversation"
-                            >
-                              Rename
-                            </button>
-                            <button
-                              onClick={() => handleDeleteConversation(conversation.id)}
-                              className="text-xs text-red-400 hover:text-red-300"
-                              aria-label="Delete conversation"
-                            >
-                              Delete
-                            </button>
-                          </>
-                        )}
-                      </div>
+                      {isEditing && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <button
+                            onClick={handleSaveEdit}
+                            className="text-xs text-green-400 hover:text-green-300"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={handleCancelEdit}
+                            className="text-xs text-gray-400 hover:text-gray-200"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

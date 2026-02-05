@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { apiClient } from '../services/api'
@@ -18,6 +18,13 @@ export function ChatPage() {
   const [kb, setKb] = useState<KnowledgeBase | null>(null)
   const [kbLoading, setKbLoading] = useState(true)
   const [kbError, setKbError] = useState<string | null>(null)
+  const [chatListCollapsed, setChatListCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('chat_list_collapsed') === '1'
+    } catch {
+      return false
+    }
+  })
 
   const [showSettings, setShowSettings] = useState(false)
   const [topK, setTopK] = useState(() => {
@@ -561,6 +568,18 @@ export function ChatPage() {
     }
   }
 
+  const toggleChatListCollapsed = () => {
+    setChatListCollapsed((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem('chat_list_collapsed', next ? '1' : '0')
+      } catch {
+        // ignore storage errors
+      }
+      return next
+    })
+  }
+
   if (kbLoading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -588,9 +607,9 @@ export function ChatPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col">
+    <div className="h-screen overflow-hidden bg-gray-900 flex flex-col">
       {/* Header */}
-      <header className="bg-gray-800 border-b border-gray-700">
+      <header className="sticky top-0 z-30 bg-gray-800/95 backdrop-blur border-b border-gray-700 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -633,82 +652,119 @@ export function ChatPage() {
 
       {/* Settings Panel */}
       {showSettings && (
-        <ChatSettings
-          topK={topK}
-          temperature={temperature}
-          maxContextChars={maxContextChars}
-          scoreThreshold={scoreThreshold}
-          retrievalMode={retrievalMode}
-          lexicalTopK={lexicalTopK}
-          hybridDenseWeight={hybridDenseWeight}
-          hybridLexicalWeight={hybridLexicalWeight}
-          bm25MatchMode={bm25MatchMode}
-          bm25MinShouldMatch={bm25MinShouldMatch}
-          bm25UsePhrase={bm25UsePhrase}
-          bm25Analyzer={bm25Analyzer}
-          bm25MatchModes={bm25MatchModes ?? undefined}
-          bm25Analyzers={bm25Analyzers ?? undefined}
-          opensearchAvailable={opensearchAvailable ?? undefined}
-          llmModel={llmModel}
-          llmProvider={llmProvider}
-          useStructure={useStructure}
-          useMmr={useMmr}
-          mmrDiversity={mmrDiversity}
-          useSelfCheck={useSelfCheck}
-          useConversationHistory={useConversationHistory}
-          conversationHistoryLimit={conversationHistoryLimit}
-          useDocumentFilter={useDocumentFilter}
-          contextExpansion={contextExpansion}
-          contextWindow={contextWindow}
-          selectedDocumentIds={selectedDocumentIds}
-          documents={documents}
-          documentsLoading={documentsLoading}
-          onTopKChange={setTopK}
-          onTemperatureChange={setTemperature}
-          onMaxContextCharsChange={setMaxContextChars}
-          onScoreThresholdChange={setScoreThreshold}
-          onRetrievalModeChange={setRetrievalMode}
-          onLexicalTopKChange={setLexicalTopK}
-          onHybridDenseWeightChange={setHybridDenseWeight}
-          onHybridLexicalWeightChange={setHybridLexicalWeight}
-          onBm25MatchModeChange={setBm25MatchMode}
-          onBm25MinShouldMatchChange={setBm25MinShouldMatch}
-          onBm25UsePhraseChange={setBm25UsePhrase}
-          onBm25AnalyzerChange={setBm25Analyzer}
-          onLLMChange={handleLLMChange}
-          onUseStructureChange={setUseStructure}
-          onUseMmrChange={setUseMmr}
-          onMmrDiversityChange={setMmrDiversity}
-          onUseSelfCheckChange={setUseSelfCheck}
-          onUseConversationHistoryChange={setUseConversationHistory}
-          onConversationHistoryLimitChange={(value) => {
-            setConversationHistoryLimit(Number.isFinite(value) ? value : 0)
-          }}
-          onUseDocumentFilterChange={setUseDocumentFilter}
-          onContextExpansionChange={setContextExpansion}
-          onContextWindowChange={setContextWindow}
-          onSelectedDocumentIdsChange={setSelectedDocumentIds}
-          onResetDefaults={handleResetDefaults}
-          onClose={() => setShowSettings(false)}
-        />
+        <div className="sticky top-[88px] z-20 bg-gray-800/95 backdrop-blur border-b border-gray-700 shadow-sm">
+          <div className="max-h-[60vh] overflow-y-auto">
+            <ChatSettings
+              topK={topK}
+              temperature={temperature}
+              maxContextChars={maxContextChars}
+              scoreThreshold={scoreThreshold}
+              retrievalMode={retrievalMode}
+              lexicalTopK={lexicalTopK}
+              hybridDenseWeight={hybridDenseWeight}
+              hybridLexicalWeight={hybridLexicalWeight}
+              bm25MatchMode={bm25MatchMode}
+              bm25MinShouldMatch={bm25MinShouldMatch}
+              bm25UsePhrase={bm25UsePhrase}
+              bm25Analyzer={bm25Analyzer}
+              bm25MatchModes={bm25MatchModes ?? undefined}
+              bm25Analyzers={bm25Analyzers ?? undefined}
+              opensearchAvailable={opensearchAvailable ?? undefined}
+              llmModel={llmModel}
+              llmProvider={llmProvider}
+              useStructure={useStructure}
+              useMmr={useMmr}
+              mmrDiversity={mmrDiversity}
+              useSelfCheck={useSelfCheck}
+              useConversationHistory={useConversationHistory}
+              conversationHistoryLimit={conversationHistoryLimit}
+              useDocumentFilter={useDocumentFilter}
+              contextExpansion={contextExpansion}
+              contextWindow={contextWindow}
+              selectedDocumentIds={selectedDocumentIds}
+              documents={documents}
+              documentsLoading={documentsLoading}
+              onTopKChange={setTopK}
+              onTemperatureChange={setTemperature}
+              onMaxContextCharsChange={setMaxContextChars}
+              onScoreThresholdChange={setScoreThreshold}
+              onRetrievalModeChange={setRetrievalMode}
+              onLexicalTopKChange={setLexicalTopK}
+              onHybridDenseWeightChange={setHybridDenseWeight}
+              onHybridLexicalWeightChange={setHybridLexicalWeight}
+              onBm25MatchModeChange={setBm25MatchMode}
+              onBm25MinShouldMatchChange={setBm25MinShouldMatch}
+              onBm25UsePhraseChange={setBm25UsePhrase}
+              onBm25AnalyzerChange={setBm25Analyzer}
+              onLLMChange={handleLLMChange}
+              onUseStructureChange={setUseStructure}
+              onUseMmrChange={setUseMmr}
+              onMmrDiversityChange={setMmrDiversity}
+              onUseSelfCheckChange={setUseSelfCheck}
+              onUseConversationHistoryChange={setUseConversationHistory}
+              onConversationHistoryLimitChange={(value) => {
+                setConversationHistoryLimit(Number.isFinite(value) ? value : 0)
+              }}
+              onUseDocumentFilterChange={setUseDocumentFilter}
+              onContextExpansionChange={setContextExpansion}
+              onContextWindowChange={setContextWindow}
+              onSelectedDocumentIdsChange={setSelectedDocumentIds}
+              onResetDefaults={handleResetDefaults}
+              onClose={() => setShowSettings(false)}
+            />
+          </div>
+        </div>
       )}
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-[280px,1fr] gap-6">
-            <ConversationList
-              conversations={conversations}
-              conversationsLoading={conversationsLoading}
-              activeConversationId={conversationId}
-              onStartNewChat={startNewChat}
-              onSelectConversation={selectConversation}
-              onDeleteConversation={deleteConversation}
-              onRenameConversation={renameConversation}
-            />
+      <main className="flex-1 min-h-0 overflow-hidden px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-7xl mx-auto h-full min-h-0">
+          <div
+            className={`grid grid-cols-1 gap-6 h-full min-h-0 ${
+              chatListCollapsed ? 'lg:grid-cols-[56px,1fr]' : 'lg:grid-cols-[280px,1fr]'
+            }`}
+          >
+            <aside className="hidden lg:block h-full min-h-0 relative">
+              <div className="h-full min-h-0 overflow-y-auto">
+                <ConversationList
+                  conversations={conversations}
+                  conversationsLoading={conversationsLoading}
+                  activeConversationId={conversationId}
+                  onStartNewChat={startNewChat}
+                  onSelectConversation={selectConversation}
+                  onDeleteConversation={deleteConversation}
+                  onRenameConversation={renameConversation}
+                  collapsed={chatListCollapsed}
+                  onToggleCollapsed={toggleChatListCollapsed}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={toggleChatListCollapsed}
+                className="absolute top-1/2 -right-3 -translate-y-1/2 w-6 h-10 rounded-r-lg bg-gray-800 border border-gray-700 text-gray-300 hover:text-white transition-colors"
+                aria-label={chatListCollapsed ? 'Expand chat list' : 'Collapse chat list'}
+                title={chatListCollapsed ? 'Expand chat list' : 'Collapse chat list'}
+              >
+                {chatListCollapsed ? '▸' : '▾'}
+              </button>
+            </aside>
 
-            <section className="min-w-0">
-              <div className="max-w-4xl mx-auto">
+            <section className="min-w-0 h-full min-h-0 flex flex-col overflow-hidden">
+              <div className="lg:hidden mb-6">
+                <ConversationList
+                  conversations={conversations}
+                  conversationsLoading={conversationsLoading}
+                  activeConversationId={conversationId}
+                  onStartNewChat={startNewChat}
+                  onSelectConversation={selectConversation}
+                  onDeleteConversation={deleteConversation}
+                  onRenameConversation={renameConversation}
+                  collapsed={false}
+                  onToggleCollapsed={toggleChatListCollapsed}
+                />
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                <div className="max-w-4xl mx-auto">
                 {/* Error Display */}
                 {error && (
                   <div className="mb-4 p-4 bg-red-500 bg-opacity-10 border border-red-500 rounded-lg text-red-500">
@@ -799,18 +855,19 @@ export function ChatPage() {
                 )}
 
                 <div ref={messagesEndRef} />
+                </div>
+              </div>
+
+              {/* Chat Input */}
+              <div className="border-t border-gray-700 bg-gray-800">
+                <div className="max-w-4xl mx-auto py-4">
+                  <ChatInput onSend={handleSendMessage} disabled={isLoading} />
+                </div>
               </div>
             </section>
           </div>
         </div>
       </main>
-
-      {/* Chat Input */}
-      <div className="border-t border-gray-700 bg-gray-800">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <ChatInput onSend={handleSendMessage} disabled={isLoading} />
-        </div>
-      </div>
     </div>
   )
 }
