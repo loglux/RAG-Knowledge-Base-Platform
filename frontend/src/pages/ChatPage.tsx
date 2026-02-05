@@ -673,7 +673,7 @@ export function ChatPage() {
             <div className="flex items-center space-x-3">
               <button
                 onClick={handleLogout}
-                className="btn-secondary text-sm px-3 py-1.5"
+                className="btn-secondary btn-sm"
               >
                 Logout
               </button>
@@ -797,7 +797,7 @@ export function ChatPage() {
 
             <section className="min-w-0 h-full min-h-0 flex flex-col">
               <div className="lg:hidden mb-4">
-                <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 flex items-center justify-between">
+                <div className="panel p-3 flex items-center justify-between">
                   <div className="min-w-0">
                     <div className="text-xs text-gray-400">Chats</div>
                     <div className="text-sm text-white truncate">{activeConversationTitle}</div>
@@ -806,14 +806,14 @@ export function ChatPage() {
                     <button
                       type="button"
                       onClick={() => startNewChat()}
-                      className="btn-secondary text-xs px-2 py-1"
+                      className="btn-secondary btn-xs"
                     >
                       New
                     </button>
                     <button
                       type="button"
                       onClick={() => setMobileChatListOpen((prev) => !prev)}
-                      className="btn-secondary text-xs px-2 py-1"
+                      className="btn-secondary btn-xs"
                     >
                       {mobileChatListOpen ? 'Hide' : 'Show'}
                     </button>

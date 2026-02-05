@@ -60,14 +60,14 @@ export function DashboardPage() {
             <div className="flex items-center space-x-4">
               <button
                 onClick={() => navigate('/settings')}
-                className="btn-secondary text-sm px-3 py-1.5 flex items-center gap-2"
+                className="btn-secondary btn-sm flex items-center gap-2"
               >
                 <span aria-hidden="true">⚙️</span>
                 <span>Settings</span>
               </button>
               <button
                 onClick={handleLogout}
-                className="btn-secondary text-sm px-3 py-1.5 flex items-center gap-2"
+                className="btn-secondary btn-sm flex items-center gap-2"
               >
                 <span aria-hidden="true">⎋</span>
                 <span>Logout</span>
@@ -188,7 +188,7 @@ export function DashboardPage() {
                             e.stopPropagation()
                             handleRestore(kb.id)
                           }}
-                          className="btn-primary text-sm px-3 py-1.5"
+                          className="btn-primary btn-sm"
                         >
                           Restore
                         </button>
@@ -197,7 +197,7 @@ export function DashboardPage() {
                             e.stopPropagation()
                             handlePurge(kb.id)
                           }}
-                          className="btn-secondary text-sm px-3 py-1.5"
+                          className="btn-secondary btn-sm"
                         >
                           Purge
                         </button>

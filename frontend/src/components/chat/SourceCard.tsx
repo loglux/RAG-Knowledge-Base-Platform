@@ -25,7 +25,7 @@ export function SourceCard({ source }: SourceCardProps) {
   const combinedScore = typeof metadata.combined_score === 'number' ? metadata.combined_score : null
 
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm">
+    <div className="panel p-3 text-sm">
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center space-x-2">
           <span className="text-gray-400">📄</span>

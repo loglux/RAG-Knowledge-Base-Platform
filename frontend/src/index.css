@@ -31,8 +31,24 @@ details[open] .sources-caret {
     @apply bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors;
   }
 
+  .btn-sm {
+    @apply text-sm px-3 py-1.5;
+  }
+
+  .btn-xs {
+    @apply text-xs px-2 py-1;
+  }
+
+  .btn-xs-wide {
+    @apply text-xs px-3 py-1.5;
+  }
+
   .card {
     @apply bg-gray-800 rounded-lg shadow-lg p-6 border border-gray-700;
+  }
+
+  .panel {
+    @apply bg-gray-800 border border-gray-700 rounded-lg;
   }
 
   .input {

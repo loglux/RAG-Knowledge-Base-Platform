@@ -105,7 +105,7 @@ export function ConversationList({
 
   if (collapsed) {
     return (
-      <aside className="bg-gray-800 border border-gray-700 rounded-lg h-full flex flex-col items-center py-3">
+      <aside className="panel h-full flex flex-col items-center py-3">
         <button
           type="button"
           onClick={onToggleCollapsed}
@@ -127,12 +127,12 @@ export function ConversationList({
   }
 
   return (
-    <aside className="bg-gray-800 border border-gray-700 rounded-lg p-4 h-full flex flex-col overflow-hidden">
+    <aside className="panel p-4 h-full flex flex-col overflow-hidden">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-semibold text-gray-200">Chats</h2>
         <button
           onClick={handleStartNewChat}
-          className="btn-secondary text-xs px-2 py-1"
+          className="btn-secondary btn-xs"
         >
           New chat
         </button>

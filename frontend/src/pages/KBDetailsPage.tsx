@@ -678,14 +678,14 @@ export function KBDetailsPage() {
                     />
                     <button
                       onClick={handleSaveName}
-                      className="btn-primary text-sm px-3 py-1.5"
+                      className="btn-primary btn-sm"
                       disabled={nameSaving}
                     >
                       {nameSaving ? 'Saving...' : 'Save'}
                     </button>
                     <button
                       onClick={handleCancelEditName}
-                      className="btn-secondary text-sm px-3 py-1.5"
+                      className="btn-secondary btn-sm"
                       disabled={nameSaving}
                     >
                       Cancel
@@ -710,7 +710,7 @@ export function KBDetailsPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleLogout}
-                className="btn-secondary text-sm px-3 py-1.5"
+                className="btn-secondary btn-sm"
               >
                 Logout
               </button>
@@ -850,7 +850,7 @@ export function KBDetailsPage() {
                 <button
                   onClick={handleUploadQaFile}
                   disabled={!qaFile || qaUploading}
-                  className="btn-secondary text-xs px-3 py-1.5 disabled:opacity-60"
+                  className="btn-secondary btn-xs-wide disabled:opacity-60"
                 >
                   {qaUploading ? 'Uploading…' : 'Upload'}
                 </button>
@@ -893,7 +893,7 @@ export function KBDetailsPage() {
                 <button
                   onClick={handleRunGoldEval}
                   disabled={qaRunning}
-                  className="btn-primary text-xs px-3 py-1.5 disabled:opacity-60"
+                  className="btn-primary btn-xs-wide disabled:opacity-60"
                 >
                   {qaRunning ? 'Running…' : 'Run Evaluation'}
                 </button>
@@ -902,7 +902,7 @@ export function KBDetailsPage() {
                 <button
                   onClick={handleRunPresetSuite}
                   disabled={qaPresetRunning || qaRunning}
-                  className="btn-secondary text-xs px-3 py-1.5 disabled:opacity-60"
+                  className="btn-secondary btn-xs-wide disabled:opacity-60"
                 >
                   {qaPresetRunning ? 'Running presets…' : 'Run Preset Suite'}
                 </button>
@@ -1136,7 +1136,7 @@ export function KBDetailsPage() {
             {!isEditingSettings && (
               <button
                 onClick={() => setIsEditingSettings(true)}
-                className="btn-secondary text-xs px-3 py-1.5"
+                className="btn-secondary btn-xs-wide"
               >
                 Edit
               </button>
@@ -1431,14 +1431,14 @@ export function KBDetailsPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={handleSaveSettings}
-                  className="btn-primary text-xs px-3 py-1.5"
+                  className="btn-primary btn-xs-wide"
                   disabled={settingsSaving}
                 >
                   {settingsSaving ? 'Saving...' : 'Save'}
                 </button>
                 <button
                   onClick={handleCancelSettings}
-                  className="btn-secondary text-xs px-3 py-1.5"
+                  className="btn-secondary btn-xs-wide"
                   disabled={settingsSaving}
                 >
                   Cancel
@@ -1505,7 +1505,7 @@ export function KBDetailsPage() {
             </div>
             <button
               onClick={handleReindexBm25}
-              className="btn-secondary text-xs px-3 py-1.5"
+              className="btn-secondary btn-xs-wide"
               disabled={reindexing}
             >
               {reindexing ? 'Reindexing…' : 'Reindex for BM25'}
@@ -1518,7 +1518,7 @@ export function KBDetailsPage() {
             </div>
             <button
               onClick={handleReprocessWithNewStrategy}
-              className="btn-secondary text-xs px-3 py-1.5"
+              className="btn-secondary btn-xs-wide"
               disabled={reindexing}
             >
               {reindexing ? 'Reprocessing…' : 'Reprocess All Documents'}
@@ -1552,7 +1552,7 @@ export function KBDetailsPage() {
                 />
                 <button
                   onClick={handleRegenerateTitles}
-                  className="btn-secondary text-xs px-3 py-1.5"
+                  className="btn-secondary btn-xs-wide"
                   disabled={regenTitlesLoading}
                 >
                   {regenTitlesLoading ? 'Regenerating…' : 'Regenerate Chat Titles'}

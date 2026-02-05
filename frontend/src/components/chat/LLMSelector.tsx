@@ -102,7 +102,7 @@ export function LLMSelector({ value, onChange }: LLMSelectorProps) {
       </div>
 
       {selectedModel && (
-        <div className="p-3 bg-gray-800 border border-gray-700 rounded-lg space-y-2">
+        <div className="panel p-3 space-y-2">
           <div className="flex items-center gap-2">
             <span className={`px-2 py-1 text-xs rounded border ${getProviderColor(selectedModel.provider)}`}>
               {selectedModel.provider.toUpperCase()}
