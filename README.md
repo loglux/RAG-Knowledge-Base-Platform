@@ -186,6 +186,15 @@ API details are available in Swagger (`/docs`).
 
 Pagination note: list endpoints accept `page` and `page_size` (default 10, max 100).
 
+## Windowed Retrieval (Context Expansion)
+
+You can expand retrieval context by including neighboring chunks from the same document.
+This helps recover surrounding text that was split during chunking.
+
+API fields:
+- `context_expansion: ["window"]`
+- `context_window: N` (number of chunks on each side, 0–5)
+
 ## Configuration
 
 All configuration lives in `.env`. The sample file is `.env.example`.
