@@ -28,7 +28,7 @@ export function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-gray-800 border border-gray-700 rounded-lg p-6">
+      <div className="card w-full max-w-md">
         <h1 className="text-2xl font-semibold text-white mb-2">Sign in</h1>
         <p className="text-sm text-gray-400 mb-6">Use your admin credentials</p>
 
