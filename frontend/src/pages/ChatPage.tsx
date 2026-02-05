@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { apiClient } from '../services/api'
@@ -18,6 +18,7 @@ export function ChatPage() {
   const [kb, setKb] = useState<KnowledgeBase | null>(null)
   const [kbLoading, setKbLoading] = useState(true)
   const [kbError, setKbError] = useState<string | null>(null)
+  const [headerHeight, setHeaderHeight] = useState(0)
   const [chatListCollapsed, setChatListCollapsed] = useState(() => {
     try {
       return localStorage.getItem('chat_list_collapsed') === '1'
@@ -104,6 +105,7 @@ export function ChatPage() {
   const [showPromptVersions, setShowPromptVersions] = useState(false)
 
   const messagesScrollRef = useRef<HTMLDivElement>(null)
+  const headerRef = useRef<HTMLElement>(null)
 
   const {
     conversations,
@@ -455,6 +457,33 @@ export function ChatPage() {
     }
   }, [id])
 
+  useLayoutEffect(() => {
+    const headerEl = headerRef.current
+    if (!headerEl) return
+
+    const updateHeight = () => {
+      setHeaderHeight(headerEl.getBoundingClientRect().height)
+    }
+
+    updateHeight()
+
+    let observer: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => updateHeight())
+      observer.observe(headerEl)
+    } else {
+      window.addEventListener('resize', updateHeight)
+    }
+
+    return () => {
+      if (observer) {
+        observer.disconnect()
+      } else {
+        window.removeEventListener('resize', updateHeight)
+      }
+    }
+  }, [])
+
   useEffect(() => {
     if (!kb || conversationId || kbDefaultsApplied) return
     if (kb.bm25_match_mode !== undefined && kb.bm25_match_mode !== null) {
@@ -621,7 +650,7 @@ export function ChatPage() {
   return (
     <div className="h-screen overflow-hidden bg-gray-900 flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-gray-800/95 backdrop-blur border-b border-gray-700 shadow-sm">
+      <header ref={headerRef} className="sticky top-0 z-30 bg-gray-800/95 backdrop-blur border-b border-gray-700 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
@@ -667,7 +696,10 @@ export function ChatPage() {
 
       {/* Settings Panel */}
       {showSettings && (
-        <div className="sticky top-[88px] z-20 bg-gray-800/95 backdrop-blur border-b border-gray-700 shadow-sm">
+        <div
+          className="sticky z-20 bg-gray-800/95 backdrop-blur border-b border-gray-700 shadow-sm"
+          style={{ top: headerHeight }}
+        >
           <div className="max-h-[60vh] overflow-y-auto">
             <ChatSettings
               topK={topK}
@@ -740,19 +772,17 @@ export function ChatPage() {
             }`}
           >
             <aside className="hidden lg:block h-full min-h-0 relative">
-              <div className="h-full min-h-0 overflow-y-auto">
-                <ConversationList
-                  conversations={conversations}
-                  conversationsLoading={conversationsLoading}
-                  activeConversationId={conversationId}
-                  onStartNewChat={startNewChat}
-                  onSelectConversation={selectConversation}
-                  onDeleteConversation={deleteConversation}
-                  onRenameConversation={renameConversation}
-                  collapsed={chatListCollapsed}
-                  onToggleCollapsed={toggleChatListCollapsed}
-                />
-              </div>
+              <ConversationList
+                conversations={conversations}
+                conversationsLoading={conversationsLoading}
+                activeConversationId={conversationId}
+                onStartNewChat={startNewChat}
+                onSelectConversation={selectConversation}
+                onDeleteConversation={deleteConversation}
+                onRenameConversation={renameConversation}
+                collapsed={chatListCollapsed}
+                onToggleCollapsed={toggleChatListCollapsed}
+              />
               <button
                 type="button"
                 onClick={toggleChatListCollapsed}

@@ -127,7 +127,7 @@ export function ConversationList({
   }
 
   return (
-    <aside className="bg-gray-800 border border-gray-700 rounded-lg p-4 h-full">
+    <aside className="bg-gray-800 border border-gray-700 rounded-lg p-4 h-full flex flex-col overflow-hidden">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-semibold text-gray-200">Chats</h2>
         <button
@@ -159,111 +159,113 @@ export function ConversationList({
         </div>
       </div>
 
-      {conversationsLoading ? (
-        <div className="text-xs text-gray-400">Loading chats...</div>
-      ) : filteredConversations.length === 0 ? (
-        <div className="text-xs text-gray-400">
-          {conversations.length === 0 ? 'No chats yet.' : 'No chats match your search.'}
-        </div>
-      ) : (
-        <ul className="space-y-2">
-          {pagedConversations.map((conversation) => {
-            const isActive = conversation.id === activeConversationId
-            const isEditing = editingConversationId === conversation.id
-            const titleLabel = (conversation.title ?? '').trim() || 'Untitled chat'
-            const updatedLabel = new Date(conversation.updated_at).toLocaleString()
+      <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+        {conversationsLoading ? (
+          <div className="text-xs text-gray-400">Loading chats...</div>
+        ) : filteredConversations.length === 0 ? (
+          <div className="text-xs text-gray-400">
+            {conversations.length === 0 ? 'No chats yet.' : 'No chats match your search.'}
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {pagedConversations.map((conversation) => {
+              const isActive = conversation.id === activeConversationId
+              const isEditing = editingConversationId === conversation.id
+              const titleLabel = (conversation.title ?? '').trim() || 'Untitled chat'
+              const updatedLabel = new Date(conversation.updated_at).toLocaleString()
 
-            return (
-              <li key={conversation.id}>
-                <div
-                  className={`border rounded-lg transition-colors ${
-                    isActive
-                      ? 'border-primary-500 bg-primary-500/10'
-                      : 'border-gray-700 bg-gray-900/40 hover:bg-gray-900'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => handleSelectConversation(conversation.id)}
-                    className="w-full text-left p-3"
-                    disabled={isEditing}
+              return (
+                <li key={conversation.id}>
+                  <div
+                    className={`border rounded-lg transition-colors ${
+                      isActive
+                        ? 'border-primary-500 bg-primary-500/10'
+                        : 'border-gray-700 bg-gray-900/40 hover:bg-gray-900'
+                    }`}
                   >
-                    <div className="flex flex-col gap-2">
-                      {isEditing ? (
-                        <div className="flex-1 min-w-0">
-                          <input
-                            value={editingTitle}
-                            onChange={(e) => setEditingTitle(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleSaveEdit()
-                              if (e.key === 'Escape') handleCancelEdit()
-                            }}
-                            className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            placeholder="Conversation title"
-                            autoFocus
-                          />
-                          <p className="text-[11px] text-gray-500 mt-1">{updatedLabel}</p>
-                        </div>
-                      ) : (
-                        <>
-                          <p className="text-sm font-medium text-white truncate">{titleLabel}</p>
-                          <div className="flex items-center justify-between text-[11px] text-gray-500">
-                            <span>{updatedLabel}</span>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleEditConversation(conversation.id, conversation.title)
-                                }}
-                                className="text-xs text-gray-400 hover:text-gray-200"
-                                aria-label="Rename conversation"
-                              >
-                                Rename
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleDeleteConversation(conversation.id)
-                                }}
-                                className="text-xs text-red-400 hover:text-red-300"
-                                aria-label="Delete conversation"
-                              >
-                                Delete
-                              </button>
-                            </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectConversation(conversation.id)}
+                      className="w-full text-left p-3"
+                      disabled={isEditing}
+                    >
+                      <div className="flex flex-col gap-2">
+                        {isEditing ? (
+                          <div className="flex-1 min-w-0">
+                            <input
+                              value={editingTitle}
+                              onChange={(e) => setEditingTitle(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveEdit()
+                                if (e.key === 'Escape') handleCancelEdit()
+                              }}
+                              className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                              placeholder="Conversation title"
+                              autoFocus
+                            />
+                            <p className="text-[11px] text-gray-500 mt-1">{updatedLabel}</p>
                           </div>
-                        </>
-                      )}
-                      {isEditing && (
-                        <div className="flex items-center gap-2 text-xs">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleSaveEdit()
-                            }}
-                            className="text-xs text-green-400 hover:text-green-300"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleCancelEdit()
-                            }}
-                            className="text-xs text-gray-400 hover:text-gray-200"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </button>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
-      )}
+                        ) : (
+                          <>
+                            <p className="text-sm font-medium text-white truncate">{titleLabel}</p>
+                            <div className="flex items-center justify-between text-[11px] text-gray-500">
+                              <span>{updatedLabel}</span>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleEditConversation(conversation.id, conversation.title)
+                                  }}
+                                  className="text-xs text-gray-400 hover:text-gray-200"
+                                  aria-label="Rename conversation"
+                                >
+                                  Rename
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDeleteConversation(conversation.id)
+                                  }}
+                                  className="text-xs text-red-400 hover:text-red-300"
+                                  aria-label="Delete conversation"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                        {isEditing && (
+                          <div className="flex items-center gap-2 text-xs">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleSaveEdit()
+                              }}
+                              className="text-xs text-green-400 hover:text-green-300"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleCancelEdit()
+                              }}
+                              className="text-xs text-gray-400 hover:text-gray-200"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
 
       {filteredConversations.length > 0 && (
         <div className="mt-3 flex items-center justify-between text-xs text-gray-400">
