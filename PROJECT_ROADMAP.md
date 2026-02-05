@@ -19,6 +19,7 @@ Transform the Knowledge Base Platform from MVP to production-ready, enterprise-g
 ## Backlog
 
 - Chat titles regeneration options
+- Chat scroll restore: we currently persist `scrollTop` per conversation (session/local storage). If restored position drifts due to dynamic content height, consider restoring via message anchor (e.g., `message_id` + offset).
 - Background (async) regeneration for large KBs to avoid blocking UI
 - Smart regeneration mode: update only missing/auto-fallback titles to preserve manual names and reduce cost
 
