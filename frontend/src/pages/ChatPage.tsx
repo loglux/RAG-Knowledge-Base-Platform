@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { apiClient } from '../services/api'
@@ -25,7 +25,6 @@ export function ChatPage() {
       return false
     }
   })
-
   const [showSettings, setShowSettings] = useState(false)
   const [topK, setTopK] = useState(() => {
     return 5
@@ -121,6 +120,11 @@ export function ChatPage() {
     selectConversation,
     conversationId,
   } = useChat(id!)
+
+  const activeConversation = useMemo(() => {
+    return conversations.find((conversation) => conversation.id === conversationId) ?? null
+  }, [conversations, conversationId])
+  const activeConversationTitle = (activeConversation?.title ?? '').trim() || 'Untitled chat'
 
   const handleLogout = async () => {
     await logout()
@@ -622,6 +626,9 @@ export function ChatPage() {
               </button>
               <div>
                 <h1 className="text-2xl font-bold text-white">💬 Chat with {kb.name}</h1>
+                <p className="text-sm text-gray-300 mt-1">
+                  {activeConversationTitle}
+                </p>
                 {kb.description && <p className="text-gray-400 text-sm mt-1">{kb.description}</p>}
               </div>
             </div>

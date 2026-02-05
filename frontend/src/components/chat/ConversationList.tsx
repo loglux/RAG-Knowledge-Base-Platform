@@ -182,7 +182,12 @@ export function ConversationList({
                       : 'border-gray-700 bg-gray-900/40 hover:bg-gray-900'
                   }`}
                 >
-                  <div className="p-3">
+                  <button
+                    type="button"
+                    onClick={() => handleSelectConversation(conversation.id)}
+                    className="w-full text-left p-3"
+                    disabled={isEditing}
+                  >
                     <div className="flex flex-col gap-2">
                       {isEditing ? (
                         <div className="flex-1 min-w-0">
@@ -201,25 +206,25 @@ export function ConversationList({
                         </div>
                       ) : (
                         <>
-                          <button
-                            type="button"
-                            onClick={() => handleSelectConversation(conversation.id)}
-                            className="min-w-0 text-left"
-                          >
-                            <p className="text-sm font-medium text-white truncate">{titleLabel}</p>
-                          </button>
+                          <p className="text-sm font-medium text-white truncate">{titleLabel}</p>
                           <div className="flex items-center justify-between text-[11px] text-gray-500">
                             <span>{updatedLabel}</span>
                             <div className="flex items-center gap-2">
                               <button
-                                onClick={() => handleEditConversation(conversation.id, conversation.title)}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleEditConversation(conversation.id, conversation.title)
+                                }}
                                 className="text-xs text-gray-400 hover:text-gray-200"
                                 aria-label="Rename conversation"
                               >
                                 Rename
                               </button>
                               <button
-                                onClick={() => handleDeleteConversation(conversation.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDeleteConversation(conversation.id)
+                                }}
                                 className="text-xs text-red-400 hover:text-red-300"
                                 aria-label="Delete conversation"
                               >
@@ -232,13 +237,19 @@ export function ConversationList({
                       {isEditing && (
                         <div className="flex items-center gap-2 text-xs">
                           <button
-                            onClick={handleSaveEdit}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleSaveEdit()
+                            }}
                             className="text-xs text-green-400 hover:text-green-300"
                           >
                             Save
                           </button>
                           <button
-                            onClick={handleCancelEdit}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleCancelEdit()
+                            }}
                             className="text-xs text-gray-400 hover:text-gray-200"
                           >
                             Cancel
@@ -246,7 +257,7 @@ export function ConversationList({
                         </div>
                       )}
                     </div>
-                  </div>
+                  </button>
                 </div>
               </li>
             )
