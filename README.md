@@ -177,7 +177,7 @@ Explore and test endpoints directly in your browser:
 
 - **[Swagger UI](http://localhost:8004/docs)** - Interactive API documentation with "Try it out" functionality
 - **[ReDoc](http://localhost:8004/redoc)** - Clean, responsive API documentation
-- **[OpenAPI JSON](http://localhost:8004/openapi.json)** - Machine-readable API specification
+- **[OpenAPI JSON](http://localhost:8004/api/v1/openapi.json)** - Machine-readable API specification
 
 ### 📁 Local Documentation
 Documentation source files are available in the [`docs/`](docs/) directory:
