@@ -13,7 +13,7 @@
 ![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
 
-Knowledge Base Platform is a production-ready RAG backend with a clean API and a modern web UI. It ingests documents, builds a semantic index in Qdrant, and answers questions with grounded citations. It also generates document structure (TOC metadata) to enable section-aware retrieval and precise "show me question X" queries.
+Knowledge Base Platform is a production-ready RAG backend with a clean API and a modern web UI. It ingests documents, builds a semantic index in Qdrant, and answers questions with grounded citations. It also generates document structure (TOC metadata) to enable section-aware retrieval and precise "show me question X" queries, and provides a **retrieve-only** API for automation and MCP-style tools.
 
 It can be used as a standalone service or integrated into other products via its API (plugin-style: you bring the data, it provides retrieval, citations, and answers).
 
@@ -24,6 +24,7 @@ It can be used as a standalone service or integrated into other products via its
 - **API-first**: Use the backend independently from the UI.
 - **Provider-flexible**: OpenAI by default, with optional Anthropic, Voyage, or Ollama.
 - **Grounded answers**: Responses are built from your documents, not guesses.
+- **Retrieve-only access**: Get chunks + context without creating chat history.
 
 ## Key features
 
@@ -39,10 +40,13 @@ It can be used as a standalone service or integrated into other products via its
 - **Retrieve-only API** for MCP/search tools (no chat side-effects)
 - **Chat history controls**: delete individual Q/A pairs from a conversation
 - **BM25 phrase matching**: adds an exact `match_phrase` clause for strict wording
+- **Windowed retrieval (context expansion)** for neighboring chunk context
 - Structured document analysis and TOC metadata
 - RAG answers with citations
 - FastAPI backend + React frontend
 - Docker-first dev setup
+- **KB-level retrieval defaults** stored per knowledge base
+- JWT-based admin auth for protected endpoints
 
 ## Architecture overview
 
@@ -81,6 +85,12 @@ If you need **retrieval without LLM generation** (for tools like MCP `search`/`r
 - `POST /api/v1/retrieve/`
 
 This returns chunks + assembled context **without** creating chat conversations or messages.
+
+You can also set **KB-level retrieval defaults** (e.g., `top_k`, `retrieval_mode`, BM25 settings):
+
+- `GET /api/v1/knowledge-bases/{kb_id}/retrieval-settings`
+- `PUT /api/v1/knowledge-bases/{kb_id}/retrieval-settings`
+- `DELETE /api/v1/knowledge-bases/{kb_id}/retrieval-settings`
 
 ## Chunking strategies
 
@@ -123,7 +133,7 @@ The platform supports three chunking strategies with different trade-offs:
 
 ## Quick start (Docker)
 
-This starts the **backend services only** (API + DB + Qdrant + OpenSearch). The frontend runs locally via Vite.
+This starts the full stack (API + DB + Qdrant + OpenSearch + frontend).
 
 1) Create env file
 
@@ -146,14 +156,6 @@ docker compose up -d --build
 
 ```text
 http://localhost:8004/docs
-```
-
-## Quick start (local Docker)
-
-The default setup runs everything in Docker (frontend + API + DB + vector stores).
-
-```bash
-docker compose up -d --build
 ```
 
 URLs:
