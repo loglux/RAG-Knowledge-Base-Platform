@@ -402,6 +402,10 @@ ALTER TABLE conversations ADD COLUMN user_id UUID;
    - *Idea:* Validate key formats (e.g., `sk-`, `sk-ant-`) and add a "Verify" button (Ollama ping, minimal provider checks).
    - *Rationale:* Avoid silent failures from malformed keys (e.g., whitespace, missing prefix).
 
+5. Should we implement proactive token refresh to avoid 401 noise after access-token expiry?
+   - *Idea:* Schedule refresh 1–2 minutes before JWT exp to eliminate 401 spikes in console.
+   - *Rationale:* Current reactive refresh works but logs a 401 on first request after expiry.
+
 ---
 
 ## Next Steps
