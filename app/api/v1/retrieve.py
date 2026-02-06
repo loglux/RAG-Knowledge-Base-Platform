@@ -1,5 +1,6 @@
 """Retrieve-only endpoint (no LLM generation)."""
 import logging
+import time
 from typing import Optional
 from uuid import UUID
 
@@ -35,6 +36,8 @@ async def retrieve_only(
     """
     Retrieve relevant chunks from a knowledge base without generating an answer.
     """
+    start_ts = time.perf_counter()
+
     kb_query = select(KnowledgeBaseModel).where(
         KnowledgeBaseModel.id == request.knowledge_base_id,
         KnowledgeBaseModel.is_deleted == False,
@@ -60,6 +63,7 @@ async def retrieve_only(
     overrides.pop("query", None)
     overrides.pop("knowledge_base_id", None)
     document_ids = overrides.pop("document_ids", None)
+    debug_enabled = bool(overrides.pop("debug", False))
 
     effective = resolve_retrieval_settings(
         kb=kb,
@@ -109,6 +113,7 @@ async def retrieve_only(
     if hasattr(mode, "value"):
         mode = mode.value
 
+    mode_used = mode
     if mode == "hybrid":
         retrieval_result = await retrieval_engine.retrieve_hybrid(
             query=request.query,
@@ -168,6 +173,23 @@ async def retrieve_only(
         for chunk in chunks
     ]
 
+    debug_payload = None
+    if debug_enabled:
+        debug_payload = {
+            "mode_requested": mode,
+            "mode_used": mode_used,
+            "collection_name": kb.collection_name,
+            "embedding_model": kb.embedding_model,
+            "filters": merged_filters,
+            "document_filter": document_filter,
+            "structure_filters": chunk_filters,
+            "context_chars": len(context),
+            "chunks_before_expansion": len(retrieval_result.chunks),
+            "chunks_after_expansion": len(chunks),
+            "context_window": window_size if "window" in expansion_modes else 0,
+            "elapsed_ms": int((time.perf_counter() - start_ts) * 1000),
+        }
+
     return RetrieveResponse(
         query=request.query,
         knowledge_base_id=request.knowledge_base_id,
@@ -175,4 +197,5 @@ async def retrieve_only(
         chunks=response_chunks,
         context=context,
         settings=EffectiveRetrievalSettings(**effective),
+        debug=debug_payload,
     )

@@ -352,6 +352,10 @@ class RetrieveRequest(RetrievalSettingsUpdate):
         default=None,
         description="Optional document ID allow-list for retrieval"
     )
+    debug: Optional[bool] = Field(
+        default=False,
+        description="Include debug info in response (timings, filters, mode)"
+    )
 
 
 class RetrieveResponse(BaseModel):
@@ -363,6 +367,7 @@ class RetrieveResponse(BaseModel):
     chunks: List[SourceChunk] = Field(..., description="Retrieved chunks")
     context: str = Field(..., description="Assembled context")
     settings: EffectiveRetrievalSettings = Field(..., description="Resolved retrieval settings")
+    debug: Optional[Dict[str, Any]] = Field(default=None, description="Debug metadata (optional)")
 
 
 class ConversationMessage(BaseModel):
