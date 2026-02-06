@@ -36,6 +36,7 @@ It can be used as a standalone service or integrated into other products via its
 - **MMR (Maximal Marginal Relevance)** for diversity-aware search
 - Optional BM25 lexical index (OpenSearch) for hybrid retrieval
 - **Self-Check Validation** (optional): Two-stage answer generation with validation for improved accuracy
+- **Retrieve-only API** for MCP/search tools (no chat side-effects)
 - **Chat history controls**: delete individual Q/A pairs from a conversation
 - **BM25 phrase matching**: adds an exact `match_phrase` clause for strict wording
 - Structured document analysis and TOC metadata
@@ -72,6 +73,14 @@ Vectorization turns unstructured text into numeric vectors that capture meaning,
 The system performs **semantic retrieval**: it embeds the user query, finds the closest chunk vectors, and assembles them into a context window for the LLM. You can also enable **hybrid retrieval** (BM25 + vectors), which boosts exact keyword matches while preserving semantic recall. Because the answer is grounded in retrieved chunks, we can return **citations** (source snippets) alongside the response.
 
 For structured documents, an optional **Structure‑Aware Retrieval** step builds a TOC and section metadata. This enables section‑targeted queries (e.g., "show Question 2"), returning full, verbatim excerpts rather than a generic summary.
+
+### Retrieve-only (MCP-friendly)
+
+If you need **retrieval without LLM generation** (for tools like MCP `search`/`retrieve`), use:
+
+- `POST /api/v1/retrieve/`
+
+This returns chunks + assembled context **without** creating chat conversations or messages.
 
 ## Chunking strategies
 
@@ -181,8 +190,21 @@ Documentation source files are available in the [`docs/`](docs/) directory:
 - Create a knowledge base
 - Upload a document
 - Ask a question
+- (Optional) Retrieve-only without creating chats
 
 API details are available in Swagger (`/docs`).
+
+### Retrieve-only example
+
+```bash
+curl -X POST http://localhost:8004/api/v1/retrieve/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "What is this document about?",
+    "knowledge_base_id": "your-kb-id",
+    "top_k": 5
+  }'
+```
 
 Pagination note: list endpoints accept `page` and `page_size` (default 10, max 100).
 

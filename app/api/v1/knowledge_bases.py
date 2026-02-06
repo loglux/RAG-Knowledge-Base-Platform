@@ -25,12 +25,16 @@ from app.models.schemas import (
     KnowledgeBaseList,
     RegenerateChatTitlesRequest,
     RegenerateChatTitlesResponse,
+    RetrievalSettingsUpdate,
+    RetrievalSettingsEnvelope,
+    EffectiveRetrievalSettings,
 )
 from app.dependencies import get_current_user_id
 from app.core.embeddings_base import EMBEDDING_MODELS
 from app.core.vector_store import get_vector_store
 from app.core.lexical_store import get_lexical_store
 from app.services.chat_titles import build_conversation_title
+from app.services.retrieval_settings import load_kb_retrieval_settings, resolve_retrieval_settings
 
 logger = logging.getLogger(__name__)
 
@@ -252,6 +256,23 @@ async def get_knowledge_base(
     return kb
 
 
+async def _build_retrieval_settings_envelope(
+    kb: KnowledgeBaseModel,
+    db: AsyncSession,
+) -> RetrievalSettingsEnvelope:
+    settings_result = await db.execute(select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1))
+    app_settings = settings_result.scalar_one_or_none()
+
+    stored = load_kb_retrieval_settings(kb)
+    effective = resolve_retrieval_settings(kb=kb, app_settings=app_settings, overrides=None)
+
+    stored_payload = RetrievalSettingsUpdate(**stored) if stored else None
+    return RetrievalSettingsEnvelope(
+        stored=stored_payload,
+        effective=EffectiveRetrievalSettings(**effective),
+    )
+
+
 @router.put("/{kb_id}", response_model=KnowledgeBaseResponse)
 async def update_knowledge_base(
     kb_id: UUID,
@@ -290,6 +311,85 @@ async def update_knowledge_base(
     await db.refresh(kb)
 
     return kb
+
+
+@router.get("/{kb_id}/retrieval-settings", response_model=RetrievalSettingsEnvelope)
+async def get_retrieval_settings(
+    kb_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """Get stored and effective retrieval settings for a knowledge base."""
+    query = select(KnowledgeBaseModel).where(
+        KnowledgeBaseModel.id == kb_id,
+        KnowledgeBaseModel.is_deleted == False,
+    )
+    result = await db.execute(query)
+    kb = result.scalar_one_or_none()
+
+    if not kb:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Knowledge base {kb_id} not found"
+        )
+
+    return await _build_retrieval_settings_envelope(kb, db)
+
+
+@router.put("/{kb_id}/retrieval-settings", response_model=RetrievalSettingsEnvelope)
+async def update_retrieval_settings(
+    kb_id: UUID,
+    payload: RetrievalSettingsUpdate,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """Update retrieval settings for a knowledge base (stored as JSON overrides)."""
+    query = select(KnowledgeBaseModel).where(
+        KnowledgeBaseModel.id == kb_id,
+        KnowledgeBaseModel.is_deleted == False,
+    )
+    result = await db.execute(query)
+    kb = result.scalar_one_or_none()
+
+    if not kb:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Knowledge base {kb_id} not found"
+        )
+
+    data = payload.model_dump(exclude_none=True)
+    kb.retrieval_settings_json = json.dumps(data) if data else None
+    await db.commit()
+    await db.refresh(kb)
+
+    return await _build_retrieval_settings_envelope(kb, db)
+
+
+@router.delete("/{kb_id}/retrieval-settings", response_model=RetrievalSettingsEnvelope)
+async def clear_retrieval_settings(
+    kb_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """Clear stored retrieval settings for a knowledge base."""
+    query = select(KnowledgeBaseModel).where(
+        KnowledgeBaseModel.id == kb_id,
+        KnowledgeBaseModel.is_deleted == False,
+    )
+    result = await db.execute(query)
+    kb = result.scalar_one_or_none()
+
+    if not kb:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Knowledge base {kb_id} not found"
+        )
+
+    kb.retrieval_settings_json = None
+    await db.commit()
+    await db.refresh(kb)
+
+    return await _build_retrieval_settings_envelope(kb, db)
 
 
 @router.post("/{kb_id}/regenerate_chat_titles", response_model=RegenerateChatTitlesResponse)

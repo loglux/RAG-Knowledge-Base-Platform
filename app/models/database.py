@@ -99,6 +99,11 @@ class KnowledgeBase(Base):
         nullable=True,
         comment="Override for LLM-generated chat titles (True/False), None = use app default"
     )
+    retrieval_settings_json: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="JSON-encoded retrieval settings overrides"
+    )
 
     # Statistics
     document_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

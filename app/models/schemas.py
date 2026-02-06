@@ -290,6 +290,81 @@ class SourceChunk(BaseModel):
     )
 
 
+# ============================================================================
+# Retrieval Settings Schemas
+# ============================================================================
+
+class RetrievalSettingsUpdate(BaseModel):
+    """Schema for retrieval settings overrides."""
+
+    top_k: Optional[int] = Field(default=None, ge=1, le=100)
+    retrieval_mode: Optional[RetrievalMode] = Field(default=None)
+    lexical_top_k: Optional[int] = Field(default=None, ge=1, le=200)
+    hybrid_dense_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    hybrid_lexical_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    max_context_chars: Optional[int] = Field(default=None, ge=0)
+    score_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    use_structure: Optional[bool] = Field(default=None)
+    use_mmr: Optional[bool] = Field(default=None)
+    mmr_diversity: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    context_expansion: Optional[List[str]] = Field(default=None)
+    context_window: Optional[int] = Field(default=None, ge=0, le=5)
+    bm25_match_mode: Optional[str] = Field(default=None)
+    bm25_min_should_match: Optional[int] = Field(default=None, ge=0, le=100)
+    bm25_use_phrase: Optional[bool] = Field(default=None)
+    bm25_analyzer: Optional[str] = Field(default=None)
+
+
+class EffectiveRetrievalSettings(BaseModel):
+    """Schema for resolved retrieval settings."""
+
+    top_k: int = Field(..., ge=1, le=100)
+    retrieval_mode: RetrievalMode = Field(...)
+    lexical_top_k: int = Field(..., ge=1, le=200)
+    hybrid_dense_weight: float = Field(..., ge=0.0, le=1.0)
+    hybrid_lexical_weight: float = Field(..., ge=0.0, le=1.0)
+    max_context_chars: int = Field(..., ge=0)
+    score_threshold: float = Field(..., ge=0.0, le=1.0)
+    use_structure: bool = Field(...)
+    use_mmr: bool = Field(...)
+    mmr_diversity: float = Field(..., ge=0.0, le=1.0)
+    context_expansion: Optional[List[str]] = Field(default=None)
+    context_window: Optional[int] = Field(default=None, ge=0, le=5)
+    bm25_match_mode: Optional[str] = Field(default=None)
+    bm25_min_should_match: Optional[int] = Field(default=None, ge=0, le=100)
+    bm25_use_phrase: Optional[bool] = Field(default=None)
+    bm25_analyzer: Optional[str] = Field(default=None)
+
+
+class RetrievalSettingsEnvelope(BaseModel):
+    """Stored and effective retrieval settings."""
+
+    stored: Optional[RetrievalSettingsUpdate] = Field(default=None)
+    effective: EffectiveRetrievalSettings
+
+
+class RetrieveRequest(RetrievalSettingsUpdate):
+    """Schema for retrieve-only request."""
+
+    query: str = Field(..., min_length=1, max_length=2000, description="Search query")
+    knowledge_base_id: UUID = Field(..., description="Knowledge base ID")
+    document_ids: Optional[List[UUID]] = Field(
+        default=None,
+        description="Optional document ID allow-list for retrieval"
+    )
+
+
+class RetrieveResponse(BaseModel):
+    """Schema for retrieve-only response."""
+
+    query: str = Field(..., description="Original query")
+    knowledge_base_id: UUID = Field(..., description="Knowledge base queried")
+    total_found: int = Field(..., description="Number of chunks returned")
+    chunks: List[SourceChunk] = Field(..., description="Retrieved chunks")
+    context: str = Field(..., description="Assembled context")
+    settings: EffectiveRetrievalSettings = Field(..., description="Resolved retrieval settings")
+
+
 class ConversationMessage(BaseModel):
     """Single message in conversation history."""
     role: str = Field(..., description="Message role: user or assistant")
