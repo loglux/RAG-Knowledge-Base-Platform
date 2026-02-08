@@ -190,7 +190,7 @@ class APIClient {
   async exportKnowledgeBases(payload: KBExportRequest): Promise<{ blob: Blob; filename: string }> {
     const response = await this.client.post('/kb/export', payload, { responseType: 'blob' })
     const disposition = response.headers?.['content-disposition'] || ''
-    const match = disposition.match(/filename=\"?([^\";]+)\"?/i)
+    const match = disposition.match(/filename="?([^";]+)"?/i)
     const filename = match?.[1] || 'kb_export.tar.gz'
     return { blob: response.data as Blob, filename }
   }
