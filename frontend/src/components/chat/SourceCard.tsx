@@ -3,10 +3,13 @@ import type { SourceChunk } from '../../types/index'
 
 interface SourceCardProps {
   source: SourceChunk
+  index: number
+  anchorPrefix?: string
 }
 
-export function SourceCard({ source }: SourceCardProps) {
+export function SourceCard({ source, index, anchorPrefix }: SourceCardProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const anchorId = anchorPrefix ? `${anchorPrefix}-${index + 1}` : undefined
 
   const confidencePercent = Math.round(source.score * 100)
   const confidenceColor =
@@ -25,9 +28,12 @@ export function SourceCard({ source }: SourceCardProps) {
   const combinedScore = typeof metadata.combined_score === 'number' ? metadata.combined_score : null
 
   return (
-    <div className="panel p-3 text-sm">
+    <div id={anchorId} className="panel p-3 text-sm scroll-mt-24">
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center space-x-2">
+          <span className="text-[11px] text-gray-400 font-mono">
+            Source {index + 1}
+          </span>
           <span className="text-gray-400">📄</span>
           <span className="text-white font-medium">{source.filename}</span>
           <span className="text-gray-500 text-xs">Chunk #{source.chunk_index}</span>

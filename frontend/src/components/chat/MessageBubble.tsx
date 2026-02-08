@@ -9,15 +9,29 @@ interface MessageBubbleProps {
   message: ChatMessage
   onDelete?: () => void
   showPromptVersion?: boolean
+  sourceAnchorPrefix?: string
 }
 
-export function MessageBubble({ message, onDelete, showPromptVersion }: MessageBubbleProps) {
+export function MessageBubble({ message, onDelete, showPromptVersion, sourceAnchorPrefix }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const timestamp = new Date(message.timestamp).toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
   })
   const [copied, setCopied] = useState(false)
+  const sourceCount = message.sources?.length ?? 0
+  const sourceLinkPattern = /\b(Источник|Source)\s+(\d+)\b/g
+
+  const renderedContent =
+    !isUser && sourceCount > 0 && sourceAnchorPrefix
+      ? message.content.replace(sourceLinkPattern, (match, label, num) => {
+          const index = Number(num)
+          if (!Number.isFinite(index) || index < 1 || index > sourceCount) {
+            return match
+          }
+          return `[${label} ${num}](#${sourceAnchorPrefix}-${num})`
+        })
+      : message.content
 
   const handleCopy = async () => {
     let ok = false
@@ -178,7 +192,7 @@ export function MessageBubble({ message, onDelete, showPromptVersion }: MessageB
                 ),
               }}
             >
-              {message.content}
+              {renderedContent}
             </ReactMarkdown>
           )}
         </div>

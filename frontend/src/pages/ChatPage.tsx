@@ -965,6 +965,8 @@ export function ChatPage() {
                 <div className="space-y-6">
                   {messages.map((message, index) => {
                     const previous = messages[index - 1]
+                    const anchorSeed = message.id ?? message.timestamp
+                    const sourceAnchorPrefix = `src-${String(anchorSeed).replace(/[^a-zA-Z0-9_-]/g, '-')}`
                     const canDeletePair = (
                       message.role === 'assistant' &&
                       previous?.role === 'user' &&
@@ -986,6 +988,7 @@ export function ChatPage() {
                           message={message}
                           onDelete={handleDelete}
                           showPromptVersion={showPromptVersions}
+                          sourceAnchorPrefix={sourceAnchorPrefix}
                         />
                       {message.sources && message.sources.length > 0 && (
                         <details className="mt-4 space-y-2">
@@ -1000,7 +1003,12 @@ export function ChatPage() {
                           </summary>
                           <div className="grid grid-cols-1 gap-2 mt-2">
                             {message.sources.map((source, idx) => (
-                              <SourceCard key={idx} source={source} />
+                              <SourceCard
+                                key={idx}
+                                source={source}
+                                index={idx}
+                                anchorPrefix={sourceAnchorPrefix}
+                              />
                             ))}
                           </div>
                         </details>
