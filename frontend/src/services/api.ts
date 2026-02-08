@@ -195,6 +195,14 @@ class APIClient {
     return { blob: response.data as Blob, filename }
   }
 
+  async exportChatsMarkdown(payload: { kb_ids: string[] }): Promise<{ blob: Blob; filename: string }> {
+    const response = await this.client.post('/kb/export-chats-md', payload, { responseType: 'blob' })
+    const disposition = response.headers?.['content-disposition'] || ''
+    const match = disposition.match(/filename="?([^";]+)"?/i)
+    const filename = match?.[1] || 'kb_chats.zip'
+    return { blob: response.data as Blob, filename }
+  }
+
   async importKnowledgeBases(file: File, options?: KBImportOptions): Promise<KBImportResponse> {
     const form = new FormData()
     form.append('file', file)

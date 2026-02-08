@@ -39,6 +39,7 @@ It can be used as a standalone service or integrated into other products via its
 - **Self-Check Validation** (optional): Two-stage answer generation with validation for improved accuracy
 - **Retrieve-only API** for MCP/search tools (no chat side-effects)
 - **KB export/import**: portable archives for backup, migration, and QA
+- **Chat export (Markdown)**: separate archive for human reading (not importable)
 - **Chat history controls**: delete individual Q/A pairs from a conversation
 - **BM25 phrase matching**: adds an exact `match_phrase` clause for strict wording
 - **Windowed retrieval (context expansion)** for neighboring chunk context
@@ -92,6 +93,11 @@ You can also set **KB-level retrieval defaults** (e.g., `top_k`, `retrieval_mode
 - `GET /api/v1/knowledge-bases/{kb_id}/retrieval-settings`
 - `PUT /api/v1/knowledge-bases/{kb_id}/retrieval-settings`
 - `DELETE /api/v1/knowledge-bases/{kb_id}/retrieval-settings`
+
+### KB Transfer
+
+- **KB export/import**: `POST /api/v1/kb/export`, `POST /api/v1/kb/import`
+- **Chats (Markdown)**: `POST /api/v1/kb/export-chats-md` (separate archive for reading)
 
 ## Chunking strategies
 

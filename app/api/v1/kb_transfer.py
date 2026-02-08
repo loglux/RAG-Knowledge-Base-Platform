@@ -9,7 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.models.schemas import KBExportRequest, KBImportOptions, KBImportResponse
-from app.services.kb_export_import import export_kbs, import_kbs, KBExportImportError
+from app.services.kb_export_import import (
+    export_kbs,
+    export_chats_markdown,
+    import_kbs,
+    KBExportImportError,
+)
 
 
 router = APIRouter(prefix="/kb", tags=["kb-transfer"])
@@ -23,7 +28,11 @@ async def export_kb(
 ):
     """Export one or more KBs as a compressed archive."""
     try:
-        archive_path, archive_name = await export_kbs(db, payload.kb_ids, payload.include)
+        archive_path, archive_name = await export_kbs(
+            db,
+            payload.kb_ids,
+            payload.include,
+        )
     except KBExportImportError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
@@ -40,6 +49,38 @@ async def export_kb(
         path=archive_path,
         filename=archive_name,
         media_type="application/gzip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{archive_name}"',
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+
+
+@router.post("/export-chats-md")
+async def export_chats_md(
+    payload: KBExportRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """Export chats as Markdown (separate archive, not for import)."""
+    try:
+        archive_path, archive_name = await export_chats_markdown(db, payload.kb_ids)
+    except KBExportImportError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    def _cleanup(path: str):
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except Exception:
+            pass
+
+    background_tasks.add_task(_cleanup, archive_path)
+
+    return FileResponse(
+        path=archive_path,
+        filename=archive_name,
+        media_type="application/zip",
         headers={
             "Content-Disposition": f'attachment; filename="{archive_name}"',
             "Access-Control-Expose-Headers": "Content-Disposition",

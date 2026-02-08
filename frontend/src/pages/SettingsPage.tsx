@@ -132,6 +132,7 @@ export function SettingsPage() {
   const [targetKbId, setTargetKbId] = useState('')
   const [importFile, setImportFile] = useState<File | null>(null)
   const [exportingKbArchive, setExportingKbArchive] = useState(false)
+  const [exportingChatsMd, setExportingChatsMd] = useState(false)
   const [importingKbArchive, setImportingKbArchive] = useState(false)
 
   useEffect(() => {
@@ -263,6 +264,10 @@ export function SettingsPage() {
       setError('Select at least one knowledge base to export')
       return
     }
+    if (exportInclude.chats && !exportInclude.documents) {
+      setError('Chats export requires documents to be included')
+      return
+    }
     try {
       setExportingKbArchive(true)
       setError(null)
@@ -296,6 +301,10 @@ export function SettingsPage() {
       setError('Select a target KB for merge')
       return
     }
+    if (importInclude.chats && !importInclude.documents) {
+      setError('Chats import requires documents to be included')
+      return
+    }
     try {
       setImportingKbArchive(true)
       setError(null)
@@ -313,6 +322,34 @@ export function SettingsPage() {
       setError(err instanceof Error ? err.message : 'Failed to import KBs')
     } finally {
       setImportingKbArchive(false)
+    }
+  }
+
+  const handleExportChatsMarkdown = async () => {
+    if (kbSelection.length === 0) {
+      setError('Select at least one knowledge base to export chats')
+      return
+    }
+    try {
+      setExportingChatsMd(true)
+      setError(null)
+      setSuccess(null)
+      const { blob, filename } = await apiClient.exportChatsMarkdown({
+        kb_ids: kbSelection,
+      })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      setSuccess('Chats export started. Download should begin automatically.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export chats')
+    } finally {
+      setExportingChatsMd(false)
     }
   }
 
@@ -934,8 +971,10 @@ export function SettingsPage() {
             importFile={importFile}
             setImportFile={setImportFile}
             onExport={handleExportKbs}
+            onExportChatsMarkdown={handleExportChatsMarkdown}
             onImport={handleImportKbs}
             exporting={exportingKbArchive}
+            exportingChatsMd={exportingChatsMd}
             importing={importingKbArchive}
           />
         )}
@@ -987,8 +1026,10 @@ type KBTransferTabProps = {
   importFile: File | null
   setImportFile: (file: File | null) => void
   onExport: () => void
+  onExportChatsMarkdown: () => void
   onImport: () => void
   exporting: boolean
+  exportingChatsMd: boolean
   importing: boolean
 }
 
@@ -1010,8 +1051,10 @@ const KBTransferTab: React.FC<KBTransferTabProps> = ({
   importFile,
   setImportFile,
   onExport,
+  onExportChatsMarkdown,
   onImport,
   exporting,
+  exportingChatsMd,
   importing,
 }) => {
   return (
@@ -1087,11 +1130,29 @@ const KBTransferTab: React.FC<KBTransferTabProps> = ({
             />
             <span>Uploads (optional)</span>
           </label>
+          <label className="flex items-center gap-2 text-sm text-gray-200">
+            <input
+              type="checkbox"
+              checked={exportInclude.chats}
+              onChange={(e) => setExportInclude({ ...exportInclude, chats: e.target.checked })}
+              className="rounded border-gray-600 bg-gray-900"
+            />
+            <span>Chats (JSONL)</span>
+          </label>
         </div>
 
         <Button onClick={onExport} disabled={exporting}>
           {exporting ? 'Exporting...' : 'Export Selected KBs'}
         </Button>
+
+        <div className="mt-4 text-sm text-gray-400">
+          Markdown export is separate from KB archives.
+        </div>
+        <div className="mt-3">
+          <Button onClick={onExportChatsMarkdown} disabled={exportingChatsMd}>
+            {exportingChatsMd ? 'Exporting...' : 'Export Chats (Markdown)'}
+          </Button>
+        </div>
       </div>
 
       <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
@@ -1192,6 +1253,15 @@ const KBTransferTab: React.FC<KBTransferTabProps> = ({
               className="rounded border-gray-600 bg-gray-900"
             />
             <span>Uploads (optional)</span>
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-200">
+            <input
+              type="checkbox"
+              checked={importInclude.chats}
+              onChange={(e) => setImportInclude({ ...importInclude, chats: e.target.checked })}
+              className="rounded border-gray-600 bg-gray-900"
+            />
+            <span>Chats (JSONL)</span>
           </label>
         </div>
 

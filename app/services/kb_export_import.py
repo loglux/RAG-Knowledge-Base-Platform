@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import tarfile
+import zipfile
 import tempfile
 import shutil
 from datetime import datetime
@@ -22,6 +23,8 @@ from app.models.database import (
     KnowledgeBase as KnowledgeBaseModel,
     Document as DocumentModel,
     DocumentStructure as DocumentStructureModel,
+    Conversation as ConversationModel,
+    ChatMessage as ChatMessageModel,
 )
 from app.models.enums import DocumentStatus, ChunkingStrategy, FileType
 from app.models.schemas import KBExportInclude, KBImportOptions
@@ -40,6 +43,15 @@ def _ensure_include(include: Optional[KBExportInclude]) -> KBExportInclude:
 
 def _dt(value: Optional[datetime]) -> Optional[str]:
     return value.isoformat() if value else None
+
+
+def _parse_dt(value: Optional[str]) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except Exception:
+        return None
 
 
 def _write_jsonl(path: str, rows: Iterable[Dict[str, Any]]) -> None:
@@ -69,6 +81,8 @@ async def export_kbs(
     include = _ensure_include(include)
     if not include.documents and (include.vectors or include.bm25):
         raise KBExportImportError("documents must be included when exporting vectors or BM25 data")
+    if include.chats and not include.documents:
+        raise KBExportImportError("documents must be included when exporting chats")
 
     kb_query = select(KnowledgeBaseModel).where(
         KnowledgeBaseModel.id.in_(kb_ids),
@@ -188,6 +202,55 @@ async def export_kbs(
             })
     _write_jsonl(os.path.join(db_dir, "document_structures.jsonl"), structures)
 
+    conversations = []
+    messages = []
+    if include.chats:
+        convo_query = select(ConversationModel).where(
+            ConversationModel.knowledge_base_id.in_(kb_ids),
+            ConversationModel.is_deleted == False,
+        )
+        convo_result = await db.execute(convo_query)
+        convo_rows = convo_result.scalars().all()
+        convo_ids = [c.id for c in convo_rows]
+
+        for convo in convo_rows:
+            conversations.append({
+                "id": str(convo.id),
+                "knowledge_base_id": str(convo.knowledge_base_id),
+                "title": convo.title,
+                "settings_json": convo.settings_json,
+                "user_id": str(convo.user_id) if convo.user_id else None,
+                "created_at": _dt(convo.created_at),
+                "updated_at": _dt(convo.updated_at),
+                "is_deleted": convo.is_deleted,
+            })
+
+        if convo_ids:
+            msg_query = select(ChatMessageModel).where(
+                ChatMessageModel.conversation_id.in_(convo_ids)
+            )
+            msg_result = await db.execute(msg_query)
+            msg_rows = msg_result.scalars().all()
+        else:
+            msg_rows = []
+
+        for msg in msg_rows:
+            messages.append({
+                "id": str(msg.id),
+                "conversation_id": str(msg.conversation_id),
+                "role": msg.role,
+                "content": msg.content,
+                "sources_json": msg.sources_json,
+                "model": msg.model,
+                "use_self_check": msg.use_self_check,
+                "prompt_version_id": str(msg.prompt_version_id) if msg.prompt_version_id else None,
+                "message_index": msg.message_index,
+                "created_at": _dt(msg.created_at),
+            })
+
+        _write_jsonl(os.path.join(db_dir, "conversations.jsonl"), conversations)
+        _write_jsonl(os.path.join(db_dir, "chat_messages.jsonl"), messages)
+
     if include.vectors:
         qdrant_dir = os.path.join(export_dir, "qdrant")
         os.makedirs(qdrant_dir, exist_ok=True)
@@ -283,6 +346,95 @@ async def export_kbs(
     return archive_path, archive_name
 
 
+async def export_chats_markdown(
+    db: AsyncSession,
+    kb_ids: List[UUID],
+) -> tuple[str, str]:
+    kb_query = select(KnowledgeBaseModel).where(
+        KnowledgeBaseModel.id.in_(kb_ids),
+        KnowledgeBaseModel.is_deleted == False,
+    )
+    kb_result = await db.execute(kb_query)
+    kbs = kb_result.scalars().all()
+    if len(kbs) != len(kb_ids):
+        raise KBExportImportError("One or more knowledge bases not found")
+
+    convo_query = select(ConversationModel).where(
+        ConversationModel.knowledge_base_id.in_(kb_ids),
+        ConversationModel.is_deleted == False,
+    )
+    convo_result = await db.execute(convo_query)
+    convo_rows = convo_result.scalars().all()
+    convo_ids = [c.id for c in convo_rows]
+
+    if convo_ids:
+        msg_query = select(ChatMessageModel).where(
+            ChatMessageModel.conversation_id.in_(convo_ids)
+        )
+        msg_result = await db.execute(msg_query)
+        msg_rows = msg_result.scalars().all()
+    else:
+        msg_rows = []
+
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    export_root = tempfile.mkdtemp(prefix="kb_chats_md_")
+    export_dir = os.path.join(export_root, f"kb_chats_md_{timestamp}")
+    os.makedirs(export_dir, exist_ok=True)
+
+    messages_by_convo: Dict[str, List[ChatMessageModel]] = {}
+    for msg in msg_rows:
+        messages_by_convo.setdefault(str(msg.conversation_id), []).append(msg)
+
+    for convo in convo_rows:
+        convo_id = str(convo.id)
+        convo_msgs = sorted(
+            messages_by_convo.get(convo_id, []),
+            key=lambda m: m.message_index,
+        )
+        title = convo.title or f"Conversation {convo_id}"
+        filename = f"{convo_id}.md"
+        out_path = os.path.join(export_dir, filename)
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.write(f"# {title}\n\n")
+            f.write(f"- KB: {convo.knowledge_base_id}\n")
+            f.write(f"- Conversation ID: {convo_id}\n")
+            f.write(f"- Created: {_dt(convo.created_at)}\n")
+            f.write(f"- Updated: {_dt(convo.updated_at)}\n")
+            if convo.settings_json:
+                f.write("\n## Settings\n\n")
+                f.write("```json\n")
+                f.write(convo.settings_json)
+                f.write("\n```\n")
+            f.write("\n## Messages\n\n")
+            for msg in convo_msgs:
+                role = (msg.role or "assistant").capitalize()
+                f.write(f"**{role}:** {msg.content}\n\n")
+                if msg.sources_json:
+                    try:
+                        sources = json.loads(msg.sources_json)
+                    except Exception:
+                        sources = []
+                    if sources:
+                        f.write("> Sources:\n")
+                        for source in sources:
+                            doc_id = source.get("document_id")
+                            filename = source.get("filename")
+                            chunk_index = source.get("chunk_index")
+                            f.write(f"> - {filename} (doc_id={doc_id}, chunk={chunk_index})\n")
+                        f.write("\n")
+
+    archive_name = f"kb_chats_{timestamp}.zip"
+    archive_path = os.path.join(export_root, archive_name)
+    with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for name in os.listdir(export_dir):
+            full = os.path.join(export_dir, name)
+            if os.path.isfile(full):
+                zf.write(full, arcname=name)
+
+    shutil.rmtree(export_dir, ignore_errors=True)
+    return archive_path, archive_name
+
+
 async def import_kbs(
     db: AsyncSession,
     archive_path: str,
@@ -291,6 +443,8 @@ async def import_kbs(
     include = _ensure_include(options.include)
     if not include.documents and (include.vectors or include.bm25):
         raise KBExportImportError("documents must be included when importing vectors or BM25 data")
+    if include.chats and not include.documents:
+        raise KBExportImportError("documents must be included when importing chats")
 
     if options.mode not in {"create", "merge"}:
         raise KBExportImportError("Only create/merge modes are supported in MVP")
@@ -318,10 +472,18 @@ async def import_kbs(
         kb_rows = _read_jsonl(os.path.join(db_dir, "knowledge_bases.jsonl"))
         doc_rows = _read_jsonl(os.path.join(db_dir, "documents.jsonl"))
         struct_rows = _read_jsonl(os.path.join(db_dir, "document_structures.jsonl"))
-    
+        convo_path = os.path.join(db_dir, "conversations.jsonl")
+        msg_path = os.path.join(db_dir, "chat_messages.jsonl")
+        if include.chats and (not os.path.exists(convo_path) or not os.path.exists(msg_path)):
+            raise KBExportImportError("Chat export files missing from archive")
+        convo_rows = _read_jsonl(convo_path)
+        msg_rows = _read_jsonl(msg_path)
+
         if not include.documents:
             doc_rows = []
             struct_rows = []
+            convo_rows = []
+            msg_rows = []
     
         target_kb = None
         if options.target_kb_id:
@@ -503,6 +665,62 @@ async def import_kbs(
                     approved_by_user=struct.get("approved_by_user", False),
                 )
                 db.add(model)
+
+        convo_id_map: Dict[str, str] = {}
+        if include.chats and convo_rows:
+            for convo in convo_rows:
+                old_id = convo["id"]
+                new_id = str(uuid4()) if options.remap_ids else old_id
+                convo_id_map[old_id] = new_id
+
+            for convo in convo_rows:
+                new_convo_id = UUID(convo_id_map[convo["id"]])
+                old_kb_id = convo["knowledge_base_id"]
+                new_kb_id = kb_id_map.get(old_kb_id, old_kb_id)
+
+                convo_model = ConversationModel(
+                    id=new_convo_id,
+                    knowledge_base_id=UUID(new_kb_id),
+                    title=convo.get("title"),
+                    settings_json=convo.get("settings_json"),
+                    user_id=None,
+                    created_at=_parse_dt(convo.get("created_at")) or datetime.utcnow(),
+                    updated_at=_parse_dt(convo.get("updated_at")) or datetime.utcnow(),
+                    is_deleted=convo.get("is_deleted", False),
+                )
+                db.add(convo_model)
+
+            for msg in msg_rows:
+                old_convo_id = msg["conversation_id"]
+                if old_convo_id not in convo_id_map:
+                    continue
+                new_convo_id = UUID(convo_id_map[old_convo_id])
+
+                sources_json = msg.get("sources_json")
+                if sources_json:
+                    try:
+                        sources = json.loads(sources_json)
+                        for source in sources:
+                            old_doc_id = source.get("document_id")
+                            if old_doc_id in doc_id_map:
+                                source["document_id"] = doc_id_map[old_doc_id]
+                        sources_json = json.dumps(sources, ensure_ascii=False)
+                    except Exception:
+                        sources_json = None
+
+                msg_model = ChatMessageModel(
+                    id=uuid4() if options.remap_ids else UUID(msg["id"]),
+                    conversation_id=new_convo_id,
+                    role=msg.get("role", "assistant"),
+                    content=msg.get("content", ""),
+                    sources_json=sources_json,
+                    model=msg.get("model"),
+                    use_self_check=msg.get("use_self_check"),
+                    prompt_version_id=None,
+                    message_index=msg.get("message_index", 0),
+                    created_at=_parse_dt(msg.get("created_at")) or datetime.utcnow(),
+                )
+                db.add(msg_model)
 
         await db.commit()
 
