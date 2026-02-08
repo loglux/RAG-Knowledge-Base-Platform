@@ -668,6 +668,7 @@ async def import_kbs(
 
         convo_id_map: Dict[str, str] = {}
         if include.chats and convo_rows:
+            valid_kb_ids = {str(kb["id"]) for kb in kb_rows}
             for convo in convo_rows:
                 old_id = convo["id"]
                 new_id = str(uuid4()) if options.remap_ids else old_id
@@ -675,17 +676,19 @@ async def import_kbs(
 
             for convo in convo_rows:
                 new_convo_id = UUID(convo_id_map[convo["id"]])
-                old_kb_id = convo["knowledge_base_id"]
+                old_kb_id = str(convo["knowledge_base_id"])
                 if target_kb:
                     new_kb_id = str(target_kb.id)
                 else:
+                    if old_kb_id not in valid_kb_ids:
+                        raise KBExportImportError(
+                            f"Conversation references KB not in archive: {old_kb_id}"
+                        )
                     new_kb_id = kb_id_map.get(old_kb_id)
                     if not new_kb_id:
-                        if options.remap_ids:
-                            raise KBExportImportError(
-                                f"Conversation references KB not in archive: {old_kb_id}"
-                            )
-                        new_kb_id = old_kb_id
+                        raise KBExportImportError(
+                            f"Conversation references KB not in archive: {old_kb_id}"
+                        )
 
                 convo_model = ConversationModel(
                     id=new_convo_id,
