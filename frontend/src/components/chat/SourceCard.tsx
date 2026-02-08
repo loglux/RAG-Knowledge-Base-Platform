@@ -19,8 +19,8 @@ export function SourceCard({ source, index, anchorPrefix }: SourceCardProps) {
       ? 'text-yellow-500'
       : 'text-orange-500'
 
-  const contentPreview = source.text.slice(0, 120)
-  const hasMore = source.text.length > 120
+  const contentPreview = source.text.slice(0, 240)
+  const hasMore = source.text.length > 240
   const metadata = source.metadata || {}
   const sourceType = typeof metadata.source_type === 'string' ? metadata.source_type : null
   const denseScoreRaw = typeof metadata.dense_score_raw === 'number' ? metadata.dense_score_raw : null
@@ -68,7 +68,7 @@ export function SourceCard({ source, index, anchorPrefix }: SourceCardProps) {
         </div>
       )}
 
-      <div className="text-gray-300 text-[11px] font-mono leading-tight whitespace-pre-wrap bg-gray-900 rounded p-3 max-h-96 overflow-y-auto break-all">
+      <div className="text-gray-300 text-[11px] font-mono leading-tight whitespace-pre-wrap bg-gray-900 rounded p-3 max-h-96 overflow-y-auto break-words">
         {isExpanded ? source.text : contentPreview}
         {hasMore && !isExpanded && <span className="text-gray-500">...</span>}
       </div>

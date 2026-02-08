@@ -180,16 +180,50 @@ export function MessageBubble({ message, onDelete, showPromptVersion, sourceAnch
                     {children}
                   </blockquote>
                 ),
-                a: ({ href, children }) => (
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary-400 hover:text-primary-300 underline"
-                  >
-                    {children}
-                  </a>
-                ),
+                a: ({ href = '', children }) => {
+                  const sourceHrefPrefix = sourceAnchorPrefix ? `#${sourceAnchorPrefix}-` : null
+                  const isSourceLink = sourceHrefPrefix ? href.startsWith(sourceHrefPrefix) : false
+                  if (isSourceLink && sourceCount > 0) {
+                    const indexStr = href.slice(sourceHrefPrefix!.length)
+                    const index = Number(indexStr) - 1
+                    const source = Number.isFinite(index) ? message.sources?.[index] : undefined
+                    const preview = source?.text?.slice(0, 220) ?? ''
+                    const showPreview = preview.length > 0
+
+                    return (
+                      <span className="relative inline-flex items-center group">
+                        <a
+                          href={href}
+                          className="text-primary-400 hover:text-primary-300 underline"
+                        >
+                          {children}
+                        </a>
+                        {showPreview && (
+                          <span className="pointer-events-none absolute left-0 top-full z-20 mt-2 hidden w-80 max-w-[90vw] rounded border border-gray-700 bg-gray-900 p-3 text-[11px] text-gray-200 shadow-xl group-hover:block">
+                            <span className="block text-[10px] text-gray-400 mb-1">
+                              {source?.filename} · chunk {source?.chunk_index}
+                            </span>
+                            <span className="block whitespace-pre-wrap break-words">
+                              {preview}
+                              {source && source.text.length > preview.length ? '…' : ''}
+                            </span>
+                          </span>
+                        )}
+                      </span>
+                    )
+                  }
+
+                  return (
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary-400 hover:text-primary-300 underline"
+                    >
+                      {children}
+                    </a>
+                  )
+                },
               }}
             >
               {renderedContent}
