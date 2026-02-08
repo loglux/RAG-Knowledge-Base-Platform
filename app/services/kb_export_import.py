@@ -590,6 +590,9 @@ async def import_kbs(
                 )
                 db.add(kb_model)
                 kb_created += 1
+
+        # Ensure KBs exist in DB before inserting dependent records (e.g., conversations).
+        await db.flush()
     
         for doc in doc_rows:
             doc_id = UUID(doc_id_map[doc["id"]])
