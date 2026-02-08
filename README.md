@@ -38,6 +38,7 @@ It can be used as a standalone service or integrated into other products via its
 - Optional BM25 lexical index (OpenSearch) for hybrid retrieval
 - **Self-Check Validation** (optional): Two-stage answer generation with validation for improved accuracy
 - **Retrieve-only API** for MCP/search tools (no chat side-effects)
+- **KB export/import**: portable archives for backup, migration, and QA
 - **Chat history controls**: delete individual Q/A pairs from a conversation
 - **BM25 phrase matching**: adds an exact `match_phrase` clause for strict wording
 - **Windowed retrieval (context expansion)** for neighboring chunk context
@@ -186,6 +187,7 @@ Documentation source files are available in the [`docs/`](docs/) directory:
 - `API_DOCUMENTATION.md` - Full API reference
 - `ENDPOINTS_QUICK_REFERENCE.md` - Quick lookup tables
 - `API_MAP.md` - Architecture and diagrams
+- `KB_EXPORT_IMPORT.md` - KB export/import (API + format + behavior)
 
 ## Minimal API usage
 

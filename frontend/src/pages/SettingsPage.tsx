@@ -6,13 +6,14 @@ import { LLMSelector } from '../components/chat/LLMSelector'
 import { Button } from '../components/common/Button'
 import type {
   AppSettings,
+  KnowledgeBase,
   PromptVersionDetail,
   PromptVersionSummary,
   SelfCheckPromptVersionDetail,
   SelfCheckPromptVersionSummary
 } from '../types/index'
 
-type TabType = 'query' | 'kb-defaults' | 'ai-providers' | 'databases' | 'prompts'
+type TabType = 'query' | 'kb-defaults' | 'ai-providers' | 'databases' | 'prompts' | 'kb-transfer'
 
 export function SettingsPage() {
   const navigate = useNavigate()
@@ -108,9 +109,39 @@ export function SettingsPage() {
   const [systemName, setSystemName] = useState('')
   const [maxFileSizeMb, setMaxFileSizeMb] = useState(50)
 
+  // KB Transfer
+  const [kbList, setKbList] = useState<KnowledgeBase[]>([])
+  const [kbTransferLoading, setKbTransferLoading] = useState(false)
+  const [kbSelection, setKbSelection] = useState<string[]>([])
+  const [exportInclude, setExportInclude] = useState({
+    documents: true,
+    vectors: true,
+    bm25: true,
+    uploads: false,
+    chats: false,
+  })
+  const [importInclude, setImportInclude] = useState({
+    documents: true,
+    vectors: true,
+    bm25: true,
+    uploads: false,
+    chats: false,
+  })
+  const [importMode, setImportMode] = useState<'create' | 'merge'>('create')
+  const [remapIds, setRemapIds] = useState(true)
+  const [targetKbId, setTargetKbId] = useState('')
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [exportingKbArchive, setExportingKbArchive] = useState(false)
+  const [importingKbArchive, setImportingKbArchive] = useState(false)
+
   useEffect(() => {
     loadAllSettings()
   }, [])
+
+  useEffect(() => {
+    if (activeTab !== 'kb-transfer') return
+    loadKbList()
+  }, [activeTab])
 
   const loadAllSettings = async () => {
     try {
@@ -208,6 +239,80 @@ export function SettingsPage() {
       setError(err instanceof Error ? err.message : 'Failed to load settings')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadKbList = async () => {
+    try {
+      setKbTransferLoading(true)
+      const data = await apiClient.getKnowledgeBases(1, 100)
+      setKbList(data.items || [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load knowledge bases')
+    } finally {
+      setKbTransferLoading(false)
+    }
+  }
+
+  const toggleKbSelection = (id: string) => {
+    setKbSelection((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+
+  const handleExportKbs = async () => {
+    if (kbSelection.length === 0) {
+      setError('Select at least one knowledge base to export')
+      return
+    }
+    try {
+      setExportingKbArchive(true)
+      setError(null)
+      setSuccess(null)
+      const { blob, filename } = await apiClient.exportKnowledgeBases({
+        kb_ids: kbSelection,
+        include: exportInclude,
+      })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      setSuccess('Export started. Download should begin automatically.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to export KBs')
+    } finally {
+      setExportingKbArchive(false)
+    }
+  }
+
+  const handleImportKbs = async () => {
+    if (!importFile) {
+      setError('Select an export archive to import')
+      return
+    }
+    if (importMode === 'merge' && !targetKbId) {
+      setError('Select a target KB for merge')
+      return
+    }
+    try {
+      setImportingKbArchive(true)
+      setError(null)
+      setSuccess(null)
+      const result = await apiClient.importKnowledgeBases(importFile, {
+        mode: importMode,
+        remap_ids: remapIds,
+        target_kb_id: importMode === 'merge' ? targetKbId : null,
+        include: importInclude,
+      })
+      setSuccess(`Import complete. KBs created: ${result.kb_created}, updated: ${result.kb_updated}`)
+      setImportFile(null)
+      await loadKbList()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to import KBs')
+    } finally {
+      setImportingKbArchive(false)
     }
   }
 
@@ -637,6 +742,16 @@ export function SettingsPage() {
         >
           Prompts
         </button>
+        <button
+          onClick={() => setActiveTab('kb-transfer')}
+          className={`px-6 py-3 font-medium whitespace-nowrap border-b-2 transition-colors ${
+            activeTab === 'kb-transfer'
+              ? 'border-primary-500 text-primary-500'
+              : 'border-transparent text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          KB Transfer
+        </button>
       </div>
 
       {/* Alerts */}
@@ -799,12 +914,295 @@ export function SettingsPage() {
             saving={saving}
           />
         )}
+
+        {activeTab === 'kb-transfer' && (
+          <KBTransferTab
+            kbList={kbList}
+            kbTransferLoading={kbTransferLoading}
+            kbSelection={kbSelection}
+            toggleKbSelection={toggleKbSelection}
+            exportInclude={exportInclude}
+            setExportInclude={setExportInclude}
+            importInclude={importInclude}
+            setImportInclude={setImportInclude}
+            importMode={importMode}
+            setImportMode={setImportMode}
+            remapIds={remapIds}
+            setRemapIds={setRemapIds}
+            targetKbId={targetKbId}
+            setTargetKbId={setTargetKbId}
+            importFile={importFile}
+            setImportFile={setImportFile}
+            onExport={handleExportKbs}
+            onImport={handleImportKbs}
+            exporting={exportingKbArchive}
+            importing={importingKbArchive}
+          />
+        )}
       </div>
     </div>
   )
 }
 
 // Tab Components
+type KBTransferTabProps = {
+  kbList: KnowledgeBase[]
+  kbTransferLoading: boolean
+  kbSelection: string[]
+  toggleKbSelection: (id: string) => void
+  exportInclude: {
+    documents: boolean
+    vectors: boolean
+    bm25: boolean
+    uploads: boolean
+    chats: boolean
+  }
+  setExportInclude: React.Dispatch<React.SetStateAction<{
+    documents: boolean
+    vectors: boolean
+    bm25: boolean
+    uploads: boolean
+    chats: boolean
+  }>>
+  importInclude: {
+    documents: boolean
+    vectors: boolean
+    bm25: boolean
+    uploads: boolean
+    chats: boolean
+  }
+  setImportInclude: React.Dispatch<React.SetStateAction<{
+    documents: boolean
+    vectors: boolean
+    bm25: boolean
+    uploads: boolean
+    chats: boolean
+  }>>
+  importMode: 'create' | 'merge'
+  setImportMode: (value: 'create' | 'merge') => void
+  remapIds: boolean
+  setRemapIds: (value: boolean) => void
+  targetKbId: string
+  setTargetKbId: (value: string) => void
+  importFile: File | null
+  setImportFile: (file: File | null) => void
+  onExport: () => void
+  onImport: () => void
+  exporting: boolean
+  importing: boolean
+}
+
+const KBTransferTab: React.FC<KBTransferTabProps> = ({
+  kbList,
+  kbTransferLoading,
+  kbSelection,
+  toggleKbSelection,
+  exportInclude,
+  setExportInclude,
+  importInclude,
+  setImportInclude,
+  importMode,
+  setImportMode,
+  remapIds,
+  setRemapIds,
+  targetKbId,
+  setTargetKbId,
+  importFile,
+  setImportFile,
+  onExport,
+  onImport,
+  exporting,
+  importing,
+}) => {
+  return (
+    <div className="space-y-8">
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-gray-100 mb-2">Export Knowledge Bases</h3>
+        <p className="text-sm text-gray-400 mb-4">
+          Select one or more KBs and export a portable archive.
+        </p>
+
+        <div className="mb-4">
+          <div className="text-sm text-gray-300 mb-2">Knowledge Bases</div>
+          <div className="max-h-48 overflow-y-auto border border-gray-700 rounded-md p-3">
+            {kbTransferLoading && (
+              <div className="text-gray-400 text-sm">Loading knowledge bases...</div>
+            )}
+            {!kbTransferLoading && kbList.length === 0 && (
+              <div className="text-gray-400 text-sm">No knowledge bases found.</div>
+            )}
+            {!kbTransferLoading && kbList.length > 0 && (
+              <div className="space-y-2">
+                {kbList.map((kb) => (
+                  <label key={kb.id} className="flex items-center gap-2 text-sm text-gray-200">
+                    <input
+                      type="checkbox"
+                      checked={kbSelection.includes(kb.id)}
+                      onChange={() => toggleKbSelection(kb.id)}
+                      className="rounded border-gray-600 bg-gray-900"
+                    />
+                    <span>{kb.name}</span>
+                    <span className="text-gray-500 text-xs">{kb.id}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="flex items-center gap-2 text-sm text-gray-200">
+            <input
+              type="checkbox"
+              checked={exportInclude.documents}
+              onChange={(e) => setExportInclude({ ...exportInclude, documents: e.target.checked })}
+              className="rounded border-gray-600 bg-gray-900"
+            />
+            <span>Documents</span>
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-200">
+            <input
+              type="checkbox"
+              checked={exportInclude.vectors}
+              onChange={(e) => setExportInclude({ ...exportInclude, vectors: e.target.checked })}
+              className="rounded border-gray-600 bg-gray-900"
+            />
+            <span>Qdrant Vectors</span>
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-200">
+            <input
+              type="checkbox"
+              checked={exportInclude.bm25}
+              onChange={(e) => setExportInclude({ ...exportInclude, bm25: e.target.checked })}
+              className="rounded border-gray-600 bg-gray-900"
+            />
+            <span>OpenSearch BM25</span>
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-200">
+            <input
+              type="checkbox"
+              checked={exportInclude.uploads}
+              onChange={(e) => setExportInclude({ ...exportInclude, uploads: e.target.checked })}
+              className="rounded border-gray-600 bg-gray-900"
+            />
+            <span>Uploads (optional)</span>
+          </label>
+        </div>
+
+        <Button onClick={onExport} disabled={exporting}>
+          {exporting ? 'Exporting...' : 'Export Selected KBs'}
+        </Button>
+      </div>
+
+      <div className="bg-gray-800 border border-gray-700 rounded-lg p-6">
+        <h3 className="text-lg font-semibold text-gray-100 mb-2">Import Knowledge Bases</h3>
+        <p className="text-sm text-gray-400 mb-4">
+          Import a KB archive generated by the export tool.
+        </p>
+
+        <div className="mb-4">
+          <input
+            type="file"
+            accept=".tar.gz"
+            onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+            className="text-sm text-gray-300"
+          />
+          {importFile && (
+            <div className="text-xs text-gray-400 mt-2">{importFile.name}</div>
+          )}
+        </div>
+
+        <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="flex items-center gap-2 text-sm text-gray-200">
+            <span>Mode</span>
+            <select
+              value={importMode}
+              onChange={(e) => setImportMode(e.target.value as 'create' | 'merge')}
+              className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm"
+            >
+              <option value="create">create</option>
+              <option value="merge">merge</option>
+            </select>
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-200">
+            <input
+              type="checkbox"
+              checked={remapIds}
+              onChange={(e) => setRemapIds(e.target.checked)}
+              className="rounded border-gray-600 bg-gray-900"
+            />
+            <span>Remap IDs</span>
+          </label>
+        </div>
+
+        {importMode === 'merge' && (
+          <div className="mb-4">
+            <label className="block text-sm text-gray-300 mb-2">Target Knowledge Base</label>
+            <select
+              value={targetKbId}
+              onChange={(e) => setTargetKbId(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-2 text-sm text-gray-200"
+            >
+              <option value="">Select a KB...</option>
+              {kbList.map((kb) => (
+                <option key={kb.id} value={kb.id}>
+                  {kb.name} ({kb.id})
+                </option>
+              ))}
+            </select>
+            <div className="text-xs text-gray-500 mt-2">
+              Merge requires a single-KB archive. The target KB must already exist.
+            </div>
+          </div>
+        )}
+
+        <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="flex items-center gap-2 text-sm text-gray-200">
+            <input
+              type="checkbox"
+              checked={importInclude.documents}
+              onChange={(e) => setImportInclude({ ...importInclude, documents: e.target.checked })}
+              className="rounded border-gray-600 bg-gray-900"
+            />
+            <span>Documents</span>
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-200">
+            <input
+              type="checkbox"
+              checked={importInclude.vectors}
+              onChange={(e) => setImportInclude({ ...importInclude, vectors: e.target.checked })}
+              className="rounded border-gray-600 bg-gray-900"
+            />
+            <span>Qdrant Vectors</span>
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-200">
+            <input
+              type="checkbox"
+              checked={importInclude.bm25}
+              onChange={(e) => setImportInclude({ ...importInclude, bm25: e.target.checked })}
+              className="rounded border-gray-600 bg-gray-900"
+            />
+            <span>OpenSearch BM25</span>
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-200">
+            <input
+              type="checkbox"
+              checked={importInclude.uploads}
+              onChange={(e) => setImportInclude({ ...importInclude, uploads: e.target.checked })}
+              className="rounded border-gray-600 bg-gray-900"
+            />
+            <span>Uploads (optional)</span>
+          </label>
+        </div>
+
+        <Button onClick={onImport} disabled={importing || !importFile}>
+          {importing ? 'Importing...' : 'Import KB Archive'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 type QueryDefaultsTabProps = {
   llmModel: string
   setLlmModel: (value: string) => void

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from app.api.v1 import (
     health,
     knowledge_bases,
+    kb_transfer,
     documents,
     chat,
     retrieve,
@@ -30,6 +31,7 @@ api_router.include_router(auth.router)
 
 # Protected routers
 protected_router.include_router(knowledge_bases.router, prefix="/knowledge-bases", tags=["knowledge-bases"])
+protected_router.include_router(kb_transfer.router)
 protected_router.include_router(documents.router, prefix="/documents", tags=["documents"])
 protected_router.include_router(chat.router, prefix="/chat", tags=["chat"])
 protected_router.include_router(retrieve.router, prefix="/retrieve", tags=["retrieve"])

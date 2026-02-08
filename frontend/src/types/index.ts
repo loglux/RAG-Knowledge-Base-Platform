@@ -98,6 +98,34 @@ export interface APIError {
   suggestion?: string
 }
 
+export interface KBExportInclude {
+  documents: boolean
+  vectors: boolean
+  bm25: boolean
+  uploads: boolean
+  chats: boolean
+}
+
+export interface KBExportRequest {
+  kb_ids: string[]
+  include?: KBExportInclude
+}
+
+export interface KBImportOptions {
+  mode: 'create' | 'merge' | 'replace'
+  remap_ids: boolean
+  target_kb_id?: string | null
+  include?: KBExportInclude
+}
+
+export interface KBImportResponse {
+  status: string
+  kb_imported: number
+  kb_created: number
+  kb_updated: number
+  warnings: string[]
+}
+
 // Auth Types
 export interface LoginRequest {
   username: string

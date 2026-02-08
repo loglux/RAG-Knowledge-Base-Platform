@@ -769,6 +769,48 @@ class MeResponse(BaseModel):
 
 
 # ============================================================================
+# KB Export/Import Schemas
+# ============================================================================
+
+class KBExportInclude(BaseModel):
+    """Toggle export/import components for KB transfer."""
+
+    documents: bool = True
+    vectors: bool = True
+    bm25: bool = True
+    uploads: bool = True
+    chats: bool = False
+
+
+class KBExportRequest(BaseModel):
+    """Request body for KB export."""
+
+    kb_ids: List[UUID]
+    include: Optional[KBExportInclude] = None
+
+
+class KBImportOptions(BaseModel):
+    """Options for KB import."""
+
+    mode: str = Field(default="create", description="create|merge|replace")
+    remap_ids: bool = Field(default=True, description="Generate new KB/document IDs on import")
+    target_kb_id: Optional[UUID] = Field(
+        default=None,
+        description="Target KB ID for merge; only valid when mode=merge and archive has a single KB",
+    )
+    include: Optional[KBExportInclude] = None
+
+
+class KBImportResponse(BaseModel):
+    """Response for KB import."""
+
+    status: str
+    kb_imported: int
+    kb_created: int
+    kb_updated: int
+    warnings: List[str] = Field(default_factory=list)
+
+# ============================================================================
 # QA Auto-Tuning Schemas
 # ============================================================================
 

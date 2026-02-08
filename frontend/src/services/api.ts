@@ -33,6 +33,9 @@ import type {
   QAEvalRunConfig,
   QAEvalRunDetail,
   QAGoldCountResponse,
+  KBExportRequest,
+  KBImportOptions,
+  KBImportResponse,
 } from '../types/index'
 
 const ACCESS_TOKEN_KEY = 'kb_access_token'
@@ -181,6 +184,26 @@ class APIClient {
 
   async getKnowledgeBase(id: string): Promise<KnowledgeBase> {
     const response = await this.client.get<KnowledgeBase>(`/knowledge-bases/${id}`)
+    return response.data
+  }
+
+  async exportKnowledgeBases(payload: KBExportRequest): Promise<{ blob: Blob; filename: string }> {
+    const response = await this.client.post('/kb/export', payload, { responseType: 'blob' })
+    const disposition = response.headers?.['content-disposition'] || ''
+    const match = disposition.match(/filename=\"?([^\";]+)\"?/i)
+    const filename = match?.[1] || 'kb_export.tar.gz'
+    return { blob: response.data as Blob, filename }
+  }
+
+  async importKnowledgeBases(file: File, options?: KBImportOptions): Promise<KBImportResponse> {
+    const form = new FormData()
+    form.append('file', file)
+    if (options) {
+      form.append('options', JSON.stringify(options))
+    }
+    const response = await this.client.post<KBImportResponse>('/kb/import', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
     return response.data
   }
 
