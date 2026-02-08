@@ -681,9 +681,11 @@ async def import_kbs(
                 else:
                     new_kb_id = kb_id_map.get(old_kb_id)
                     if not new_kb_id:
-                        raise KBExportImportError(
-                            f"Conversation references KB not in archive: {old_kb_id}"
-                        )
+                        if options.remap_ids:
+                            raise KBExportImportError(
+                                f"Conversation references KB not in archive: {old_kb_id}"
+                            )
+                        new_kb_id = old_kb_id
 
                 convo_model = ConversationModel(
                     id=new_convo_id,
