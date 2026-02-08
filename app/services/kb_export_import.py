@@ -676,7 +676,14 @@ async def import_kbs(
             for convo in convo_rows:
                 new_convo_id = UUID(convo_id_map[convo["id"]])
                 old_kb_id = convo["knowledge_base_id"]
-                new_kb_id = kb_id_map.get(old_kb_id, old_kb_id)
+                if target_kb:
+                    new_kb_id = str(target_kb.id)
+                else:
+                    new_kb_id = kb_id_map.get(old_kb_id)
+                    if not new_kb_id:
+                        raise KBExportImportError(
+                            f"Conversation references KB not in archive: {old_kb_id}"
+                        )
 
                 convo_model = ConversationModel(
                     id=new_convo_id,
