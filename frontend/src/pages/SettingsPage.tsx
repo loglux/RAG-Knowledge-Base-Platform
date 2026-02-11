@@ -11,7 +11,9 @@ import type {
   PromptVersionSummary,
   SelfCheckPromptVersionDetail,
   SelfCheckPromptVersionSummary,
-  MCPToken
+  MCPToken,
+  MCPRefreshToken,
+  OAuthTokenResponse
 } from '../types/index'
 
 const MCP_TOOL_OPTIONS = [
@@ -132,6 +134,13 @@ export function SettingsPage() {
   const [mcpTokenName, setMcpTokenName] = useState('')
   const [mcpTokenTTL, setMcpTokenTTL] = useState<number | ''>('')
   const [mcpCreatedToken, setMcpCreatedToken] = useState<string | null>(null)
+  const [mcpAccessTokenTtlMinutes, setMcpAccessTokenTtlMinutes] = useState<number | ''>('')
+  const [mcpRefreshTokenTtlDays, setMcpRefreshTokenTtlDays] = useState<number | ''>('')
+  const [mcpRefreshTokens, setMcpRefreshTokens] = useState<MCPRefreshToken[]>([])
+  const [mcpOAuthUsername, setMcpOAuthUsername] = useState('')
+  const [mcpOAuthPassword, setMcpOAuthPassword] = useState('')
+  const [mcpOAuthIssued, setMcpOAuthIssued] = useState<OAuthTokenResponse | null>(null)
+  const [mcpOAuthLoading, setMcpOAuthLoading] = useState(false)
 
   // KB Transfer
   const [kbList, setKbList] = useState<KnowledgeBase[]>([])
@@ -171,6 +180,7 @@ export function SettingsPage() {
   useEffect(() => {
     if (activeTab !== 'mcp') return
     loadMcpTokens()
+    loadMcpRefreshTokens()
   }, [activeTab])
 
   const loadAllSettings = async () => {
@@ -233,6 +243,12 @@ export function SettingsPage() {
       if (systemSettings.opensearch_url) setOpensearchUrl(systemSettings.opensearch_url)
       if (systemSettings.opensearch_username) setOpensearchUsername(systemSettings.opensearch_username)
       if (systemSettings.opensearch_password) setOpensearchPassword(systemSettings.opensearch_password)
+      if (systemSettings.mcp_access_token_ttl_minutes !== undefined && systemSettings.mcp_access_token_ttl_minutes !== null) {
+        setMcpAccessTokenTtlMinutes(systemSettings.mcp_access_token_ttl_minutes)
+      }
+      if (systemSettings.mcp_refresh_token_ttl_days !== undefined && systemSettings.mcp_refresh_token_ttl_days !== null) {
+        setMcpRefreshTokenTtlDays(systemSettings.mcp_refresh_token_ttl_days)
+      }
       if (systemSettings.system_name) setSystemName(systemSettings.system_name)
       if (systemSettings.max_file_size_mb) setMaxFileSizeMb(systemSettings.max_file_size_mb)
 
@@ -302,6 +318,15 @@ export function SettingsPage() {
     }
   }
 
+  const loadMcpRefreshTokens = async () => {
+    try {
+      const tokens = await apiClient.listMcpRefreshTokens()
+      setMcpRefreshTokens(tokens)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load MCP refresh tokens')
+    }
+  }
+
   const handleSaveMcpSettings = async () => {
     try {
       setSaving(true)
@@ -313,6 +338,12 @@ export function SettingsPage() {
         mcp_path: mcpPath,
         mcp_default_kb_id: mcpDefaultKbId || null,
         mcp_tools_enabled: mcpToolsEnabled,
+      }
+      if (mcpAccessTokenTtlMinutes !== '') {
+        payload.mcp_access_token_ttl_minutes = Number(mcpAccessTokenTtlMinutes)
+      }
+      if (mcpRefreshTokenTtlDays !== '') {
+        payload.mcp_refresh_token_ttl_days = Number(mcpRefreshTokenTtlDays)
       }
 
       await apiClient.updateSystemSettings(payload)
@@ -343,6 +374,47 @@ export function SettingsPage() {
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create MCP token')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleIssueOAuthToken = async () => {
+    if (!mcpOAuthUsername.trim() || !mcpOAuthPassword) {
+      setError('Enter username and password to issue OAuth tokens')
+      return
+    }
+    try {
+      setMcpOAuthLoading(true)
+      setError(null)
+      setSuccess(null)
+      setMcpOAuthIssued(null)
+      const result = await apiClient.createMcpOAuthToken({
+        username: mcpOAuthUsername.trim(),
+        password: mcpOAuthPassword,
+      })
+      setMcpOAuthIssued(result)
+      setMcpOAuthPassword('')
+      await loadMcpRefreshTokens()
+      setSuccess('OAuth tokens issued')
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to issue OAuth tokens')
+    } finally {
+      setMcpOAuthLoading(false)
+    }
+  }
+
+  const handleRevokeRefreshToken = async (jti: string) => {
+    try {
+      setSaving(true)
+      setError(null)
+      await apiClient.revokeMcpRefreshToken(jti)
+      await loadMcpRefreshTokens()
+      setSuccess('Refresh token revoked')
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to revoke refresh token')
     } finally {
       setSaving(false)
     }
@@ -1135,11 +1207,25 @@ export function SettingsPage() {
             setMcpTokenTTL={setMcpTokenTTL}
             mcpCreatedToken={mcpCreatedToken}
             setMcpCreatedToken={setMcpCreatedToken}
+            mcpAccessTokenTtlMinutes={mcpAccessTokenTtlMinutes}
+            setMcpAccessTokenTtlMinutes={setMcpAccessTokenTtlMinutes}
+            mcpRefreshTokenTtlDays={mcpRefreshTokenTtlDays}
+            setMcpRefreshTokenTtlDays={setMcpRefreshTokenTtlDays}
+            mcpRefreshTokens={mcpRefreshTokens}
+            mcpOAuthUsername={mcpOAuthUsername}
+            setMcpOAuthUsername={setMcpOAuthUsername}
+            mcpOAuthPassword={mcpOAuthPassword}
+            setMcpOAuthPassword={setMcpOAuthPassword}
+            mcpOAuthIssued={mcpOAuthIssued}
+            setMcpOAuthIssued={setMcpOAuthIssued}
             onSave={handleSaveMcpSettings}
             onCreateToken={handleCreateMcpToken}
             onRevokeToken={handleRevokeMcpToken}
             onDeleteToken={handleDeleteMcpToken}
+            onIssueOAuthToken={handleIssueOAuthToken}
+            onRevokeRefreshToken={handleRevokeRefreshToken}
             saving={saving}
+            oauthLoading={mcpOAuthLoading}
           />
         )}
       </div>
@@ -1213,11 +1299,25 @@ type MCPSettingsTabProps = {
   setMcpTokenTTL: (value: number | '') => void
   mcpCreatedToken: string | null
   setMcpCreatedToken: (value: string | null) => void
+  mcpAccessTokenTtlMinutes: number | ''
+  setMcpAccessTokenTtlMinutes: (value: number | '') => void
+  mcpRefreshTokenTtlDays: number | ''
+  setMcpRefreshTokenTtlDays: (value: number | '') => void
+  mcpRefreshTokens: MCPRefreshToken[]
+  mcpOAuthUsername: string
+  setMcpOAuthUsername: (value: string) => void
+  mcpOAuthPassword: string
+  setMcpOAuthPassword: (value: string) => void
+  mcpOAuthIssued: OAuthTokenResponse | null
+  setMcpOAuthIssued: (value: OAuthTokenResponse | null) => void
   onSave: () => void
   onCreateToken: () => void
   onRevokeToken: (tokenId: string) => void
   onDeleteToken: (tokenId: string) => void
+  onIssueOAuthToken: () => void
+  onRevokeRefreshToken: (jti: string) => void
   saving: boolean
+  oauthLoading: boolean
 }
 
 function MCPSettingsTab(props: MCPSettingsTabProps) {
@@ -1237,11 +1337,25 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
     setMcpTokenTTL,
     mcpCreatedToken,
     setMcpCreatedToken,
+    mcpAccessTokenTtlMinutes,
+    setMcpAccessTokenTtlMinutes,
+    mcpRefreshTokenTtlDays,
+    setMcpRefreshTokenTtlDays,
+    mcpRefreshTokens,
+    mcpOAuthUsername,
+    setMcpOAuthUsername,
+    mcpOAuthPassword,
+    setMcpOAuthPassword,
+    mcpOAuthIssued,
+    setMcpOAuthIssued,
     onSave,
     onCreateToken,
     onRevokeToken,
     onDeleteToken,
+    onIssueOAuthToken,
+    onRevokeRefreshToken,
     saving,
+    oauthLoading,
   } = props
   const [copySuccess, setCopySuccess] = useState<string | null>(null)
 
@@ -1280,6 +1394,38 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
       setCopySuccess('Copy failed')
       setTimeout(() => setCopySuccess(null), 2000)
     }
+  }
+
+  const handleCopyValue = async (value: string) => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(value)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = value
+        textarea.style.position = 'fixed'
+        textarea.style.top = '0'
+        textarea.style.left = '0'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.focus()
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+      }
+      setCopySuccess('Copied')
+      setTimeout(() => setCopySuccess(null), 2000)
+    } catch {
+      setCopySuccess('Copy failed')
+      setTimeout(() => setCopySuccess(null), 2000)
+    }
+  }
+
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return '—'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+    return date.toLocaleString()
   }
 
   return (
@@ -1406,8 +1552,8 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
               <div className="text-sm text-gray-200">
                 <div className="font-mono">prefix: {token.token_prefix}</div>
                 <div className="text-gray-400">{token.name || 'Unnamed token'}</div>
-                {token.expires_at && <div className="text-gray-400">expires: {token.expires_at}</div>}
-                {token.revoked_at && <div className="text-red-300">revoked: {token.revoked_at}</div>}
+                {token.expires_at && <div className="text-gray-400">expires: {formatDateTime(token.expires_at)}</div>}
+                {token.revoked_at && <div className="text-red-300">revoked: {formatDateTime(token.revoked_at)}</div>}
               </div>
               <div className="flex gap-2">
                 <Button variant="secondary" onClick={() => onRevokeToken(token.id)} disabled={saving}>
@@ -1415,6 +1561,112 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
                 </Button>
                 <Button variant="secondary" onClick={() => onDeleteToken(token.id)} disabled={saving}>
                   Delete
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-100">OAuth (Gateway)</h3>
+          <p className="text-sm text-gray-400">
+            Issue access + refresh tokens for AuthMCP Gateway using an admin account.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Access TTL (minutes)</label>
+            <input
+              type="number"
+              min={1}
+              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+              placeholder="e.g. 30"
+              value={mcpAccessTokenTtlMinutes}
+              onChange={(e) => setMcpAccessTokenTtlMinutes(e.target.value === '' ? '' : Number(e.target.value))}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Refresh TTL (days)</label>
+            <input
+              type="number"
+              min={1}
+              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+              placeholder="e.g. 30"
+              value={mcpRefreshTokenTtlDays}
+              onChange={(e) => setMcpRefreshTokenTtlDays(e.target.value === '' ? '' : Number(e.target.value))}
+            />
+          </div>
+        </div>
+        <p className="text-xs text-gray-400">
+          Applies to newly issued OAuth tokens. Save with <span className="text-gray-200">Save MCP Settings</span> above.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <input
+            type="text"
+            className="px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            placeholder="Admin username"
+            value={mcpOAuthUsername}
+            onChange={(e) => setMcpOAuthUsername(e.target.value)}
+          />
+          <input
+            type="password"
+            className="px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            placeholder="Admin password"
+            value={mcpOAuthPassword}
+            onChange={(e) => setMcpOAuthPassword(e.target.value)}
+          />
+          <Button variant="primary" onClick={onIssueOAuthToken} disabled={oauthLoading}>
+            {oauthLoading ? 'Issuing...' : 'Issue OAuth Tokens'}
+          </Button>
+        </div>
+
+        {mcpOAuthIssued && (
+          <div className="bg-gray-900 rounded-lg p-4 border border-gray-700 space-y-3">
+            <div className="text-sm text-gray-300">
+              Access token (expires in {mcpOAuthIssued.expires_in}s)
+            </div>
+            <div className="font-mono text-xs text-gray-100 break-all">{mcpOAuthIssued.access_token}</div>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={() => handleCopyValue(mcpOAuthIssued.access_token)}>
+                Copy access
+              </Button>
+              {copySuccess && <span className="text-xs text-gray-400 self-center">{copySuccess}</span>}
+            </div>
+            {mcpOAuthIssued.refresh_token && (
+              <>
+                <div className="text-sm text-gray-300">Refresh token</div>
+                <div className="font-mono text-xs text-gray-100 break-all">{mcpOAuthIssued.refresh_token}</div>
+                <div className="flex gap-2">
+                  <Button variant="secondary" onClick={() => handleCopyValue(mcpOAuthIssued.refresh_token || '')}>
+                    Copy refresh
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <div className="text-sm font-medium text-gray-200">Refresh Tokens</div>
+          {mcpRefreshTokens.length === 0 && (
+            <div className="text-sm text-gray-400">No refresh tokens yet</div>
+          )}
+          {mcpRefreshTokens.map((token) => (
+            <div key={token.jti} className="flex items-center justify-between bg-gray-900 rounded-lg p-3 border border-gray-700">
+              <div className="text-sm text-gray-200">
+                <div className="font-mono">jti: {token.jti}</div>
+                <div className="text-gray-400">admin: {token.admin_username}</div>
+                <div className="text-gray-400">created: {formatDateTime(token.created_at)}</div>
+                <div className="text-gray-400">expires: {formatDateTime(token.expires_at)}</div>
+                {token.revoked_at && <div className="text-red-300">revoked: {formatDateTime(token.revoked_at)}</div>}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="secondary" onClick={() => onRevokeRefreshToken(token.jti)} disabled={saving}>
+                  Revoke
                 </Button>
               </div>
             </div>

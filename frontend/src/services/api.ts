@@ -38,6 +38,8 @@ import type {
   KBImportResponse,
   MCPToken,
   MCPTokenCreateResponse,
+  MCPRefreshToken,
+  OAuthTokenResponse,
 } from '../types/index'
 
 const ACCESS_TOKEN_KEY = 'kb_access_token'
@@ -45,6 +47,7 @@ const ACCESS_TOKEN_KEY = 'kb_access_token'
 class APIClient {
   private client: AxiosInstance
   private refreshPromise: Promise<boolean> | null = null
+  private oauthClient: AxiosInstance
 
   constructor() {
     const baseURL = import.meta.env.VITE_API_BASE_URL || ''
@@ -55,6 +58,14 @@ class APIClient {
       withCredentials: true,
       headers: {
         'Content-Type': 'application/json',
+      },
+    })
+
+    this.oauthClient = axios.create({
+      baseURL,
+      withCredentials: true,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
     })
 
@@ -545,6 +556,25 @@ class APIClient {
 
   async createMcpToken(payload: { name?: string; expires_in_days?: number | null }): Promise<MCPTokenCreateResponse> {
     const response = await this.client.post<MCPTokenCreateResponse>('/mcp-tokens/', payload)
+    return response.data
+  }
+
+  async listMcpRefreshTokens(): Promise<MCPRefreshToken[]> {
+    const response = await this.client.get<MCPRefreshToken[]>('/mcp-refresh-tokens/')
+    return response.data
+  }
+
+  async revokeMcpRefreshToken(jti: string): Promise<void> {
+    await this.client.delete(`/mcp-refresh-tokens/${jti}`)
+  }
+
+  async createMcpOAuthToken(payload: { username: string; password: string }): Promise<OAuthTokenResponse> {
+    const params = new URLSearchParams()
+    params.set('grant_type', 'password')
+    params.set('username', payload.username)
+    params.set('password', payload.password)
+
+    const response = await this.oauthClient.post<OAuthTokenResponse>('/oauth/token', params)
     return response.data
   }
 

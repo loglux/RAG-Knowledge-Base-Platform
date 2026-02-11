@@ -236,8 +236,16 @@ class Settings(BaseSettings):
             return [item.strip() for item in v.split(",") if item.strip()]
         return v
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, description="Access token expiration in minutes")
+    MCP_ACCESS_TOKEN_TTL_MINUTES: Optional[int] = Field(
+        default=None,
+        description="MCP OAuth access token TTL in minutes (from DB)"
+    )
     ALGORITHM: str = Field(default="HS256", description="JWT algorithm")
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=30, description="Refresh token expiration in days")
+    MCP_REFRESH_TOKEN_TTL_DAYS: Optional[int] = Field(
+        default=None,
+        description="MCP OAuth refresh token TTL in days (from DB)"
+    )
     COOKIE_SECURE: bool = Field(default=False, description="Use secure cookies (HTTPS only)")
     COOKIE_SAMESITE: str = Field(default="lax", description="Cookie SameSite policy (lax/strict/none)")
 

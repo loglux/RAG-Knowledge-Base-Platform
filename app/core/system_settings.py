@@ -27,6 +27,8 @@ class SystemSettingsManager:
         "mcp_path": "MCP_PATH",
         "mcp_default_kb_id": "MCP_DEFAULT_KB_ID",
         "mcp_tools_enabled": "MCP_TOOLS_ENABLED",
+        "mcp_access_token_ttl_minutes": "MCP_ACCESS_TOKEN_TTL_MINUTES",
+        "mcp_refresh_token_ttl_days": "MCP_REFRESH_TOKEN_TTL_DAYS",
 
         # Database URLs
         "qdrant_url": "QDRANT_URL",
@@ -191,6 +193,33 @@ class SystemSettingsManager:
         except Exception as e:
             logger.warning(f"Failed to get setting '{key}': {e}")
             return None
+
+    @staticmethod
+    async def ensure_defaults(db: AsyncSession, defaults: Dict[str, tuple[str, str, Optional[str]]]) -> None:
+        """
+        Ensure default settings exist in DB if missing.
+
+        Args:
+            db: Database session
+            defaults: key -> (value, category, description)
+        """
+        if not defaults:
+            return
+        result = await db.execute(
+            select(SystemSettings.key).where(SystemSettings.key.in_(list(defaults.keys())))
+        )
+        existing = {row[0] for row in result.all()}
+        for key, (value, category, description) in defaults.items():
+            if key in existing:
+                continue
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key=key,
+                value=value,
+                category=category,
+                description=description,
+                is_encrypted=False,
+            )
 
     @staticmethod
     async def delete_setting(db: AsyncSession, key: str) -> bool:

@@ -18,6 +18,7 @@ from app.api.v1 import (
     auth,
     auto_tune,
     mcp_tokens,
+    mcp_refresh_tokens,
 )
 from app.dependencies import get_current_user_id
 
@@ -44,6 +45,7 @@ protected_router.include_router(ollama.router, prefix="/ollama", tags=["ollama"]
 protected_router.include_router(llm.router, prefix="/llm", tags=["llm"])
 protected_router.include_router(auto_tune.router, tags=["auto-tune"])
 protected_router.include_router(mcp_tokens.router)
+protected_router.include_router(mcp_refresh_tokens.router)
 
 api_router.include_router(protected_router)
 

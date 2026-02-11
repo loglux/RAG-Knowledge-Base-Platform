@@ -146,6 +146,13 @@ export interface TokenResponse {
   role: string
 }
 
+export interface OAuthTokenResponse {
+  access_token: string
+  token_type: string
+  expires_in: number
+  refresh_token?: string | null
+}
+
 export interface MeResponse {
   admin_id: number
   username: string
@@ -482,4 +489,13 @@ export interface MCPToken {
 export interface MCPTokenCreateResponse {
   token: string
   record: MCPToken
+}
+
+export interface MCPRefreshToken {
+  jti: string
+  admin_user_id: number
+  admin_username: string
+  created_at: string
+  expires_at: string
+  revoked_at?: string | null
 }

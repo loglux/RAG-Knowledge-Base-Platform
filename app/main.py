@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from app.config import settings
 from app.db.session import close_db
 from app.api.v1 import api_router
+from app.api import oauth
 from app.mcp.server import get_mcp_app
 from app.mcp.middleware import MCPAcceptMiddleware, MCPAuthMiddleware
 
@@ -130,6 +131,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include OAuth router (no API prefix)
+app.include_router(oauth.router)
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_PREFIX)

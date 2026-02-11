@@ -54,6 +54,8 @@ class SystemSettingsResponse(BaseModel):
     mcp_path: Optional[str] = Field(None, description="MCP endpoint path")
     mcp_default_kb_id: Optional[str] = Field(None, description="Default KB for MCP tools")
     mcp_tools_enabled: Optional[list[str]] = Field(None, description="Enabled MCP tools")
+    mcp_access_token_ttl_minutes: Optional[int] = Field(None, description="MCP OAuth access token TTL (minutes)")
+    mcp_refresh_token_ttl_days: Optional[int] = Field(None, description="MCP OAuth refresh token TTL (days)")
 
     # Database URLs
     qdrant_url: Optional[str] = Field(None, description="Qdrant URL")
@@ -79,6 +81,8 @@ class SystemSettingsUpdate(BaseModel):
     mcp_path: Optional[str] = Field(None, description="MCP endpoint path")
     mcp_default_kb_id: Optional[str] = Field(None, description="Default KB for MCP tools")
     mcp_tools_enabled: Optional[list[str]] = Field(None, description="Enabled MCP tools")
+    mcp_access_token_ttl_minutes: Optional[int] = Field(None, description="MCP OAuth access token TTL (minutes)")
+    mcp_refresh_token_ttl_days: Optional[int] = Field(None, description="MCP OAuth refresh token TTL (days)")
 
     # Database URLs
     qdrant_url: Optional[str] = Field(None, description="Qdrant URL")
@@ -129,6 +133,16 @@ async def get_system_settings(db: AsyncSession = Depends(get_db)):
             mcp_path=settings_dict.get("mcp_path"),
             mcp_default_kb_id=settings_dict.get("mcp_default_kb_id"),
             mcp_tools_enabled=_coerce_list(settings_dict.get("mcp_tools_enabled")),
+            mcp_access_token_ttl_minutes=(
+                int(settings_dict.get("mcp_access_token_ttl_minutes"))
+                if settings_dict.get("mcp_access_token_ttl_minutes") is not None
+                else None
+            ),
+            mcp_refresh_token_ttl_days=(
+                int(settings_dict.get("mcp_refresh_token_ttl_days"))
+                if settings_dict.get("mcp_refresh_token_ttl_days") is not None
+                else None
+            ),
             qdrant_url=settings_dict.get("qdrant_url"),
             qdrant_api_key=_mask_sensitive(settings_dict.get("qdrant_api_key")),
             opensearch_url=settings_dict.get("opensearch_url"),
@@ -256,6 +270,28 @@ async def update_system_settings(
                 value=json.dumps(payload.mcp_tools_enabled),
                 category="mcp",
                 description="Enabled MCP tools",
+                is_encrypted=False,
+            )
+            updated_count += 1
+
+        if payload.mcp_access_token_ttl_minutes is not None:
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="mcp_access_token_ttl_minutes",
+                value=str(payload.mcp_access_token_ttl_minutes),
+                category="mcp",
+                description="MCP OAuth access token TTL (minutes)",
+                is_encrypted=False,
+            )
+            updated_count += 1
+
+        if payload.mcp_refresh_token_ttl_days is not None:
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="mcp_refresh_token_ttl_days",
+                value=str(payload.mcp_refresh_token_ttl_days),
+                category="mcp",
+                description="MCP OAuth refresh token TTL (days)",
                 is_encrypted=False,
             )
             updated_count += 1
