@@ -182,7 +182,7 @@ async def get_system_settings(db: AsyncSession = Depends(get_db)):
 async def update_system_settings(
     payload: SystemSettingsUpdate,
     db: AsyncSession = Depends(get_db),
-    request: Request = None,
+    request: Request,
 ):
     """
     Update system settings (API keys, database URLs, etc.).
@@ -480,10 +480,13 @@ async def update_system_settings(
         from app.config import load_settings_from_db
         await load_settings_from_db()
 
-        if mcp_updated and request is not None:
+        if mcp_updated:
             try:
                 from app.mcp.manager import reload_mcp_routes
-                await reload_mcp_routes(request.app)
+                if request is None:
+                    logger.warning("MCP settings updated but request is unavailable; skipping reload.")
+                else:
+                    await reload_mcp_routes(request.app)
             except Exception as exc:
                 logger.warning("Failed to reload MCP routes: %s", exc)
 
