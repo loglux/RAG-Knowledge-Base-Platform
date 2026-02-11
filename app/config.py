@@ -202,6 +202,10 @@ class Settings(BaseSettings):
     # MCP (Model Context Protocol)
     MCP_ENABLED: bool = Field(default=False, description="Enable MCP endpoint")
     MCP_PATH: str = Field(default="/mcp", description="MCP endpoint path")
+    MCP_PUBLIC_BASE_URL: Optional[str] = Field(
+        default=None,
+        description="Public base URL for MCP (used for OAuth metadata and endpoint display)"
+    )
     MCP_DEFAULT_KB_ID: Optional[str] = Field(default=None, description="Default knowledge base ID for MCP tools")
     MCP_TOOLS_ENABLED: List[str] = Field(
         default=[
@@ -235,6 +239,26 @@ class Settings(BaseSettings):
                     pass
             return [item.strip() for item in v.split(",") if item.strip()]
         return v
+    MCP_OAUTH_ENABLED: bool = Field(
+        default=False,
+        description="Enable FastMCP OAuth (full /authorize, /token, /.well-known)"
+    )
+    MCP_OAUTH_PROVIDER: str = Field(
+        default="github",
+        description="FastMCP OAuth provider (currently supports: github)"
+    )
+    MCP_OAUTH_CLIENT_ID: Optional[str] = Field(
+        default=None,
+        description="OAuth client ID for FastMCP provider"
+    )
+    MCP_OAUTH_CLIENT_SECRET: Optional[str] = Field(
+        default=None,
+        description="OAuth client secret for FastMCP provider"
+    )
+    MCP_OAUTH_ISSUER_URL: Optional[str] = Field(
+        default=None,
+        description="Optional OAuth issuer URL override (for well-known metadata)"
+    )
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, description="Access token expiration in minutes")
     MCP_ACCESS_TOKEN_TTL_MINUTES: Optional[int] = Field(
         default=None,

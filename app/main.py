@@ -1,7 +1,7 @@
 """FastAPI application entry point."""
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Callable
+from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +12,7 @@ from app.db.session import close_db
 from app.api.v1 import api_router
 from app.api import oauth
 from app.mcp.server import get_mcp_app
-from app.mcp.middleware import MCPAcceptMiddleware, MCPAuthMiddleware
+from app.mcp.middleware import MCPAcceptMiddleware, MCPAuthMiddleware, MCPEnabledMiddleware
 
 # Configure logging
 logging.basicConfig(
@@ -82,36 +82,46 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
         logger.warning(f"Could not load settings from database: {e}")
         logger.info("Using settings from environment variables")
 
-    yield
+    mcp_app = None
+    mcp_lifespan = None
+    oauth_enabled = False
+    well_known_routes = []
+    try:
+        mcp_app, well_known_routes, oauth_enabled = get_mcp_app()
+        mcp_lifespan = getattr(mcp_app, "lifespan", None)
+    except Exception as exc:
+        logger.warning("Failed to initialize MCP app: %s", exc)
+
+    if mcp_app:
+        try:
+            mcp_app.add_middleware(MCPEnabledMiddleware)
+            mcp_app.add_middleware(MCPAcceptMiddleware)
+            if not oauth_enabled:
+                mcp_app.add_middleware(MCPAuthMiddleware)
+            if hasattr(mcp_app, "router"):
+                mcp_app.router.redirect_slashes = False
+
+            mount_path = settings.MCP_PATH if settings.MCP_PATH.startswith("/") else f"/{settings.MCP_PATH}"
+            mount_path = mount_path.rstrip("/") or "/mcp"
+
+            if not getattr(app.state, "mcp_mounted", False):
+                app.state.mcp_mounted = True
+                if well_known_routes:
+                    app.router.routes = list(well_known_routes) + list(app.router.routes)
+                app.mount(mount_path, mcp_app)
+                logger.info("Mounted MCP endpoint at %s", mount_path)
+        except Exception as exc:
+            logger.warning("Failed to mount MCP endpoint: %s", exc)
+
+    if mcp_lifespan is not None:
+        async with mcp_lifespan(app):
+            yield
+    else:
+        yield
 
     # Shutdown
     logger.info("Shutting down Knowledge Base Platform")
     await close_db()
-
-def build_combined_lifespan(
-    primary: Callable,
-    secondary: Callable | None,
-):
-    if secondary is None:
-        return primary
-
-    @asynccontextmanager
-    async def _combined(app: FastAPI):
-        async with primary(app):
-            async with secondary(app):
-                yield
-
-    return _combined
-
-# Build MCP app early so we can combine lifespans.
-mcp_app = None
-combined_lifespan = lifespan
-try:
-    mcp_app = get_mcp_app()
-    mcp_lifespan = getattr(mcp_app, "lifespan", None)
-    combined_lifespan = build_combined_lifespan(lifespan, mcp_lifespan)
-except Exception as exc:
-    logger.warning("Failed to initialize MCP app: %s", exc)
 
 # Create FastAPI application
 app = FastAPI(
@@ -121,7 +131,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url=f"{settings.API_PREFIX}/openapi.json",
-    lifespan=combined_lifespan,
+    lifespan=lifespan,
 )
 # Configure CORS
 app.add_middleware(
@@ -138,26 +148,13 @@ app.include_router(oauth.router)
 # Include API router
 app.include_router(api_router, prefix=settings.API_PREFIX)
 
-# MCP endpoint (mounted separately, uses its own auth middleware)
-if mcp_app:
-    try:
-        mcp_app.add_middleware(MCPAcceptMiddleware)
-        mcp_app.add_middleware(MCPAuthMiddleware)
-        if hasattr(mcp_app, "router"):
-            mcp_app.router.redirect_slashes = False
-        mount_path = settings.MCP_PATH if settings.MCP_PATH.startswith("/") else f"/{settings.MCP_PATH}"
-        mount_path = mount_path.rstrip("/") or "/mcp"
-
-        @app.middleware("http")
-        async def mcp_slash_middleware(request, call_next):
-            if request.url.path == mount_path:
-                request.scope["path"] = mount_path + "/"
-            return await call_next(request)
-
-        app.mount(mount_path, mcp_app)
-        logger.info("Mounted MCP endpoint at %s", mount_path)
-    except Exception as exc:
-        logger.warning("Failed to mount MCP endpoint: %s", exc)
+@app.middleware("http")
+async def mcp_slash_middleware(request, call_next):
+    mount_path = settings.MCP_PATH if settings.MCP_PATH.startswith("/") else f"/{settings.MCP_PATH}"
+    mount_path = mount_path.rstrip("/") or "/mcp"
+    if request.url.path == mount_path:
+        request.scope["path"] = mount_path + "/"
+    return await call_next(request)
 
 @app.get("/", tags=["root"])
 async def root():

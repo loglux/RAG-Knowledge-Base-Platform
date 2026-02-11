@@ -52,8 +52,14 @@ class SystemSettingsResponse(BaseModel):
     ollama_base_url: Optional[str] = Field(None, description="Ollama API base URL")
     mcp_enabled: Optional[bool] = Field(None, description="Enable MCP endpoint")
     mcp_path: Optional[str] = Field(None, description="MCP endpoint path")
+    mcp_public_base_url: Optional[str] = Field(None, description="Public MCP base URL")
     mcp_default_kb_id: Optional[str] = Field(None, description="Default KB for MCP tools")
     mcp_tools_enabled: Optional[list[str]] = Field(None, description="Enabled MCP tools")
+    mcp_oauth_enabled: Optional[bool] = Field(None, description="Enable FastMCP OAuth")
+    mcp_oauth_provider: Optional[str] = Field(None, description="FastMCP OAuth provider")
+    mcp_oauth_client_id: Optional[str] = Field(None, description="FastMCP OAuth client ID (masked)")
+    mcp_oauth_client_secret: Optional[str] = Field(None, description="FastMCP OAuth client secret (masked)")
+    mcp_oauth_issuer_url: Optional[str] = Field(None, description="FastMCP OAuth issuer URL override")
     mcp_access_token_ttl_minutes: Optional[int] = Field(None, description="MCP OAuth access token TTL (minutes)")
     mcp_refresh_token_ttl_days: Optional[int] = Field(None, description="MCP OAuth refresh token TTL (days)")
 
@@ -79,8 +85,14 @@ class SystemSettingsUpdate(BaseModel):
     ollama_base_url: Optional[str] = Field(None, description="Ollama API base URL")
     mcp_enabled: Optional[bool] = Field(None, description="Enable MCP endpoint")
     mcp_path: Optional[str] = Field(None, description="MCP endpoint path")
+    mcp_public_base_url: Optional[str] = Field(None, description="Public MCP base URL")
     mcp_default_kb_id: Optional[str] = Field(None, description="Default KB for MCP tools")
     mcp_tools_enabled: Optional[list[str]] = Field(None, description="Enabled MCP tools")
+    mcp_oauth_enabled: Optional[bool] = Field(None, description="Enable FastMCP OAuth")
+    mcp_oauth_provider: Optional[str] = Field(None, description="FastMCP OAuth provider")
+    mcp_oauth_client_id: Optional[str] = Field(None, description="FastMCP OAuth client ID")
+    mcp_oauth_client_secret: Optional[str] = Field(None, description="FastMCP OAuth client secret")
+    mcp_oauth_issuer_url: Optional[str] = Field(None, description="FastMCP OAuth issuer URL override")
     mcp_access_token_ttl_minutes: Optional[int] = Field(None, description="MCP OAuth access token TTL (minutes)")
     mcp_refresh_token_ttl_days: Optional[int] = Field(None, description="MCP OAuth refresh token TTL (days)")
 
@@ -131,8 +143,14 @@ async def get_system_settings(db: AsyncSession = Depends(get_db)):
             ollama_base_url=settings_dict.get("ollama_base_url"),  # Not sensitive
             mcp_enabled=_coerce_bool(settings_dict.get("mcp_enabled")),
             mcp_path=settings_dict.get("mcp_path"),
+            mcp_public_base_url=settings_dict.get("mcp_public_base_url"),
             mcp_default_kb_id=settings_dict.get("mcp_default_kb_id"),
             mcp_tools_enabled=_coerce_list(settings_dict.get("mcp_tools_enabled")),
+            mcp_oauth_enabled=_coerce_bool(settings_dict.get("mcp_oauth_enabled")),
+            mcp_oauth_provider=settings_dict.get("mcp_oauth_provider"),
+            mcp_oauth_client_id=_mask_sensitive(settings_dict.get("mcp_oauth_client_id")),
+            mcp_oauth_client_secret=_mask_sensitive(settings_dict.get("mcp_oauth_client_secret")),
+            mcp_oauth_issuer_url=settings_dict.get("mcp_oauth_issuer_url"),
             mcp_access_token_ttl_minutes=(
                 int(settings_dict.get("mcp_access_token_ttl_minutes"))
                 if settings_dict.get("mcp_access_token_ttl_minutes") is not None
@@ -251,6 +269,17 @@ async def update_system_settings(
             )
             updated_count += 1
 
+        if payload.mcp_public_base_url is not None:
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="mcp_public_base_url",
+                value=payload.mcp_public_base_url,
+                category="mcp",
+                description="Public MCP base URL",
+                is_encrypted=False,
+            )
+            updated_count += 1
+
         if payload.mcp_default_kb_id is not None:
             await SystemSettingsManager.save_setting(
                 db=db,
@@ -270,6 +299,61 @@ async def update_system_settings(
                 value=json.dumps(payload.mcp_tools_enabled),
                 category="mcp",
                 description="Enabled MCP tools",
+                is_encrypted=False,
+            )
+            updated_count += 1
+
+        if payload.mcp_oauth_enabled is not None:
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="mcp_oauth_enabled",
+                value=str(payload.mcp_oauth_enabled).lower(),
+                category="mcp",
+                description="Enable FastMCP OAuth",
+                is_encrypted=False,
+            )
+            updated_count += 1
+
+        if payload.mcp_oauth_provider is not None:
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="mcp_oauth_provider",
+                value=payload.mcp_oauth_provider,
+                category="mcp",
+                description="FastMCP OAuth provider",
+                is_encrypted=False,
+            )
+            updated_count += 1
+
+        if payload.mcp_oauth_client_id is not None:
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="mcp_oauth_client_id",
+                value=payload.mcp_oauth_client_id,
+                category="mcp",
+                description="FastMCP OAuth client ID",
+                is_encrypted=False,
+            )
+            updated_count += 1
+
+        if payload.mcp_oauth_client_secret is not None:
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="mcp_oauth_client_secret",
+                value=payload.mcp_oauth_client_secret,
+                category="mcp",
+                description="FastMCP OAuth client secret",
+                is_encrypted=False,
+            )
+            updated_count += 1
+
+        if payload.mcp_oauth_issuer_url is not None:
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="mcp_oauth_issuer_url",
+                value=payload.mcp_oauth_issuer_url,
+                category="mcp",
+                description="FastMCP OAuth issuer URL",
                 is_encrypted=False,
             )
             updated_count += 1

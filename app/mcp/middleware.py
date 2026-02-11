@@ -20,10 +20,33 @@ async def _get_mcp_enabled() -> bool:
     return str(raw).strip().lower() in {"1", "true", "yes", "on"}
 
 
+async def _get_mcp_oauth_enabled() -> bool:
+    async with get_db_session() as db:
+        raw = await SystemSettingsManager.get_setting(db, "mcp_oauth_enabled")
+    if raw is None:
+        return bool(settings.MCP_OAUTH_ENABLED)
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _is_oauth_path(path: str) -> bool:
+    if path.startswith("/.well-known/"):
+        return True
+    if path.startswith("/authorize"):
+        return True
+    if path.startswith("/token"):
+        return True
+    if path.startswith("/auth/callback"):
+        return True
+    return False
+
+
 class MCPAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         if not await _get_mcp_enabled():
             return JSONResponse({"detail": "MCP endpoint is disabled"}, status_code=404)
+
+        if await _get_mcp_oauth_enabled() and _is_oauth_path(request.url.path):
+            return await call_next(request)
 
         auth_header = request.headers.get("authorization", "")
         if not auth_header.lower().startswith("bearer "):
@@ -43,8 +66,18 @@ class MCPAuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+class MCPEnabledMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next) -> Response:
+        if not await _get_mcp_enabled():
+            return JSONResponse({"detail": "MCP endpoint is disabled"}, status_code=404)
+        return await call_next(request)
+
+
 class MCPAcceptMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
+        if _is_oauth_path(request.url.path):
+            return await call_next(request)
+
         accept = request.headers.get("accept")
         if accept is None:
             normalized = ""
