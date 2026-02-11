@@ -28,7 +28,7 @@ def _remove_routes(routes: List[BaseRoute], remove: List[BaseRoute]) -> List[Bas
 async def reload_mcp_routes(app: FastAPI) -> None:
     """Rebuild and remount MCP routes based on latest settings."""
     try:
-        mcp_app, well_known_routes, oauth_enabled = get_mcp_app()
+        mcp_app = getattr(app.state, "mcp_app", None) or get_mcp_app()
     except Exception as exc:
         logger.warning("Failed to rebuild MCP app: %s", exc)
         return
@@ -39,8 +39,7 @@ async def reload_mcp_routes(app: FastAPI) -> None:
 
     try:
         mcp_app.add_middleware(MCPAcceptMiddleware)
-        if not oauth_enabled:
-            mcp_app.add_middleware(MCPAuthMiddleware)
+        mcp_app.add_middleware(MCPAuthMiddleware)
         if hasattr(mcp_app, "router"):
             mcp_app.router.redirect_slashes = False
     except Exception as exc:
@@ -57,16 +56,14 @@ async def reload_mcp_routes(app: FastAPI) -> None:
 
     routes = _remove_routes(list(app.router.routes), to_remove)
 
-    # Add new well-known routes (if any) at the front
-    if well_known_routes:
-        routes = list(well_known_routes) + routes
+    # No well-known routes when OAuth is disabled.
 
     # Mount MCP endpoint at the end
     mount_route = Mount(mount_path, app=mcp_app)
     routes.append(mount_route)
 
     app.router.routes = routes
-    app.state.mcp_well_known_routes = list(well_known_routes)
+    app.state.mcp_well_known_routes = []
     app.state.mcp_mount_route = mount_route
 
-    logger.info("Reloaded MCP routes at %s (oauth=%s)", mount_path, oauth_enabled)
+    logger.info("Reloaded MCP routes at %s", mount_path)

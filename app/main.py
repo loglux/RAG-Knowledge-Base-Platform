@@ -12,6 +12,7 @@ from app.db.session import close_db
 from app.api.v1 import api_router
 from app.api import oauth
 from app.mcp.manager import reload_mcp_routes
+from app.mcp.server import get_mcp_app
 
 # Configure logging
 logging.basicConfig(
@@ -91,6 +92,31 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     logger.info("Shutting down Knowledge Base Platform")
     await close_db()
 
+def build_combined_lifespan(
+    primary: Callable,
+    secondary: Callable | None,
+):
+    if secondary is None:
+        return primary
+
+    @asynccontextmanager
+    async def _combined(app: FastAPI):
+        async with primary(app):
+            async with secondary(app):
+                yield
+
+    return _combined
+
+# Build MCP app early so we can combine lifespans.
+mcp_app = None
+combined_lifespan = lifespan
+try:
+    mcp_app = get_mcp_app()
+    mcp_lifespan = getattr(mcp_app, "lifespan", None)
+    combined_lifespan = build_combined_lifespan(lifespan, mcp_lifespan)
+except Exception as exc:
+    logger.warning("Failed to initialize MCP app for lifespan: %s", exc)
+
 # Create FastAPI application
 app = FastAPI(
     title="Knowledge Base Platform",
@@ -99,7 +125,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url=f"{settings.API_PREFIX}/openapi.json",
-    lifespan=lifespan,
+    lifespan=combined_lifespan,
 )
 # Configure CORS
 app.add_middleware(
@@ -115,6 +141,17 @@ app.include_router(oauth.router)
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_PREFIX)
+
+if mcp_app is not None:
+    app.state.mcp_app = mcp_app
+
+@app.middleware("http")
+async def mcp_slash_middleware(request, call_next):
+    mount_path = settings.MCP_PATH if settings.MCP_PATH.startswith("/") else f"/{settings.MCP_PATH}"
+    mount_path = mount_path.rstrip("/") or "/mcp"
+    if request.url.path == mount_path:
+        request.scope["path"] = mount_path + "/"
+    return await call_next(request)
 
 @app.get("/", tags=["root"])
 async def root():
