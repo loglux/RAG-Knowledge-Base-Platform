@@ -95,6 +95,24 @@ You can also set **KB-level retrieval defaults** (e.g., `top_k`, `retrieval_mode
 - `PUT /api/v1/knowledge-bases/{kb_id}/retrieval-settings`
 - `DELETE /api/v1/knowledge-bases/{kb_id}/retrieval-settings`
 
+### MCP Server (AuthMCP Gateway)
+
+The platform exposes a FastMCP endpoint for automation tools and AuthMCP Gateway:
+
+- **MCP endpoint**: `POST /mcp` (mounted at `/mcp` on the backend; a frontend proxy may also expose `/mcp`).
+- **Auth**: Bearer token.
+
+**Token options**
+- **Static MCP tokens**: create/revoke in Admin UI → MCP tab.
+- **OAuth (Gateway)**: issue access + refresh tokens via `POST /oauth/token`.
+  - `grant_type=password` with admin credentials → access+refresh
+  - `grant_type=refresh_token` → rotate tokens
+
+**TTL settings**
+- Configure OAuth token TTLs in Admin UI → MCP tab:
+  - Access TTL (minutes)
+  - Refresh TTL (days)
+
 ### KB Transfer
 
 - **KB export/import**: `POST /api/v1/kb/export`, `POST /api/v1/kb/import`
