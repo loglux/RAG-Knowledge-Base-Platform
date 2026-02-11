@@ -181,8 +181,8 @@ async def get_system_settings(db: AsyncSession = Depends(get_db)):
 @router.put("/", response_model=dict)
 async def update_system_settings(
     payload: SystemSettingsUpdate,
-    db: AsyncSession = Depends(get_db),
     request: Request,
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Update system settings (API keys, database URLs, etc.).
