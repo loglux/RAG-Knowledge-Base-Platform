@@ -128,19 +128,12 @@ export function SettingsPage() {
   // MCP Settings
   const [mcpEnabled, setMcpEnabled] = useState(false)
   const [mcpPath, setMcpPath] = useState('/mcp')
-  const [mcpPublicBaseUrl, setMcpPublicBaseUrl] = useState('')
   const [mcpDefaultKbId, setMcpDefaultKbId] = useState('')
   const [mcpToolsEnabled, setMcpToolsEnabled] = useState<string[]>(MCP_TOOL_OPTIONS.map((t) => t.id))
   const [mcpTokens, setMcpTokens] = useState<MCPToken[]>([])
   const [mcpTokenName, setMcpTokenName] = useState('')
   const [mcpTokenTTL, setMcpTokenTTL] = useState<number | ''>('')
   const [mcpCreatedToken, setMcpCreatedToken] = useState<string | null>(null)
-  const [mcpOAuthEnabled, setMcpOAuthEnabled] = useState(false)
-  const [mcpOAuthProvider, setMcpOAuthProvider] = useState('github')
-  const [mcpOAuthClientId, setMcpOAuthClientId] = useState('')
-  const [mcpOAuthClientSecret, setMcpOAuthClientSecret] = useState('')
-  const [showMcpOAuthClientSecret, setShowMcpOAuthClientSecret] = useState(false)
-  const [mcpOAuthIssuerUrl, setMcpOAuthIssuerUrl] = useState('')
   const [mcpAccessTokenTtlMinutes, setMcpAccessTokenTtlMinutes] = useState<number | ''>('')
   const [mcpRefreshTokenTtlDays, setMcpRefreshTokenTtlDays] = useState<number | ''>('')
   const [mcpRefreshTokens, setMcpRefreshTokens] = useState<MCPRefreshToken[]>([])
@@ -241,22 +234,10 @@ export function SettingsPage() {
         setMcpEnabled(systemSettings.mcp_enabled)
       }
       if (systemSettings.mcp_path) setMcpPath(systemSettings.mcp_path)
-      if (systemSettings.mcp_public_base_url) setMcpPublicBaseUrl(systemSettings.mcp_public_base_url)
       if (systemSettings.mcp_default_kb_id) setMcpDefaultKbId(systemSettings.mcp_default_kb_id)
       if (systemSettings.mcp_tools_enabled && Array.isArray(systemSettings.mcp_tools_enabled)) {
         setMcpToolsEnabled(systemSettings.mcp_tools_enabled)
       }
-      if (systemSettings.mcp_oauth_enabled !== null && systemSettings.mcp_oauth_enabled !== undefined) {
-        setMcpOAuthEnabled(systemSettings.mcp_oauth_enabled)
-      }
-      if (systemSettings.mcp_oauth_provider) setMcpOAuthProvider(systemSettings.mcp_oauth_provider)
-      if (systemSettings.mcp_oauth_client_id && !systemSettings.mcp_oauth_client_id.includes('*')) {
-        setMcpOAuthClientId(systemSettings.mcp_oauth_client_id)
-      }
-      if (systemSettings.mcp_oauth_client_secret && !systemSettings.mcp_oauth_client_secret.includes('*')) {
-        setMcpOAuthClientSecret(systemSettings.mcp_oauth_client_secret)
-      }
-      if (systemSettings.mcp_oauth_issuer_url) setMcpOAuthIssuerUrl(systemSettings.mcp_oauth_issuer_url)
       if (systemSettings.qdrant_url) setQdrantUrl(systemSettings.qdrant_url)
       if (systemSettings.qdrant_api_key) setQdrantApiKey(systemSettings.qdrant_api_key)
       if (systemSettings.opensearch_url) setOpensearchUrl(systemSettings.opensearch_url)
@@ -355,18 +336,8 @@ export function SettingsPage() {
       const payload: any = {
         mcp_enabled: mcpEnabled,
         mcp_path: mcpPath,
-        mcp_public_base_url: mcpPublicBaseUrl || null,
         mcp_default_kb_id: mcpDefaultKbId || null,
         mcp_tools_enabled: mcpToolsEnabled,
-        mcp_oauth_enabled: mcpOAuthEnabled,
-        mcp_oauth_provider: mcpOAuthProvider || null,
-        mcp_oauth_issuer_url: mcpOAuthIssuerUrl || null,
-      }
-      if (mcpOAuthClientId.trim()) {
-        payload.mcp_oauth_client_id = mcpOAuthClientId.trim()
-      }
-      if (mcpOAuthClientSecret.trim()) {
-        payload.mcp_oauth_client_secret = mcpOAuthClientSecret.trim()
       }
       if (mcpAccessTokenTtlMinutes !== '') {
         payload.mcp_access_token_ttl_minutes = Number(mcpAccessTokenTtlMinutes)
@@ -1225,8 +1196,6 @@ export function SettingsPage() {
             setMcpEnabled={setMcpEnabled}
             mcpPath={mcpPath}
             setMcpPath={setMcpPath}
-            mcpPublicBaseUrl={mcpPublicBaseUrl}
-            setMcpPublicBaseUrl={setMcpPublicBaseUrl}
             mcpDefaultKbId={mcpDefaultKbId}
             setMcpDefaultKbId={setMcpDefaultKbId}
             mcpToolsEnabled={mcpToolsEnabled}
@@ -1238,18 +1207,6 @@ export function SettingsPage() {
             setMcpTokenTTL={setMcpTokenTTL}
             mcpCreatedToken={mcpCreatedToken}
             setMcpCreatedToken={setMcpCreatedToken}
-            mcpOAuthEnabled={mcpOAuthEnabled}
-            setMcpOAuthEnabled={setMcpOAuthEnabled}
-            mcpOAuthProvider={mcpOAuthProvider}
-            setMcpOAuthProvider={setMcpOAuthProvider}
-            mcpOAuthClientId={mcpOAuthClientId}
-            setMcpOAuthClientId={setMcpOAuthClientId}
-            mcpOAuthClientSecret={mcpOAuthClientSecret}
-            setMcpOAuthClientSecret={setMcpOAuthClientSecret}
-            showMcpOAuthClientSecret={showMcpOAuthClientSecret}
-            setShowMcpOAuthClientSecret={setShowMcpOAuthClientSecret}
-            mcpOAuthIssuerUrl={mcpOAuthIssuerUrl}
-            setMcpOAuthIssuerUrl={setMcpOAuthIssuerUrl}
             mcpAccessTokenTtlMinutes={mcpAccessTokenTtlMinutes}
             setMcpAccessTokenTtlMinutes={setMcpAccessTokenTtlMinutes}
             mcpRefreshTokenTtlDays={mcpRefreshTokenTtlDays}
@@ -1331,8 +1288,6 @@ type MCPSettingsTabProps = {
   setMcpEnabled: (value: boolean) => void
   mcpPath: string
   setMcpPath: (value: string) => void
-  mcpPublicBaseUrl: string
-  setMcpPublicBaseUrl: (value: string) => void
   mcpDefaultKbId: string
   setMcpDefaultKbId: (value: string) => void
   mcpToolsEnabled: string[]
@@ -1344,18 +1299,6 @@ type MCPSettingsTabProps = {
   setMcpTokenTTL: (value: number | '') => void
   mcpCreatedToken: string | null
   setMcpCreatedToken: (value: string | null) => void
-  mcpOAuthEnabled: boolean
-  setMcpOAuthEnabled: (value: boolean) => void
-  mcpOAuthProvider: string
-  setMcpOAuthProvider: (value: string) => void
-  mcpOAuthClientId: string
-  setMcpOAuthClientId: (value: string) => void
-  mcpOAuthClientSecret: string
-  setMcpOAuthClientSecret: (value: string) => void
-  showMcpOAuthClientSecret: boolean
-  setShowMcpOAuthClientSecret: (value: boolean) => void
-  mcpOAuthIssuerUrl: string
-  setMcpOAuthIssuerUrl: (value: string) => void
   mcpAccessTokenTtlMinutes: number | ''
   setMcpAccessTokenTtlMinutes: (value: number | '') => void
   mcpRefreshTokenTtlDays: number | ''
@@ -1383,8 +1326,6 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
     setMcpEnabled,
     mcpPath,
     setMcpPath,
-    mcpPublicBaseUrl,
-    setMcpPublicBaseUrl,
     mcpDefaultKbId,
     setMcpDefaultKbId,
     mcpToolsEnabled,
@@ -1396,18 +1337,6 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
     setMcpTokenTTL,
     mcpCreatedToken,
     setMcpCreatedToken,
-    mcpOAuthEnabled,
-    setMcpOAuthEnabled,
-    mcpOAuthProvider,
-    setMcpOAuthProvider,
-    mcpOAuthClientId,
-    setMcpOAuthClientId,
-    mcpOAuthClientSecret,
-    setMcpOAuthClientSecret,
-    showMcpOAuthClientSecret,
-    setShowMcpOAuthClientSecret,
-    mcpOAuthIssuerUrl,
-    setMcpOAuthIssuerUrl,
     mcpAccessTokenTtlMinutes,
     setMcpAccessTokenTtlMinutes,
     mcpRefreshTokenTtlDays,
@@ -1430,12 +1359,8 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
   } = props
   const [copySuccess, setCopySuccess] = useState<string | null>(null)
 
-  const defaultPublicBase = window.location.origin
-  const normalizedPublicBase = mcpPublicBaseUrl.trim().replace(/\/$/, '')
-  const suggestedBase = normalizedPublicBase || defaultPublicBase
-  const endpointPublic = normalizedPublicBase
-    ? `${normalizedPublicBase}${mcpPath.startsWith('/') ? mcpPath : `/${mcpPath}`}`
-    : ''
+  const endpointBackend = import.meta.env.VITE_API_BASE_URL
+  const endpointProxy = `${window.location.origin}${mcpPath.startsWith('/') ? mcpPath : `/${mcpPath}`}`
 
   const toggleTool = (toolId: string) => {
     if (mcpToolsEnabled.includes(toolId)) {
@@ -1507,7 +1432,7 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-white mb-2">MCP</h2>
-        <p className="text-gray-400">Expose RAG as a FastMCP server (direct or via gateway)</p>
+        <p className="text-gray-400">Expose RAG as a FastMCP server for AuthMCP Gateway</p>
       </div>
 
       <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 space-y-4">
@@ -1532,26 +1457,6 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">Public API Base URL</label>
-          <input
-            type="text"
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-            placeholder="http://<host>:<port>"
-            value={mcpPublicBaseUrl}
-            onChange={(e) => setMcpPublicBaseUrl(e.target.value)}
-          />
-          <p className="text-xs text-gray-400 mt-1">
-            Used for OAuth metadata and endpoint display. If MCP is mounted at a path, include it here (e.g.
-            <span className="text-gray-200"> https://host/mcp</span>).
-          </p>
-          {!mcpPublicBaseUrl && (
-            <p className="text-xs text-gray-500 mt-1">
-              Suggested: <span className="text-gray-200">{defaultPublicBase}</span>
-            </p>
-          )}
-        </div>
-
-        <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">Default KB ID (Optional)</label>
           <input
             type="text"
@@ -1563,19 +1468,18 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
         </div>
 
         <div className="text-sm text-gray-300 space-y-1">
-          {endpointPublic ? (
+          {endpointBackend && (
             <div>
-              MCP endpoint:{' '}
-              <span className="text-gray-100">{endpointPublic}</span>
-            </div>
-          ) : (
-            <div className="text-gray-400">
-              MCP endpoint (suggested):{' '}
+              Backend endpoint:{' '}
               <span className="text-gray-100">
-                {`${suggestedBase}${mcpPath.startsWith('/') ? mcpPath : `/${mcpPath}`}`}
+                {`${endpointBackend}${mcpPath.startsWith('/') ? mcpPath : `/${mcpPath}`}`}
               </span>
             </div>
           )}
+          <div>
+            Proxy endpoint:{' '}
+            <span className="text-gray-100">{endpointProxy}</span>
+          </div>
         </div>
 
         <div className="flex justify-end">
@@ -1602,81 +1506,6 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
             </label>
           ))}
         </div>
-      </div>
-
-      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-100">FastMCP OAuth</h3>
-          <p className="text-sm text-gray-400">
-            Enable full OAuth endpoints for direct MCP clients (Claude, Cursor, etc).
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            checked={mcpOAuthEnabled}
-            onChange={(e) => setMcpOAuthEnabled(e.target.checked)}
-          />
-          <span className="text-gray-200">Enable FastMCP OAuth</span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Provider</label>
-            <select
-              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-              value={mcpOAuthProvider}
-              onChange={(e) => setMcpOAuthProvider(e.target.value)}
-            >
-              <option value="github">GitHub</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Issuer URL (Optional)</label>
-            <input
-              type="text"
-              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-              placeholder="https://your-domain"
-              value={mcpOAuthIssuerUrl}
-              onChange={(e) => setMcpOAuthIssuerUrl(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Client ID</label>
-            <input
-              type="text"
-              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-              value={mcpOAuthClientId}
-              onChange={(e) => setMcpOAuthClientId(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Client Secret</label>
-            <div className="relative">
-              <input
-                type={showMcpOAuthClientSecret ? 'text' : 'password'}
-                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500 pr-12"
-                value={mcpOAuthClientSecret}
-                onChange={(e) => setMcpOAuthClientSecret(e.target.value)}
-              />
-              <button
-                type="button"
-                className="absolute right-3 top-2 text-gray-300 text-xs"
-                onClick={() => setShowMcpOAuthClientSecret(!showMcpOAuthClientSecret)}
-              >
-                {showMcpOAuthClientSecret ? 'Hide' : 'Show'}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <p className="text-xs text-gray-400">
-          OAuth changes require server restart. Ensure Public API Base URL is set.
-        </p>
       </div>
 
       <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 space-y-4">

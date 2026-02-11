@@ -8,7 +8,6 @@ from uuid import UUID
 from sqlalchemy import select
 
 from fastmcp import FastMCP
-from starlette.routing import BaseRoute
 
 from app.config import settings
 from app.db.session import get_db_session
@@ -77,38 +76,8 @@ def _format_sources(sources: List[Dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def _build_oauth_provider():
-    if not settings.MCP_OAUTH_ENABLED:
-        return None
-    if not settings.MCP_PUBLIC_BASE_URL:
-        logger.warning("MCP OAuth enabled but MCP_PUBLIC_BASE_URL is not set.")
-        return None
-    provider = (settings.MCP_OAUTH_PROVIDER or "").strip().lower()
-    client_id = (settings.MCP_OAUTH_CLIENT_ID or "").strip()
-    client_secret = settings.MCP_OAUTH_CLIENT_SECRET or ""
-    if not client_id or not client_secret:
-        logger.warning("MCP OAuth enabled but client credentials are missing.")
-        return None
-    if provider == "github":
-        try:
-            from fastmcp.server.auth.providers.github import GitHubProvider
-        except Exception as exc:
-            logger.warning("Failed to import GitHubProvider: %s", exc)
-            return None
-        base_url = settings.MCP_PUBLIC_BASE_URL.rstrip("/")
-        return GitHubProvider(
-            client_id=client_id,
-            client_secret=client_secret,
-            base_url=base_url,
-            issuer_url=settings.MCP_OAUTH_ISSUER_URL or None,
-        )
-    logger.warning("Unsupported MCP OAuth provider: %s", provider)
-    return None
-
-
-def build_mcp_app() -> tuple[FastMCP, list[BaseRoute], bool]:
-    auth_provider = _build_oauth_provider()
-    mcp = FastMCP("RAG MCP Server", auth=auth_provider)
+def build_mcp_app() -> FastMCP:
+    mcp = FastMCP("RAG MCP Server")
 
     @mcp.tool()
     async def rag_query(
@@ -362,25 +331,10 @@ def build_mcp_app() -> tuple[FastMCP, list[BaseRoute], bool]:
             await db.commit()
         return "OK"
 
-    well_known_routes: list[BaseRoute] = []
-    if auth_provider is not None:
-        try:
-            mcp_path = settings.MCP_PATH or "/mcp"
-            if not mcp_path.startswith("/"):
-                mcp_path = f"/{mcp_path}"
-            mcp_path = mcp_path.rstrip("/") or "/mcp"
-            base_url = settings.MCP_PUBLIC_BASE_URL.rstrip("/")
-            if base_url.endswith(mcp_path):
-                mcp_path = "/"
-            well_known_routes = auth_provider.get_well_known_routes(mcp_path=mcp_path)
-        except Exception as exc:
-            logger.warning("Failed to build MCP OAuth well-known routes: %s", exc)
-
-    return mcp, well_known_routes, auth_provider is not None
+    return mcp
 
 
 def get_mcp_app():
-    mcp, well_known_routes, oauth_enabled = build_mcp_app()
+    mcp = build_mcp_app()
     # Use root path so mounting at /mcp exposes /mcp (not /mcp/mcp).
-    mcp_app = mcp.http_app(path="/", stateless_http=True, json_response=True)
-    return mcp_app, well_known_routes, oauth_enabled
+    return mcp.http_app(path="/", stateless_http=True, json_response=True)

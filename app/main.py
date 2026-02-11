@@ -1,7 +1,7 @@
 """FastAPI application entry point."""
 import logging
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Callable
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -85,7 +85,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
         await reload_mcp_routes(app)
     except Exception as exc:
         logger.warning("Failed to initialize MCP routes: %s", exc)
-
     yield
 
     # Shutdown
@@ -116,14 +115,6 @@ app.include_router(oauth.router)
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_PREFIX)
-
-@app.middleware("http")
-async def mcp_slash_middleware(request, call_next):
-    mount_path = settings.MCP_PATH if settings.MCP_PATH.startswith("/") else f"/{settings.MCP_PATH}"
-    mount_path = mount_path.rstrip("/") or "/mcp"
-    if request.url.path == mount_path:
-        request.scope["path"] = mount_path + "/"
-    return await call_next(request)
 
 @app.get("/", tags=["root"])
 async def root():
