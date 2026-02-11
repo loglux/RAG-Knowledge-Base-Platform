@@ -6,6 +6,7 @@
 ![OpenSearch](https://img.shields.io/badge/OpenSearch-005EB8?logo=opensearch&logoColor=white)
 ![OpenAI](https://img.shields.io/badge/OpenAI-111111?logo=openai&logoColor=white)
 ![Anthropic](https://img.shields.io/badge/Anthropic-191919?logo=anthropic&logoColor=white)
+![DeepSeek](https://img.shields.io/badge/DeepSeek-0E0E0E?logoColor=white)
 ![Voyage](https://img.shields.io/badge/Voyage-1B1F23?logo=voyage&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-000000?logo=ollama&logoColor=white)
 ![LangChain](https://img.shields.io/badge/🦜_LangChain-1C3C3C?logoColor=white)
@@ -22,7 +23,7 @@ It can be used as a standalone service or integrated into other products via its
 - **High-signal retrieval**: Vector search with Qdrant and configurable chunking.
 - **Structured navigation**: LLM-based TOC extraction enables section-aware search.
 - **API-first**: Use the backend independently from the UI.
-- **Provider-flexible**: OpenAI by default, with optional Anthropic, Voyage, or Ollama.
+- **Provider-flexible**: OpenAI by default, with optional Anthropic, DeepSeek, Voyage, or Ollama.
 - **Grounded answers**: Responses are built from your documents, not guesses.
 - **Retrieve-only access**: Get chunks + context without creating chat history.
 
