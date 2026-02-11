@@ -1,4 +1,5 @@
 """SQLAlchemy database models."""
+import json
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -227,6 +228,13 @@ class Document(Base):
         comment="Comma-separated list of Qdrant vector IDs"
     )
 
+    # Duplicate chunk analysis (JSON string)
+    duplicate_chunks_json: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="JSON with duplicate chunk analysis summary"
+    )
+
     # Future: User ownership (nullable for MVP)
     user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True),
@@ -260,6 +268,15 @@ class Document(Base):
 
     def __repr__(self) -> str:
         return f"<Document(id={self.id}, filename='{self.filename}', status={self.status})>"
+
+    @property
+    def duplicate_chunks(self):
+        if not self.duplicate_chunks_json:
+            return None
+        try:
+            return json.loads(self.duplicate_chunks_json)
+        except Exception:
+            return None
 
 
 class DocumentStructure(Base):

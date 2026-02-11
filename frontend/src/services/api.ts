@@ -292,8 +292,12 @@ class APIClient {
     await this.client.delete(`/knowledge-bases/${id}/purge`)
   }
 
-  async reprocessKnowledgeBase(id: string): Promise<{ queued: number; knowledge_base_id: string }> {
-    const response = await this.client.post<{ queued: number; knowledge_base_id: string }>(`/knowledge-bases/${id}/reprocess`)
+  async reprocessKnowledgeBase(id: string, detectDuplicates = false): Promise<{ queued: number; knowledge_base_id: string }> {
+    const response = await this.client.post<{ queued: number; knowledge_base_id: string }>(
+      `/knowledge-bases/${id}/reprocess`,
+      null,
+      { params: { detect_duplicates: detectDuplicates } }
+    )
     return response.data
   }
 
@@ -364,10 +368,11 @@ class APIClient {
     return response.data
   }
 
-  async uploadDocument(kbId: string, file: File): Promise<Document> {
+  async uploadDocument(kbId: string, file: File, detectDuplicates = false): Promise<Document> {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('knowledge_base_id', kbId)
+    formData.append('detect_duplicates', String(detectDuplicates))
 
     const response = await this.client.post<Document>('/documents/', formData, {
       headers: {
@@ -377,8 +382,15 @@ class APIClient {
     return response.data
   }
 
-  async reprocessDocument(id: string): Promise<Document> {
-    const response = await this.client.post<Document>(`/documents/${id}/reprocess`)
+  async reprocessDocument(id: string, detectDuplicates = false): Promise<Document> {
+    const response = await this.client.post<Document>(`/documents/${id}/reprocess`, null, {
+      params: { detect_duplicates: detectDuplicates },
+    })
+    return response.data
+  }
+
+  async recomputeDocumentDuplicates(id: string): Promise<{ total_groups: number; total_chunks: number; groups: Array<{ hash: string; chunks: number[]; count: number }> }> {
+    const response = await this.client.post(`/documents/${id}/duplicates/recompute`)
     return response.data
   }
 

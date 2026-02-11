@@ -83,6 +83,8 @@ export function KBDetailsPage() {
   const [structureModelOverride, setStructureModelOverride] = useState(false)
   const [reindexing, setReindexing] = useState(false)
   const [reindexMessage, setReindexMessage] = useState<string | null>(null)
+  const [detectDuplicatesOnUpload, setDetectDuplicatesOnUpload] = useState(false)
+  const [detectDuplicatesOnReindex, setDetectDuplicatesOnReindex] = useState(false)
   const [regenTitlesLoading, setRegenTitlesLoading] = useState(false)
   const [regenTitlesMessage, setRegenTitlesMessage] = useState<string | null>(null)
   const [regenIncludeExisting, setRegenIncludeExisting] = useState(false)
@@ -147,6 +149,7 @@ export function KBDetailsPage() {
     updateDocumentStatus,
     refresh: refreshDocuments,
     analyzeDocument,
+    recomputeDocumentDuplicates,
   } = useDocuments(id!)
 
   // Poll for document status updates
@@ -455,7 +458,7 @@ export function KBDetailsPage() {
       setRegenTitlesMessage(null)
       setReindexing(true)
       setReindexMessage(null)
-      const result = await apiClient.reprocessKnowledgeBase(kb.id)
+      const result = await apiClient.reprocessKnowledgeBase(kb.id, detectDuplicatesOnReindex)
       setReindexMessage(`Queued ${result.queued} documents for reprocessing.`)
     } catch (error) {
       setReindexMessage(error instanceof Error ? error.message : 'Failed to reprocess documents')
@@ -504,7 +507,7 @@ export function KBDetailsPage() {
     try {
       setReindexing(true)
       setReindexMessage(null)
-      const result = await apiClient.reprocessKnowledgeBase(kb.id)
+      const result = await apiClient.reprocessKnowledgeBase(kb.id, detectDuplicatesOnReindex)
       setReindexMessage(`Queued ${result.queued} documents for reprocessing with ${strategyLabel} strategy.`)
     } catch (error) {
       setReindexMessage(error instanceof Error ? error.message : 'Failed to reprocess documents')
@@ -552,7 +555,7 @@ export function KBDetailsPage() {
   const handleUpload = async (files: File[]) => {
     for (const file of files) {
       try {
-        await uploadDocument(file)
+        await uploadDocument(file, detectDuplicatesOnUpload)
       } catch (error) {
         console.error(`Failed to upload ${file.name}:`, error)
         throw error
@@ -787,6 +790,15 @@ export function KBDetailsPage() {
           {/* Upload Area */}
           <div className="mb-6">
             <FileUpload onUpload={handleUpload} accept=".txt,.md,.fb2,.docx" maxSize={50} multiple />
+            <label className="mt-2 flex items-center gap-2 text-xs text-gray-400">
+              <input
+                type="checkbox"
+                checked={detectDuplicatesOnUpload}
+                onChange={(e) => setDetectDuplicatesOnUpload(e.target.checked)}
+                className="rounded border-gray-600 bg-gray-800"
+              />
+              Compute duplicate chunks on upload
+            </label>
           </div>
 
           {/* Document List */}
@@ -812,9 +824,10 @@ export function KBDetailsPage() {
                 <DocumentItem
                   key={doc.id}
                   document={doc}
-                  onReprocess={reprocessDocument}
+                  onReprocess={(docId) => reprocessDocument(docId, detectDuplicatesOnReindex)}
                   onDelete={deleteDocument}
                   onAnalyze={analyzeDocument}
+                  onRecomputeDuplicates={recomputeDocumentDuplicates}
                 />
               ))}
             </div>
@@ -1507,28 +1520,48 @@ export function KBDetailsPage() {
 
           <div className="mt-6 flex items-center justify-between">
             <div className="text-xs text-gray-500">
-              Reindex is required to include existing documents in BM25 hybrid search.
+              Full reindex: re-chunk, re-embed, and rebuild BM25 for all existing documents.
             </div>
             <Button
               onClick={handleReindexBm25}
               size="xs-wide"
               disabled={reindexing}
             >
-              {reindexing ? 'Reindexing…' : 'Reindex for BM25'}
+              {reindexing ? 'Reindexing…' : 'Reindex All (Full)'}
             </Button>
           </div>
 
           <div className="mt-4 flex items-center justify-between">
             <div className="text-xs text-gray-500">
-              Reprocess documents to apply current chunking strategy to existing documents.
+              Full reindex using the current chunking strategy and settings.
             </div>
             <Button
               onClick={handleReprocessWithNewStrategy}
               size="xs-wide"
               disabled={reindexing}
             >
-              {reindexing ? 'Reprocessing…' : 'Reprocess All Documents'}
+              {reindexing ? 'Reprocessing…' : 'Reindex All (Strategy)'}
             </Button>
+          </div>
+
+          <div className="mt-2 text-xs text-gray-500">
+            Duplicate analysis on upload: {detectDuplicatesOnUpload ? 'enabled' : 'disabled'}.
+          </div>
+
+          <div className="mt-2 text-xs text-gray-500">
+            Duplicate analysis on reindex: {detectDuplicatesOnReindex ? 'enabled' : 'disabled'}.
+          </div>
+
+          <div className="mt-2 flex items-center gap-2">
+            <label className="flex items-center gap-2 text-xs text-gray-400">
+              <input
+                type="checkbox"
+                checked={detectDuplicatesOnReindex}
+                onChange={(e) => setDetectDuplicatesOnReindex(e.target.checked)}
+                className="rounded border-gray-600 bg-gray-800"
+              />
+              Compute duplicate chunks on reindex
+            </label>
           </div>
 
           <div className="mt-4 border-t border-gray-700 pt-4 space-y-3">

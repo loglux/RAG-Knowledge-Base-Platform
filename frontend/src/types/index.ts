@@ -70,6 +70,11 @@ export interface Document {
   processed_at: string | null
   is_deleted: boolean
   content_hash: string
+  duplicate_chunks?: {
+    total_groups: number
+    total_chunks: number
+    groups: Array<{ hash: string; chunks: number[]; count: number }>
+  } | null
 }
 
 export interface DocumentStatusResponse {

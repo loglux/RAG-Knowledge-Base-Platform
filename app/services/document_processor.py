@@ -28,6 +28,7 @@ from app.core.vector_store import (
 )
 from app.core.lexical_store import get_lexical_store, OpenSearchStore
 from app.services.chunking import get_chunking_service, ChunkingService, Chunk
+from app.services.duplicate_chunks import compute_duplicate_chunks_for_document, json_dumps
 
 
 logger = logging.getLogger(__name__)
@@ -71,6 +72,7 @@ class DocumentProcessor:
         self,
         document_id: UUID,
         db: AsyncSession,
+        detect_duplicates: bool = False,
     ) -> Dict[str, Any]:
         """
         Process a document through the complete ingestion pipeline.
@@ -258,7 +260,18 @@ class DocumentProcessor:
                 document, DocumentStatus.COMPLETED, db
             )
 
-            # 13. Recalculate KB statistics (prevents desync from incremental updates)
+            # 13. Optionally compute duplicate chunks (post-index)
+            if detect_duplicates:
+                try:
+                    await self._update_progress(document, "Analyzing duplicate chunks...", 98, db)
+                    summary = await compute_duplicate_chunks_for_document(document.id, kb.collection_name)
+                    document.duplicate_chunks_json = json_dumps(summary)
+                    await db.commit()
+                    await db.refresh(document)
+                except Exception as e:
+                    logger.warning(f"Duplicate chunk analysis failed for {document_id}: {e}")
+
+            # 14. Recalculate KB statistics (prevents desync from incremental updates)
             total_chunks = await db.scalar(
                 select(func.coalesce(func.sum(Document.chunk_count), 0)).where(
                     Document.knowledge_base_id == kb.id,
@@ -303,6 +316,7 @@ class DocumentProcessor:
         self,
         document_id: UUID,
         db: AsyncSession,
+        detect_duplicates: bool = False,
     ) -> Dict[str, Any]:
         """
         Reprocess an existing document.
@@ -339,7 +353,7 @@ class DocumentProcessor:
                 logger.warning(f"Failed to delete OpenSearch chunks: {e}")
 
             # Process document
-            return await self.process_document(document_id, db)
+            return await self.process_document(document_id, db, detect_duplicates=detect_duplicates)
 
         except Exception as e:
             logger.error(f"Failed to reprocess document {document_id}: {e}")

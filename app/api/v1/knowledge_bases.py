@@ -677,6 +677,7 @@ async def purge_knowledge_base(
 async def reprocess_knowledge_base(
     kb_id: UUID,
     background_tasks: BackgroundTasks,
+    detect_duplicates: bool = Query(False, description="Compute duplicate chunks after reprocessing"),
     db: AsyncSession = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_current_user_id),
 ):
@@ -720,6 +721,7 @@ async def reprocess_knowledge_base(
         background_tasks.add_task(
             _reprocess_document_background,
             document_id=doc.id,
+            detect_duplicates=detect_duplicates,
         )
         queued += 1
 

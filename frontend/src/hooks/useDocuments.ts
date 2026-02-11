@@ -20,8 +20,8 @@ export function useDocuments(kbId: string) {
     }
   }, [kbId])
 
-  const uploadDocument = useCallback(async (file: File): Promise<Document> => {
-    const newDoc = await apiClient.uploadDocument(kbId, file)
+  const uploadDocument = useCallback(async (file: File, detectDuplicates = false): Promise<Document> => {
+    const newDoc = await apiClient.uploadDocument(kbId, file, detectDuplicates)
     setDocuments((prev) => [newDoc, ...prev])
     return newDoc
   }, [kbId])
@@ -31,8 +31,8 @@ export function useDocuments(kbId: string) {
     setDocuments((prev) => prev.filter((doc) => doc.id !== id))
   }, [])
 
-  const reprocessDocument = useCallback(async (id: string) => {
-    const updated = await apiClient.reprocessDocument(id)
+  const reprocessDocument = useCallback(async (id: string, detectDuplicates = false) => {
+    const updated = await apiClient.reprocessDocument(id, detectDuplicates)
     setDocuments((prev) => prev.map((doc) => (doc.id === id ? updated : doc)))
   }, [])
 
@@ -50,6 +50,14 @@ export function useDocuments(kbId: string) {
     return await apiClient.analyzeDocument(id)
   }, [])
 
+  const recomputeDocumentDuplicates = useCallback(async (id: string) => {
+    const summary = await apiClient.recomputeDocumentDuplicates(id)
+    setDocuments((prev) =>
+      prev.map((doc) => (doc.id === id ? { ...doc, duplicate_chunks: summary } : doc))
+    )
+    return summary
+  }, [])
+
   useEffect(() => {
     fetchDocuments()
   }, [fetchDocuments])
@@ -64,5 +72,6 @@ export function useDocuments(kbId: string) {
     reprocessDocument,
     updateDocumentStatus,
     analyzeDocument,
+    recomputeDocumentDuplicates,
   }
 }

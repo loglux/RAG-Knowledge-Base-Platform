@@ -203,6 +203,7 @@ class DocumentResponse(DocumentBase):
     updated_at: datetime
     processed_at: Optional[datetime] = None
     is_deleted: bool
+    duplicate_chunks: Optional[dict] = None
 
     model_config = {"from_attributes": True}
 

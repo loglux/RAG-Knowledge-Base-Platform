@@ -8,10 +8,12 @@ interface DocumentItemProps {
   onReprocess?: (id: string) => void
   onDelete?: (id: string) => void
   onAnalyze?: (id: string) => Promise<any>
+  onRecomputeDuplicates?: (id: string) => Promise<any>
 }
 
-export function DocumentItem({ document, onReprocess, onDelete, onAnalyze }: DocumentItemProps) {
+export function DocumentItem({ document, onReprocess, onDelete, onAnalyze, onRecomputeDuplicates }: DocumentItemProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [isRecomputingDup, setIsRecomputingDup] = useState(false)
   const [hasStructure, setHasStructure] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [analysisResult, setAnalysisResult] = useState<any>(null)
@@ -175,6 +177,19 @@ export function DocumentItem({ document, onReprocess, onDelete, onAnalyze }: Doc
     }
   }
 
+  const handleRecomputeDuplicates = async () => {
+    if (!onRecomputeDuplicates) return
+    setIsRecomputingDup(true)
+    try {
+      await onRecomputeDuplicates(document.id)
+    } catch (error) {
+      console.error('Failed to recompute duplicates:', error)
+      alert(error instanceof Error ? error.message : 'Failed to recompute duplicates')
+    } finally {
+      setIsRecomputingDup(false)
+    }
+  }
+
   return (
     <div className="card p-4">
       <div className="flex items-start justify-between">
@@ -240,6 +255,29 @@ export function DocumentItem({ document, onReprocess, onDelete, onAnalyze }: Doc
                 </div>
               </div>
             )}
+
+            {document.duplicate_chunks && document.duplicate_chunks.total_groups > 0 && (
+              <details className="mt-3 text-xs text-gray-400">
+                <summary className="cursor-pointer select-none text-gray-300">
+                  Duplicates: {document.duplicate_chunks.total_groups} groups
+                  <span className="ml-2 text-gray-500">
+                    ({document.duplicate_chunks.total_chunks} chunks)
+                  </span>
+                </summary>
+                <div className="mt-2 space-y-1">
+                  {document.duplicate_chunks.groups.slice(0, 5).map((group, idx) => (
+                    <div key={idx} className="text-gray-500">
+                      chunks: {group.chunks.join(', ')}
+                    </div>
+                  ))}
+                  {document.duplicate_chunks.groups.length > 5 && (
+                    <div className="text-gray-500">
+                      +{document.duplicate_chunks.groups.length - 5} more groups
+                    </div>
+                  )}
+                </div>
+              </details>
+            )}
           </div>
         </div>
 
@@ -263,6 +301,18 @@ export function DocumentItem({ document, onReprocess, onDelete, onAnalyze }: Doc
               title={isAnalyzing ? "Analyzing..." : "Analyze structure"}
             >
               {isAnalyzing ? '⏳' : '🔍'}
+            </button>
+          )}
+
+          {document.status === 'completed' && onRecomputeDuplicates && (
+            <button
+              onClick={handleRecomputeDuplicates}
+              disabled={isRecomputingDup}
+              className="text-gray-400 hover:text-amber-400 p-2 rounded transition-colors disabled:opacity-50"
+              aria-label="Recompute duplicate chunks"
+              title={isRecomputingDup ? 'Recomputing duplicates...' : 'Recompute duplicate chunks'}
+            >
+              {isRecomputingDup ? '⏳' : '🧮'}
             </button>
           )}
 

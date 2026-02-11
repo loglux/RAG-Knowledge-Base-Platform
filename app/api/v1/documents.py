@@ -27,6 +27,7 @@ from app.models.schemas import (
 from app.models.enums import DocumentStatus, FileType
 from app.dependencies import get_current_user_id
 from app.services.document_processor import get_document_processor, DocumentProcessingError
+from app.services.duplicate_chunks import compute_duplicate_chunks_for_document, json_dumps
 
 
 logger = logging.getLogger(__name__)
@@ -51,7 +52,7 @@ async def _check_structure_rate_limit(limit: Optional[int]) -> Optional[int]:
     return None
 
 
-async def _process_document_background(document_id: UUID):
+async def _process_document_background(document_id: UUID, detect_duplicates: bool = False):
     """
     Background task to process a document.
 
@@ -71,7 +72,7 @@ async def _process_document_background(document_id: UUID):
             logger.info(f"[BACKGROUND] Getting document processor...")
             processor = get_document_processor()
             logger.info(f"[BACKGROUND] Calling process_document()...")
-            result = await processor.process_document(document_id, db)
+            result = await processor.process_document(document_id, db, detect_duplicates=detect_duplicates)
             logger.info(f"[BACKGROUND] Background processing completed: {result}")
 
     except Exception as e:
@@ -105,6 +106,7 @@ async def _process_document_background(document_id: UUID):
 async def create_document(
     file: UploadFile = File(...),
     knowledge_base_id: UUID = Form(...),
+    detect_duplicates: bool = Form(False),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: AsyncSession = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_current_user_id),
@@ -237,6 +239,7 @@ async def create_document(
     background_tasks.add_task(
         _process_document_background,
         document_id=doc_model.id,
+        detect_duplicates=detect_duplicates,
     )
     logger.info(f"[UPLOAD] Background task added successfully for document {doc_model.id}")
 
@@ -397,6 +400,7 @@ async def delete_document(
 async def reprocess_document(
     doc_id: UUID,
     background_tasks: BackgroundTasks,
+    detect_duplicates: bool = Query(False, description="Compute duplicate chunks after reprocessing"),
     db: AsyncSession = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_current_user_id),
 ):
@@ -443,6 +447,7 @@ async def reprocess_document(
     background_tasks.add_task(
         _reprocess_document_background,
         document_id=doc_id,
+        detect_duplicates=detect_duplicates,
     )
 
     logger.info(f"Document {doc_id} queued for reprocessing")
@@ -450,7 +455,7 @@ async def reprocess_document(
     return doc
 
 
-async def _reprocess_document_background(document_id: UUID):
+async def _reprocess_document_background(document_id: UUID, detect_duplicates: bool = False):
     """
     Background task to reprocess a document.
 
@@ -462,7 +467,7 @@ async def _reprocess_document_background(document_id: UUID):
 
         async with AsyncSessionLocal() as db:
             processor = get_document_processor()
-            result = await processor.reprocess_document(document_id, db)
+            result = await processor.reprocess_document(document_id, db, detect_duplicates=detect_duplicates)
             logger.info(f"Background reprocessing completed: {result}")
 
     except Exception as e:
@@ -553,6 +558,40 @@ async def get_document_status(
             "chunk_count": 0,
             "error_message": f"Failed to get document status: {str(e)}",
         }
+
+
+@router.post("/{doc_id}/duplicates/recompute", response_model=dict)
+async def recompute_document_duplicates(
+    doc_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """
+    Recompute duplicate chunk analysis for a document (Qdrant payload scan only).
+    Stores summary in document metadata.
+    """
+    query = select(DocumentModel, KnowledgeBaseModel).join(
+        KnowledgeBaseModel,
+        DocumentModel.knowledge_base_id == KnowledgeBaseModel.id,
+    ).where(
+        DocumentModel.id == doc_id,
+        DocumentModel.is_deleted == False,
+    )
+    result = await db.execute(query)
+    row = result.first()
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document {doc_id} not found"
+        )
+
+    doc, kb = row
+    summary = await compute_duplicate_chunks_for_document(doc.id, kb.collection_name)
+    doc.duplicate_chunks_json = json_dumps(summary)
+    await db.commit()
+    await db.refresh(doc)
+
+    return summary
 
 
 @router.post("/{doc_id}/analyze", response_model=dict)
