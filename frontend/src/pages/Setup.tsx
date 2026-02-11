@@ -47,6 +47,7 @@ const Setup: React.FC = () => {
     openai_api_key: '',
     voyage_api_key: '',
     anthropic_api_key: '',
+    deepseek_api_key: '',
     ollama_base_url: '',
   });
 
@@ -210,7 +211,8 @@ const Setup: React.FC = () => {
       // Validate at least one key
       const hasKey = apiKeysData.openai_api_key ||
                      apiKeysData.voyage_api_key ||
-                     apiKeysData.anthropic_api_key;
+                     apiKeysData.anthropic_api_key ||
+                     apiKeysData.deepseek_api_key;
 
       if (!hasKey) {
         throw new Error('At least one API key is required');
@@ -300,7 +302,7 @@ const Setup: React.FC = () => {
               <ul>
                 <li>✓ Admin account for system management</li>
                 <li>✓ Database security (optional)</li>
-                <li>✓ AI providers (OpenAI, Voyage, Anthropic, Ollama)</li>
+                <li>✓ AI providers (OpenAI, Voyage, Anthropic, DeepSeek, Ollama)</li>
                 <li>✓ Database connections (optional)</li>
                 <li>✓ System settings (optional)</li>
               </ul>
@@ -527,6 +529,18 @@ const Setup: React.FC = () => {
                 onChange={(e) => setAPIKeysData({ ...apiKeysData, anthropic_api_key: e.target.value })}
               />
               <small className="form-text">Used for Claude models</small>
+            </div>
+
+            <div className="form-group">
+              <label>DeepSeek API Key (Optional)</label>
+              <input
+                type="password"
+                className="form-control"
+                placeholder="sk-..."
+                value={apiKeysData.deepseek_api_key}
+                onChange={(e) => setAPIKeysData({ ...apiKeysData, deepseek_api_key: e.target.value })}
+              />
+              <small className="form-text">Used for DeepSeek chat and reasoner models</small>
             </div>
 
             <div className="form-group">

@@ -89,10 +89,12 @@ export function SettingsPage() {
   const [openaiApiKey, setOpenaiApiKey] = useState('')
   const [voyageApiKey, setVoyageApiKey] = useState('')
   const [anthropicApiKey, setAnthropicApiKey] = useState('')
+  const [deepseekApiKey, setDeepseekApiKey] = useState('')
   const [ollamaBaseUrl, setOllamaBaseUrl] = useState('')
   const [showOpenaiKey, setShowOpenaiKey] = useState(false)
   const [showVoyageKey, setShowVoyageKey] = useState(false)
   const [showAnthropicKey, setShowAnthropicKey] = useState(false)
+  const [showDeepseekKey, setShowDeepseekKey] = useState(false)
 
   // System Settings (Databases)
   const [qdrantUrl, setQdrantUrl] = useState('')
@@ -189,6 +191,7 @@ export function SettingsPage() {
       if (systemSettings.openai_api_key) setOpenaiApiKey(systemSettings.openai_api_key)
       if (systemSettings.voyage_api_key) setVoyageApiKey(systemSettings.voyage_api_key)
       if (systemSettings.anthropic_api_key) setAnthropicApiKey(systemSettings.anthropic_api_key)
+      if (systemSettings.deepseek_api_key) setDeepseekApiKey(systemSettings.deepseek_api_key)
       if (systemSettings.ollama_base_url) setOllamaBaseUrl(systemSettings.ollama_base_url)
       if (systemSettings.qdrant_url) setQdrantUrl(systemSettings.qdrant_url)
       if (systemSettings.qdrant_api_key) setQdrantApiKey(systemSettings.qdrant_api_key)
@@ -605,6 +608,7 @@ export function SettingsPage() {
       if (openaiApiKey && !openaiApiKey.startsWith('*')) payload.openai_api_key = openaiApiKey
       if (voyageApiKey && !voyageApiKey.startsWith('*')) payload.voyage_api_key = voyageApiKey
       if (anthropicApiKey && !anthropicApiKey.startsWith('*')) payload.anthropic_api_key = anthropicApiKey
+      if (deepseekApiKey && !deepseekApiKey.startsWith('*')) payload.deepseek_api_key = deepseekApiKey
       if (ollamaBaseUrl) payload.ollama_base_url = ollamaBaseUrl
       if (systemName) payload.system_name = systemName
       if (maxFileSizeMb) payload.max_file_size_mb = maxFileSizeMb
@@ -878,6 +882,10 @@ export function SettingsPage() {
             setAnthropicApiKey={setAnthropicApiKey}
             showAnthropicKey={showAnthropicKey}
             setShowAnthropicKey={setShowAnthropicKey}
+            deepseekApiKey={deepseekApiKey}
+            setDeepseekApiKey={setDeepseekApiKey}
+            showDeepseekKey={showDeepseekKey}
+            setShowDeepseekKey={setShowDeepseekKey}
             ollamaBaseUrl={ollamaBaseUrl}
             setOllamaBaseUrl={setOllamaBaseUrl}
             systemName={systemName}
@@ -1738,6 +1746,7 @@ function AIProvidersTab(props: any) {
     openaiApiKey, setOpenaiApiKey, showOpenaiKey, setShowOpenaiKey,
     voyageApiKey, setVoyageApiKey, showVoyageKey, setShowVoyageKey,
     anthropicApiKey, setAnthropicApiKey, showAnthropicKey, setShowAnthropicKey,
+    deepseekApiKey, setDeepseekApiKey, showDeepseekKey, setShowDeepseekKey,
     ollamaBaseUrl, setOllamaBaseUrl,
     systemName, setSystemName,
     maxFileSizeMb, setMaxFileSizeMb,
@@ -1823,6 +1832,28 @@ function AIProvidersTab(props: any) {
           </div>
           <p className="text-xs text-gray-400 mt-1">Used for Claude models</p>
         </div>
+
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">DeepSeek API Key (Optional)</label>
+          <div className="flex gap-2">
+            <input
+              type={showDeepseekKey ? 'text' : 'password'}
+              className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+              placeholder="sk-..."
+              value={deepseekApiKey}
+              onChange={(e) => setDeepseekApiKey(e.target.value)}
+            />
+            <button
+              type="button"
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              onClick={() => setShowDeepseekKey(!showDeepseekKey)}
+            >
+              {showDeepseekKey ? 'Hide' : 'Show'}
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">Used for DeepSeek chat and reasoner models</p>
+        </div>
+
       </div>
 
       {/* Ollama */}

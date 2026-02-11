@@ -13,6 +13,7 @@ class LLMProvider(str, Enum):
     """Supported LLM providers."""
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
+    DEEPSEEK = "deepseek"
     OLLAMA = "ollama"
 
 
@@ -234,6 +235,23 @@ LLM_MODELS = {
         cost_per_million_input_tokens=3.0,
         cost_per_million_output_tokens=15.0,
     ),
+    # DeepSeek
+    "deepseek-chat": LLMModel(
+        provider=LLMProvider.DEEPSEEK,
+        model_name="deepseek-chat",
+        context_window=128000,
+        description="DeepSeek V3.2 (non-thinking mode)",
+        cost_per_million_input_tokens=0.28,
+        cost_per_million_output_tokens=0.42,
+    ),
+    "deepseek-reasoner": LLMModel(
+        provider=LLMProvider.DEEPSEEK,
+        model_name="deepseek-reasoner",
+        context_window=128000,
+        description="DeepSeek V3.2 (thinking mode)",
+        cost_per_million_input_tokens=0.28,
+        cost_per_million_output_tokens=0.42,
+    ),
     # Ollama models (local, free)
     "llama3.1": LLMModel(
         provider=LLMProvider.OLLAMA,
@@ -275,6 +293,18 @@ class LLMResponse(BaseModel):
     input_tokens: Optional[int] = Field(None, description="Input tokens used")
     output_tokens: Optional[int] = Field(None, description="Output tokens generated")
     total_tokens: Optional[int] = Field(None, description="Total tokens")
+    cache_hit_tokens: Optional[int] = Field(
+        None,
+        description="Normalized cache-hit input tokens (provider-specific)",
+    )
+    cache_miss_tokens: Optional[int] = Field(
+        None,
+        description="Normalized cache-miss input tokens (provider-specific)",
+    )
+    cache_create_tokens: Optional[int] = Field(
+        None,
+        description="Tokens used to create cache entries (provider-specific)",
+    )
 
 
 class BaseLLMService(ABC):

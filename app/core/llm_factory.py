@@ -73,6 +73,19 @@ def create_llm_service(
             api_key=anthropic_key,
             model=model or settings.ANTHROPIC_CHAT_MODEL,
         )
+    elif provider_enum == LLMProvider.DEEPSEEK:
+        from app.core.llm_deepseek import DeepSeekLLMService
+        deepseek_key = api_key or settings.DEEPSEEK_API_KEY
+        if not deepseek_key:
+            raise ValueError(
+                "DEEPSEEK_API_KEY not found in settings. "
+                "Please set DEEPSEEK_API_KEY environment variable."
+            )
+        return DeepSeekLLMService(
+            api_key=deepseek_key,
+            model=model or settings.DEEPSEEK_CHAT_MODEL,
+            base_url=settings.DEEPSEEK_BASE_URL,
+        )
     elif provider_enum == LLMProvider.OLLAMA:
         from app.core.llm_ollama import OllamaLLMService
         ollama_url = settings.OLLAMA_BASE_URL
@@ -95,6 +108,8 @@ def _get_default_model_for_provider(provider: LLMProvider) -> str:
         return settings.OPENAI_CHAT_MODEL
     elif provider == LLMProvider.ANTHROPIC:
         return settings.ANTHROPIC_CHAT_MODEL
+    elif provider == LLMProvider.DEEPSEEK:
+        return settings.DEEPSEEK_CHAT_MODEL
     elif provider == LLMProvider.OLLAMA:
         return settings.OLLAMA_CHAT_MODEL
     else:

@@ -146,12 +146,29 @@ class AnthropicLLMService(BaseLLMService):
                 f"(input: {response.usage.input_tokens}, output: {response.usage.output_tokens})"
             )
 
+            cache_hit_tokens = getattr(response.usage, "cache_read_input_tokens", None)
+            cache_create_tokens = getattr(response.usage, "cache_creation_input_tokens", None)
+            cache_miss_tokens = None
+            if response.usage.input_tokens is not None:
+                try:
+                    miss_base = int(response.usage.input_tokens)
+                    if cache_hit_tokens is not None:
+                        miss_base -= int(cache_hit_tokens)
+                    if cache_create_tokens is not None:
+                        miss_base -= int(cache_create_tokens)
+                    cache_miss_tokens = max(miss_base, 0)
+                except (TypeError, ValueError):
+                    cache_miss_tokens = None
+
             return LLMResponse(
                 content=content.strip(),
                 model=self.model,
                 input_tokens=response.usage.input_tokens,
                 output_tokens=response.usage.output_tokens,
                 total_tokens=response.usage.input_tokens + response.usage.output_tokens,
+                cache_hit_tokens=cache_hit_tokens,
+                cache_miss_tokens=cache_miss_tokens,
+                cache_create_tokens=cache_create_tokens,
             )
 
         except RateLimitError as e:

@@ -28,6 +28,7 @@ class APIKeysRequest(BaseModel):
     openai_api_key: Optional[str] = Field(None, description="OpenAI API key")
     voyage_api_key: Optional[str] = Field(None, description="VoyageAI API key")
     anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key")
+    deepseek_api_key: Optional[str] = Field(None, description="DeepSeek API key")
     ollama_base_url: Optional[str] = Field(None, description="Ollama API base URL (e.g., http://localhost:11434)")
 
 
@@ -235,7 +236,13 @@ async def save_api_keys(
     """
     try:
         # Validate at least one provider is configured
-        if not any([request.openai_api_key, request.voyage_api_key, request.anthropic_api_key, request.ollama_base_url]):
+        if not any([
+            request.openai_api_key,
+            request.voyage_api_key,
+            request.anthropic_api_key,
+            request.deepseek_api_key,
+            request.ollama_base_url,
+        ]):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="At least one AI provider (API key or Ollama URL) must be configured"
@@ -247,6 +254,7 @@ async def save_api_keys(
             openai_api_key=request.openai_api_key,
             voyage_api_key=request.voyage_api_key,
             anthropic_api_key=request.anthropic_api_key,
+            deepseek_api_key=request.deepseek_api_key,
             ollama_base_url=request.ollama_base_url,
         )
 

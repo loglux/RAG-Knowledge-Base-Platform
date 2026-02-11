@@ -139,6 +139,19 @@ class OpenAILLMService(BaseLLMService):
             input_tokens = getattr(usage, "input_tokens", None)
             output_tokens = getattr(usage, "output_tokens", None)
             total_tokens = getattr(usage, "total_tokens", None)
+            cached_tokens = None
+            cache_miss_tokens = None
+            if usage is not None:
+                prompt_details = getattr(usage, "prompt_tokens_details", None)
+                input_details = getattr(usage, "input_tokens_details", None)
+                details = prompt_details or input_details
+                if details is not None:
+                    cached_tokens = getattr(details, "cached_tokens", None)
+            if input_tokens is not None and cached_tokens is not None:
+                try:
+                    cache_miss_tokens = max(int(input_tokens) - int(cached_tokens), 0)
+                except (TypeError, ValueError):
+                    cache_miss_tokens = None
 
             logger.debug(
                 f"Generated {len(content)} chars "
@@ -151,6 +164,9 @@ class OpenAILLMService(BaseLLMService):
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
                 total_tokens=total_tokens,
+                cache_hit_tokens=cached_tokens,
+                cache_miss_tokens=cache_miss_tokens,
+                cache_create_tokens=None,
             )
 
         except RateLimitError as e:

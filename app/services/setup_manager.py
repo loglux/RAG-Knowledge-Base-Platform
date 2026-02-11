@@ -123,6 +123,7 @@ class SetupManager:
         openai_api_key: Optional[str] = None,
         voyage_api_key: Optional[str] = None,
         anthropic_api_key: Optional[str] = None,
+        deepseek_api_key: Optional[str] = None,
         ollama_base_url: Optional[str] = None,
         updated_by: Optional[int] = None,
     ) -> None:
@@ -134,6 +135,7 @@ class SetupManager:
             openai_api_key: OpenAI API key (optional)
             voyage_api_key: VoyageAI API key (optional)
             anthropic_api_key: Anthropic API key (optional)
+            deepseek_api_key: DeepSeek API key (optional)
             ollama_base_url: Ollama API base URL (optional)
             updated_by: Admin user ID
 
@@ -173,6 +175,18 @@ class SetupManager:
                     value=anthropic_api_key,
                     category="api",
                     description="Anthropic API key for Claude models",
+                    is_encrypted=False,
+                    updated_by=updated_by,
+                )
+
+            # Save DeepSeek key
+            if deepseek_api_key:
+                await SystemSettingsManager.save_setting(
+                    db=db,
+                    key="deepseek_api_key",
+                    value=deepseek_api_key,
+                    category="api",
+                    description="DeepSeek API key",
                     is_encrypted=False,
                     updated_by=updated_by,
                 )

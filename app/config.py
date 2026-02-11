@@ -102,6 +102,18 @@ class Settings(BaseSettings):
     )
     ANTHROPIC_MAX_TOKENS: int = Field(default=4000, description="Max tokens for Anthropic responses")
 
+    # DeepSeek (optional)
+    DEEPSEEK_API_KEY: Optional[str] = Field(default=None, description="DeepSeek API key (optional)")
+    DEEPSEEK_BASE_URL: str = Field(
+        default="https://api.deepseek.com",
+        description="DeepSeek API base URL"
+    )
+    DEEPSEEK_CHAT_MODEL: str = Field(
+        default="deepseek-chat",
+        description="DeepSeek chat model"
+    )
+    DEEPSEEK_MAX_TOKENS: int = Field(default=8192, description="Max tokens for DeepSeek responses")
+
     # Ollama (optional)
     OLLAMA_BASE_URL: Optional[str] = Field(default=None, description="Ollama API base URL (optional)")
     OLLAMA_EMBEDDING_MODEL: str = Field(
@@ -120,7 +132,7 @@ class Settings(BaseSettings):
     # LLM Provider Selection
     LLM_PROVIDER: str = Field(
         default="openai",
-        description="LLM provider for chat (openai, anthropic, ollama)"
+        description="LLM provider for chat (openai, anthropic, deepseek, ollama)"
     )
 
     # Document Processing

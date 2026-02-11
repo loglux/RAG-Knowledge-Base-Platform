@@ -21,6 +21,7 @@ class SystemSettingsResponse(BaseModel):
     openai_api_key: Optional[str] = Field(None, description="OpenAI API key (masked)")
     voyage_api_key: Optional[str] = Field(None, description="VoyageAI API key (masked)")
     anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key (masked)")
+    deepseek_api_key: Optional[str] = Field(None, description="DeepSeek API key (masked)")
     ollama_base_url: Optional[str] = Field(None, description="Ollama API base URL")
 
     # Database URLs
@@ -41,6 +42,7 @@ class SystemSettingsUpdate(BaseModel):
     openai_api_key: Optional[str] = Field(None, description="OpenAI API key")
     voyage_api_key: Optional[str] = Field(None, description="VoyageAI API key")
     anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key")
+    deepseek_api_key: Optional[str] = Field(None, description="DeepSeek API key")
     ollama_base_url: Optional[str] = Field(None, description="Ollama API base URL")
 
     # Database URLs
@@ -86,6 +88,7 @@ async def get_system_settings(db: AsyncSession = Depends(get_db)):
             openai_api_key=_mask_sensitive(settings_dict.get("openai_api_key")),
             voyage_api_key=_mask_sensitive(settings_dict.get("voyage_api_key")),
             anthropic_api_key=_mask_sensitive(settings_dict.get("anthropic_api_key")),
+            deepseek_api_key=_mask_sensitive(settings_dict.get("deepseek_api_key")),
             ollama_base_url=settings_dict.get("ollama_base_url"),  # Not sensitive
             qdrant_url=settings_dict.get("qdrant_url"),
             qdrant_api_key=_mask_sensitive(settings_dict.get("qdrant_api_key")),
@@ -147,6 +150,17 @@ async def update_system_settings(
                 value=payload.anthropic_api_key,
                 category="api",
                 description="Anthropic API key",
+                is_encrypted=False,
+            )
+            updated_count += 1
+
+        if payload.deepseek_api_key is not None:
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="deepseek_api_key",
+                value=payload.deepseek_api_key,
+                category="api",
+                description="DeepSeek API key",
                 is_encrypted=False,
             )
             updated_count += 1
