@@ -2,7 +2,7 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -181,7 +181,8 @@ async def get_system_settings(db: AsyncSession = Depends(get_db)):
 @router.put("/", response_model=dict)
 async def update_system_settings(
     payload: SystemSettingsUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    request: Request = None,
 ):
     """
     Update system settings (API keys, database URLs, etc.).
@@ -190,6 +191,7 @@ async def update_system_settings(
     """
     try:
         updated_count = 0
+        mcp_updated = False
 
         # Update API keys
         if payload.openai_api_key is not None:
@@ -257,6 +259,7 @@ async def update_system_settings(
                 is_encrypted=False,
             )
             updated_count += 1
+            mcp_updated = True
 
         if payload.mcp_path is not None:
             await SystemSettingsManager.save_setting(
@@ -268,6 +271,7 @@ async def update_system_settings(
                 is_encrypted=False,
             )
             updated_count += 1
+            mcp_updated = True
 
         if payload.mcp_public_base_url is not None:
             await SystemSettingsManager.save_setting(
@@ -279,6 +283,7 @@ async def update_system_settings(
                 is_encrypted=False,
             )
             updated_count += 1
+            mcp_updated = True
 
         if payload.mcp_default_kb_id is not None:
             await SystemSettingsManager.save_setting(
@@ -290,6 +295,7 @@ async def update_system_settings(
                 is_encrypted=False,
             )
             updated_count += 1
+            mcp_updated = True
 
         if payload.mcp_tools_enabled is not None:
             import json
@@ -302,6 +308,7 @@ async def update_system_settings(
                 is_encrypted=False,
             )
             updated_count += 1
+            mcp_updated = True
 
         if payload.mcp_oauth_enabled is not None:
             await SystemSettingsManager.save_setting(
@@ -313,6 +320,7 @@ async def update_system_settings(
                 is_encrypted=False,
             )
             updated_count += 1
+            mcp_updated = True
 
         if payload.mcp_oauth_provider is not None:
             await SystemSettingsManager.save_setting(
@@ -324,6 +332,7 @@ async def update_system_settings(
                 is_encrypted=False,
             )
             updated_count += 1
+            mcp_updated = True
 
         if payload.mcp_oauth_client_id is not None:
             await SystemSettingsManager.save_setting(
@@ -335,6 +344,7 @@ async def update_system_settings(
                 is_encrypted=False,
             )
             updated_count += 1
+            mcp_updated = True
 
         if payload.mcp_oauth_client_secret is not None:
             await SystemSettingsManager.save_setting(
@@ -346,6 +356,7 @@ async def update_system_settings(
                 is_encrypted=False,
             )
             updated_count += 1
+            mcp_updated = True
 
         if payload.mcp_oauth_issuer_url is not None:
             await SystemSettingsManager.save_setting(
@@ -357,6 +368,7 @@ async def update_system_settings(
                 is_encrypted=False,
             )
             updated_count += 1
+            mcp_updated = True
 
         if payload.mcp_access_token_ttl_minutes is not None:
             await SystemSettingsManager.save_setting(
@@ -368,6 +380,7 @@ async def update_system_settings(
                 is_encrypted=False,
             )
             updated_count += 1
+            mcp_updated = True
 
         if payload.mcp_refresh_token_ttl_days is not None:
             await SystemSettingsManager.save_setting(
@@ -379,6 +392,7 @@ async def update_system_settings(
                 is_encrypted=False,
             )
             updated_count += 1
+            mcp_updated = True
 
 
         # Update database URLs
@@ -465,6 +479,13 @@ async def update_system_settings(
         # Reload settings from database to apply changes
         from app.config import load_settings_from_db
         await load_settings_from_db()
+
+        if mcp_updated and request is not None:
+            try:
+                from app.mcp.manager import reload_mcp_routes
+                await reload_mcp_routes(request.app)
+            except Exception as exc:
+                logger.warning("Failed to reload MCP routes: %s", exc)
 
         logger.info(f"Updated {updated_count} system settings")
 

@@ -11,8 +11,7 @@ from app.config import settings
 from app.db.session import close_db
 from app.api.v1 import api_router
 from app.api import oauth
-from app.mcp.server import get_mcp_app
-from app.mcp.middleware import MCPAcceptMiddleware, MCPAuthMiddleware, MCPEnabledMiddleware
+from app.mcp.manager import reload_mcp_routes
 
 # Configure logging
 logging.basicConfig(
@@ -82,42 +81,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
         logger.warning(f"Could not load settings from database: {e}")
         logger.info("Using settings from environment variables")
 
-    mcp_app = None
-    mcp_lifespan = None
-    oauth_enabled = False
-    well_known_routes = []
     try:
-        mcp_app, well_known_routes, oauth_enabled = get_mcp_app()
-        mcp_lifespan = getattr(mcp_app, "lifespan", None)
+        await reload_mcp_routes(app)
     except Exception as exc:
-        logger.warning("Failed to initialize MCP app: %s", exc)
+        logger.warning("Failed to initialize MCP routes: %s", exc)
 
-    if mcp_app:
-        try:
-            mcp_app.add_middleware(MCPEnabledMiddleware)
-            mcp_app.add_middleware(MCPAcceptMiddleware)
-            if not oauth_enabled:
-                mcp_app.add_middleware(MCPAuthMiddleware)
-            if hasattr(mcp_app, "router"):
-                mcp_app.router.redirect_slashes = False
-
-            mount_path = settings.MCP_PATH if settings.MCP_PATH.startswith("/") else f"/{settings.MCP_PATH}"
-            mount_path = mount_path.rstrip("/") or "/mcp"
-
-            if not getattr(app.state, "mcp_mounted", False):
-                app.state.mcp_mounted = True
-                if well_known_routes:
-                    app.router.routes = list(well_known_routes) + list(app.router.routes)
-                app.mount(mount_path, mcp_app)
-                logger.info("Mounted MCP endpoint at %s", mount_path)
-        except Exception as exc:
-            logger.warning("Failed to mount MCP endpoint: %s", exc)
-
-    if mcp_lifespan is not None:
-        async with mcp_lifespan(app):
-            yield
-    else:
-        yield
+    yield
 
     # Shutdown
     logger.info("Shutting down Knowledge Base Platform")
