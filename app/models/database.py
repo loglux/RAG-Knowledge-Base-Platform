@@ -639,6 +639,53 @@ class AdminRefreshToken(Base):
     admin_user: Mapped["AdminUser"] = relationship("AdminUser")
 
 
+class MCPToken(Base):
+    """Bearer tokens for MCP endpoint access."""
+
+    __tablename__ = "mcp_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        nullable=False
+    )
+    admin_user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("admin_users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    name: Mapped[Optional[str]] = mapped_column(
+        String(120),
+        nullable=True,
+        comment="Human-friendly label for the token"
+    )
+    token_hash: Mapped[str] = mapped_column(
+        String(64),
+        unique=True,
+        nullable=False,
+        index=True,
+        comment="SHA256 hash of the token"
+    )
+    token_prefix: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        index=True,
+        comment="Token prefix for display"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    admin_user: Mapped["AdminUser"] = relationship("AdminUser")
+
+
 class SystemSettings(Base):
     """System configuration settings - stores API keys, database URLs, etc."""
 

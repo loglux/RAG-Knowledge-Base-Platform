@@ -36,6 +36,8 @@ import type {
   KBExportRequest,
   KBImportOptions,
   KBImportResponse,
+  MCPToken,
+  MCPTokenCreateResponse,
 } from '../types/index'
 
 const ACCESS_TOKEN_KEY = 'kb_access_token'
@@ -533,6 +535,21 @@ class APIClient {
 
   async updateSystemSettings(payload: any): Promise<any> {
     const response = await this.client.put('/system-settings', payload)
+    return response.data
+  }
+
+  async listMcpTokens(): Promise<MCPToken[]> {
+    const response = await this.client.get<MCPToken[]>('/mcp-tokens/')
+    return response.data
+  }
+
+  async createMcpToken(payload: { name?: string; expires_in_days?: number | null }): Promise<MCPTokenCreateResponse> {
+    const response = await this.client.post<MCPTokenCreateResponse>('/mcp-tokens/', payload)
+    return response.data
+  }
+
+  async revokeMcpToken(tokenId: string): Promise<{ status: string; token_id: string }> {
+    const response = await this.client.delete<{ status: string; token_id: string }>(`/mcp-tokens/${tokenId}`)
     return response.data
   }
 

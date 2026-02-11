@@ -15,6 +15,33 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _coerce_bool(value: Optional[str]) -> Optional[bool]:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _coerce_list(value: Optional[str]) -> Optional[list[str]]:
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        value = value.strip()
+        if not value:
+            return []
+        if value.startswith("["):
+            import json
+            try:
+                return json.loads(value)
+            except Exception:
+                return []
+        return [item.strip() for item in value.split(",") if item.strip()]
+    return None
+
+
 class SystemSettingsResponse(BaseModel):
     """Response with system settings (sensitive values masked)."""
     # API Keys (masked)
@@ -23,6 +50,10 @@ class SystemSettingsResponse(BaseModel):
     anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key (masked)")
     deepseek_api_key: Optional[str] = Field(None, description="DeepSeek API key (masked)")
     ollama_base_url: Optional[str] = Field(None, description="Ollama API base URL")
+    mcp_enabled: Optional[bool] = Field(None, description="Enable MCP endpoint")
+    mcp_path: Optional[str] = Field(None, description="MCP endpoint path")
+    mcp_default_kb_id: Optional[str] = Field(None, description="Default KB for MCP tools")
+    mcp_tools_enabled: Optional[list[str]] = Field(None, description="Enabled MCP tools")
 
     # Database URLs
     qdrant_url: Optional[str] = Field(None, description="Qdrant URL")
@@ -44,6 +75,10 @@ class SystemSettingsUpdate(BaseModel):
     anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key")
     deepseek_api_key: Optional[str] = Field(None, description="DeepSeek API key")
     ollama_base_url: Optional[str] = Field(None, description="Ollama API base URL")
+    mcp_enabled: Optional[bool] = Field(None, description="Enable MCP endpoint")
+    mcp_path: Optional[str] = Field(None, description="MCP endpoint path")
+    mcp_default_kb_id: Optional[str] = Field(None, description="Default KB for MCP tools")
+    mcp_tools_enabled: Optional[list[str]] = Field(None, description="Enabled MCP tools")
 
     # Database URLs
     qdrant_url: Optional[str] = Field(None, description="Qdrant URL")
@@ -90,6 +125,10 @@ async def get_system_settings(db: AsyncSession = Depends(get_db)):
             anthropic_api_key=_mask_sensitive(settings_dict.get("anthropic_api_key")),
             deepseek_api_key=_mask_sensitive(settings_dict.get("deepseek_api_key")),
             ollama_base_url=settings_dict.get("ollama_base_url"),  # Not sensitive
+            mcp_enabled=_coerce_bool(settings_dict.get("mcp_enabled")),
+            mcp_path=settings_dict.get("mcp_path"),
+            mcp_default_kb_id=settings_dict.get("mcp_default_kb_id"),
+            mcp_tools_enabled=_coerce_list(settings_dict.get("mcp_tools_enabled")),
             qdrant_url=settings_dict.get("qdrant_url"),
             qdrant_api_key=_mask_sensitive(settings_dict.get("qdrant_api_key")),
             opensearch_url=settings_dict.get("opensearch_url"),
@@ -172,6 +211,51 @@ async def update_system_settings(
                 value=payload.ollama_base_url,
                 category="api",
                 description="Ollama API base URL",
+                is_encrypted=False,
+            )
+            updated_count += 1
+
+        if payload.mcp_enabled is not None:
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="mcp_enabled",
+                value=str(payload.mcp_enabled).lower(),
+                category="mcp",
+                description="Enable MCP endpoint",
+                is_encrypted=False,
+            )
+            updated_count += 1
+
+        if payload.mcp_path is not None:
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="mcp_path",
+                value=payload.mcp_path,
+                category="mcp",
+                description="MCP endpoint path",
+                is_encrypted=False,
+            )
+            updated_count += 1
+
+        if payload.mcp_default_kb_id is not None:
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="mcp_default_kb_id",
+                value=payload.mcp_default_kb_id,
+                category="mcp",
+                description="Default KB for MCP tools",
+                is_encrypted=False,
+            )
+            updated_count += 1
+
+        if payload.mcp_tools_enabled is not None:
+            import json
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="mcp_tools_enabled",
+                value=json.dumps(payload.mcp_tools_enabled),
+                category="mcp",
+                description="Enabled MCP tools",
                 is_encrypted=False,
             )
             updated_count += 1

@@ -23,6 +23,10 @@ class SystemSettingsManager:
         "anthropic_api_key": "ANTHROPIC_API_KEY",
         "deepseek_api_key": "DEEPSEEK_API_KEY",
         "ollama_base_url": "OLLAMA_BASE_URL",
+        "mcp_enabled": "MCP_ENABLED",
+        "mcp_path": "MCP_PATH",
+        "mcp_default_kb_id": "MCP_DEFAULT_KB_ID",
+        "mcp_tools_enabled": "MCP_TOOLS_ENABLED",
 
         # Database URLs
         "qdrant_url": "QDRANT_URL",

@@ -198,6 +198,43 @@ class Settings(BaseSettings):
         default="change-this-in-production-use-openssl-rand-hex-32",
         description="Secret key for JWT tokens"
     )
+
+    # MCP (Model Context Protocol)
+    MCP_ENABLED: bool = Field(default=False, description="Enable MCP endpoint")
+    MCP_PATH: str = Field(default="/mcp", description="MCP endpoint path")
+    MCP_DEFAULT_KB_ID: Optional[str] = Field(default=None, description="Default knowledge base ID for MCP tools")
+    MCP_TOOLS_ENABLED: List[str] = Field(
+        default=[
+            "rag_query",
+            "list_knowledge_bases",
+            "list_documents",
+            "retrieve_chunks",
+            "get_kb_retrieval_settings",
+            "set_kb_retrieval_settings",
+            "clear_kb_retrieval_settings",
+        ],
+        description="Enabled MCP tool names"
+    )
+
+    @field_validator("MCP_TOOLS_ENABLED", mode="before")
+    @classmethod
+    def _parse_mcp_tools(cls, v):
+        if v is None:
+            return v
+        if isinstance(v, list):
+            return v
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return []
+            if v.startswith("["):
+                try:
+                    import json
+                    return json.loads(v)
+                except Exception:
+                    pass
+            return [item.strip() for item in v.split(",") if item.strip()]
+        return v
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, description="Access token expiration in minutes")
     ALGORITHM: str = Field(default="HS256", description="JWT algorithm")
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=30, description="Refresh token expiration in days")
@@ -283,6 +320,14 @@ class Settings(BaseSettings):
                     value = float(value)
                 elif field_type == bool:
                     value = value.lower() in ("true", "1", "yes") if isinstance(value, str) else bool(value)
+                elif getattr(field_type, "__origin__", None) is list:
+                    if isinstance(value, str):
+                        value = value.strip()
+                        if value.startswith("["):
+                            import json
+                            value = json.loads(value)
+                        else:
+                            value = [item.strip() for item in value.split(",") if item.strip()]
 
                 setattr(self, key, value)
 

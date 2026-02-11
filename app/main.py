@@ -10,6 +10,8 @@ from fastapi.responses import JSONResponse
 from app.config import settings
 from app.db.session import close_db
 from app.api.v1 import api_router
+from app.mcp.server import get_mcp_app
+from app.mcp.middleware import MCPAuthMiddleware
 
 # Configure logging
 logging.basicConfig(
@@ -109,6 +111,15 @@ app.add_middleware(
 # Include API router
 app.include_router(api_router, prefix=settings.API_PREFIX)
 
+# MCP endpoint (mounted separately, uses its own auth middleware)
+try:
+    mcp_app = get_mcp_app()
+    mcp_app.add_middleware(MCPAuthMiddleware)
+    mount_path = settings.MCP_PATH if settings.MCP_PATH.startswith("/") else f"/{settings.MCP_PATH}"
+    app.mount(mount_path, mcp_app)
+    logger.info("Mounted MCP endpoint at %s", mount_path)
+except Exception as exc:
+    logger.warning("Failed to mount MCP endpoint: %s", exc)
 
 @app.get("/", tags=["root"])
 async def root():

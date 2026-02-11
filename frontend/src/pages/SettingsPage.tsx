@@ -10,10 +10,21 @@ import type {
   PromptVersionDetail,
   PromptVersionSummary,
   SelfCheckPromptVersionDetail,
-  SelfCheckPromptVersionSummary
+  SelfCheckPromptVersionSummary,
+  MCPToken
 } from '../types/index'
 
-type TabType = 'query' | 'kb-defaults' | 'ai-providers' | 'databases' | 'prompts' | 'kb-transfer'
+const MCP_TOOL_OPTIONS = [
+  { id: 'rag_query', label: 'rag_query' },
+  { id: 'list_knowledge_bases', label: 'list_knowledge_bases' },
+  { id: 'list_documents', label: 'list_documents' },
+  { id: 'retrieve_chunks', label: 'retrieve_chunks' },
+  { id: 'get_kb_retrieval_settings', label: 'get_kb_retrieval_settings' },
+  { id: 'set_kb_retrieval_settings', label: 'set_kb_retrieval_settings' },
+  { id: 'clear_kb_retrieval_settings', label: 'clear_kb_retrieval_settings' },
+]
+
+type TabType = 'query' | 'kb-defaults' | 'ai-providers' | 'databases' | 'prompts' | 'kb-transfer' | 'mcp'
 
 export function SettingsPage() {
   const navigate = useNavigate()
@@ -111,6 +122,16 @@ export function SettingsPage() {
   const [systemName, setSystemName] = useState('')
   const [maxFileSizeMb, setMaxFileSizeMb] = useState(50)
 
+  // MCP Settings
+  const [mcpEnabled, setMcpEnabled] = useState(false)
+  const [mcpPath, setMcpPath] = useState('/mcp')
+  const [mcpDefaultKbId, setMcpDefaultKbId] = useState('')
+  const [mcpToolsEnabled, setMcpToolsEnabled] = useState<string[]>(MCP_TOOL_OPTIONS.map((t) => t.id))
+  const [mcpTokens, setMcpTokens] = useState<MCPToken[]>([])
+  const [mcpTokenName, setMcpTokenName] = useState('')
+  const [mcpTokenTTL, setMcpTokenTTL] = useState<number | ''>('')
+  const [mcpCreatedToken, setMcpCreatedToken] = useState<string | null>(null)
+
   // KB Transfer
   const [kbList, setKbList] = useState<KnowledgeBase[]>([])
   const [kbTransferLoading, setKbTransferLoading] = useState(false)
@@ -144,6 +165,11 @@ export function SettingsPage() {
   useEffect(() => {
     if (activeTab !== 'kb-transfer') return
     loadKbList()
+  }, [activeTab])
+
+  useEffect(() => {
+    if (activeTab !== 'mcp') return
+    loadMcpTokens()
   }, [activeTab])
 
   const loadAllSettings = async () => {
@@ -193,6 +219,14 @@ export function SettingsPage() {
       if (systemSettings.anthropic_api_key) setAnthropicApiKey(systemSettings.anthropic_api_key)
       if (systemSettings.deepseek_api_key) setDeepseekApiKey(systemSettings.deepseek_api_key)
       if (systemSettings.ollama_base_url) setOllamaBaseUrl(systemSettings.ollama_base_url)
+      if (systemSettings.mcp_enabled !== null && systemSettings.mcp_enabled !== undefined) {
+        setMcpEnabled(systemSettings.mcp_enabled)
+      }
+      if (systemSettings.mcp_path) setMcpPath(systemSettings.mcp_path)
+      if (systemSettings.mcp_default_kb_id) setMcpDefaultKbId(systemSettings.mcp_default_kb_id)
+      if (systemSettings.mcp_tools_enabled && Array.isArray(systemSettings.mcp_tools_enabled)) {
+        setMcpToolsEnabled(systemSettings.mcp_tools_enabled)
+      }
       if (systemSettings.qdrant_url) setQdrantUrl(systemSettings.qdrant_url)
       if (systemSettings.qdrant_api_key) setQdrantApiKey(systemSettings.qdrant_api_key)
       if (systemSettings.opensearch_url) setOpensearchUrl(systemSettings.opensearch_url)
@@ -255,6 +289,76 @@ export function SettingsPage() {
       setError(err instanceof Error ? err.message : 'Failed to load knowledge bases')
     } finally {
       setKbTransferLoading(false)
+    }
+  }
+
+  const loadMcpTokens = async () => {
+    try {
+      const tokens = await apiClient.listMcpTokens()
+      setMcpTokens(tokens)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load MCP tokens')
+    }
+  }
+
+  const handleSaveMcpSettings = async () => {
+    try {
+      setSaving(true)
+      setError(null)
+      setSuccess(null)
+
+      const payload: any = {
+        mcp_enabled: mcpEnabled,
+        mcp_path: mcpPath,
+        mcp_default_kb_id: mcpDefaultKbId || null,
+        mcp_tools_enabled: mcpToolsEnabled,
+      }
+
+      await apiClient.updateSystemSettings(payload)
+      setSuccess('MCP settings saved')
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save MCP settings')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleCreateMcpToken = async () => {
+    try {
+      setSaving(true)
+      setError(null)
+      setSuccess(null)
+      const payload: any = {
+        name: mcpTokenName || undefined,
+        expires_in_days: mcpTokenTTL === '' ? undefined : Number(mcpTokenTTL),
+      }
+      const result = await apiClient.createMcpToken(payload)
+      setMcpCreatedToken(result.token)
+      setMcpTokenName('')
+      setMcpTokenTTL('')
+      await loadMcpTokens()
+      setSuccess('Token created')
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create MCP token')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleRevokeMcpToken = async (tokenId: string) => {
+    try {
+      setSaving(true)
+      setError(null)
+      await apiClient.revokeMcpToken(tokenId)
+      await loadMcpTokens()
+      setSuccess('Token revoked')
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to revoke MCP token')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -793,6 +897,16 @@ export function SettingsPage() {
         >
           KB Transfer
         </button>
+        <button
+          onClick={() => setActiveTab('mcp')}
+          className={`px-6 py-3 font-medium whitespace-nowrap border-b-2 transition-colors ${
+            activeTab === 'mcp'
+              ? 'border-primary-500 text-primary-500'
+              : 'border-transparent text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          MCP
+        </button>
       </div>
 
       {/* Alerts */}
@@ -986,6 +1100,30 @@ export function SettingsPage() {
             importing={importingKbArchive}
           />
         )}
+
+        {activeTab === 'mcp' && (
+          <MCPSettingsTab
+            mcpEnabled={mcpEnabled}
+            setMcpEnabled={setMcpEnabled}
+            mcpPath={mcpPath}
+            setMcpPath={setMcpPath}
+            mcpDefaultKbId={mcpDefaultKbId}
+            setMcpDefaultKbId={setMcpDefaultKbId}
+            mcpToolsEnabled={mcpToolsEnabled}
+            setMcpToolsEnabled={setMcpToolsEnabled}
+            mcpTokens={mcpTokens}
+            mcpTokenName={mcpTokenName}
+            setMcpTokenName={setMcpTokenName}
+            mcpTokenTTL={mcpTokenTTL}
+            setMcpTokenTTL={setMcpTokenTTL}
+            mcpCreatedToken={mcpCreatedToken}
+            setMcpCreatedToken={setMcpCreatedToken}
+            onSave={handleSaveMcpSettings}
+            onCreateToken={handleCreateMcpToken}
+            onRevokeToken={handleRevokeMcpToken}
+            saving={saving}
+          />
+        )}
       </div>
     </div>
   )
@@ -1039,6 +1177,194 @@ type KBTransferTabProps = {
   exporting: boolean
   exportingChatsMd: boolean
   importing: boolean
+}
+
+type MCPSettingsTabProps = {
+  mcpEnabled: boolean
+  setMcpEnabled: (value: boolean) => void
+  mcpPath: string
+  setMcpPath: (value: string) => void
+  mcpDefaultKbId: string
+  setMcpDefaultKbId: (value: string) => void
+  mcpToolsEnabled: string[]
+  setMcpToolsEnabled: (value: string[]) => void
+  mcpTokens: MCPToken[]
+  mcpTokenName: string
+  setMcpTokenName: (value: string) => void
+  mcpTokenTTL: number | ''
+  setMcpTokenTTL: (value: number | '') => void
+  mcpCreatedToken: string | null
+  setMcpCreatedToken: (value: string | null) => void
+  onSave: () => void
+  onCreateToken: () => void
+  onRevokeToken: (tokenId: string) => void
+  saving: boolean
+}
+
+function MCPSettingsTab(props: MCPSettingsTabProps) {
+  const {
+    mcpEnabled,
+    setMcpEnabled,
+    mcpPath,
+    setMcpPath,
+    mcpDefaultKbId,
+    setMcpDefaultKbId,
+    mcpToolsEnabled,
+    setMcpToolsEnabled,
+    mcpTokens,
+    mcpTokenName,
+    setMcpTokenName,
+    mcpTokenTTL,
+    setMcpTokenTTL,
+    mcpCreatedToken,
+    setMcpCreatedToken,
+    onSave,
+    onCreateToken,
+    onRevokeToken,
+    saving,
+  } = props
+
+  const endpointUrl =
+    typeof window !== 'undefined' ? `${window.location.origin}${mcpPath.startsWith('/') ? mcpPath : `/${mcpPath}`}` : mcpPath
+
+  const toggleTool = (toolId: string) => {
+    if (mcpToolsEnabled.includes(toolId)) {
+      setMcpToolsEnabled(mcpToolsEnabled.filter((t) => t !== toolId))
+    } else {
+      setMcpToolsEnabled([...mcpToolsEnabled, toolId])
+    }
+  }
+
+  const handleCopyToken = async () => {
+    if (!mcpCreatedToken) return
+    try {
+      await navigator.clipboard.writeText(mcpCreatedToken)
+    } catch {
+      // ignore
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-white mb-2">MCP</h2>
+        <p className="text-gray-400">Expose RAG as a FastMCP server for AuthMCP Gateway</p>
+      </div>
+
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 space-y-4">
+        <div className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            checked={mcpEnabled}
+            onChange={(e) => setMcpEnabled(e.target.checked)}
+          />
+          <span className="text-gray-200">Enable MCP endpoint</span>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">MCP Endpoint Path</label>
+          <input
+            type="text"
+            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            value={mcpPath}
+            onChange={(e) => setMcpPath(e.target.value)}
+          />
+          <p className="text-xs text-gray-400 mt-1">Changing this requires server restart</p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">Default KB ID (Optional)</label>
+          <input
+            type="text"
+            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            placeholder="UUID"
+            value={mcpDefaultKbId}
+            onChange={(e) => setMcpDefaultKbId(e.target.value)}
+          />
+        </div>
+
+        <div className="text-sm text-gray-300">
+          Endpoint: <span className="text-gray-100">{endpointUrl}</span>
+        </div>
+
+        <div className="flex justify-end">
+          <Button variant="primary" onClick={onSave} disabled={saving}>
+            {saving ? 'Saving...' : 'Save MCP Settings'}
+          </Button>
+        </div>
+      </div>
+
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 space-y-3">
+        <h3 className="text-lg font-semibold text-gray-100">Available Tools</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          {MCP_TOOL_OPTIONS.map((tool) => (
+            <label key={tool.id} className="flex items-center gap-2 text-gray-300">
+              <input
+                type="checkbox"
+                checked={mcpToolsEnabled.includes(tool.id)}
+                onChange={() => toggleTool(tool.id)}
+              />
+              <span>{tool.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 space-y-4">
+        <h3 className="text-lg font-semibold text-gray-100">MCP Tokens</h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <input
+            type="text"
+            className="px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            placeholder="Token name"
+            value={mcpTokenName}
+            onChange={(e) => setMcpTokenName(e.target.value)}
+          />
+          <input
+            type="number"
+            className="px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            placeholder="TTL days (optional)"
+            value={mcpTokenTTL}
+            onChange={(e) => setMcpTokenTTL(e.target.value === '' ? '' : Number(e.target.value))}
+          />
+          <Button variant="primary" onClick={onCreateToken} disabled={saving}>
+            {saving ? 'Creating...' : 'Create Token'}
+          </Button>
+        </div>
+
+        {mcpCreatedToken && (
+          <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
+            <div className="text-sm text-gray-300 mb-2">Token (shown once)</div>
+            <div className="font-mono text-sm text-gray-100 break-all">{mcpCreatedToken}</div>
+            <div className="mt-3 flex gap-2">
+              <Button variant="secondary" onClick={handleCopyToken}>Copy</Button>
+              <Button variant="secondary" onClick={() => setMcpCreatedToken(null)}>Dismiss</Button>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {mcpTokens.length === 0 && (
+            <div className="text-sm text-gray-400">No tokens yet</div>
+          )}
+          {mcpTokens.map((token) => (
+            <div key={token.id} className="flex items-center justify-between bg-gray-900 rounded-lg p-3 border border-gray-700">
+              <div className="text-sm text-gray-200">
+                <div className="font-mono">prefix: {token.token_prefix}</div>
+                <div className="text-gray-400">{token.name || 'Unnamed token'}</div>
+                {token.expires_at && <div className="text-gray-400">expires: {token.expires_at}</div>}
+                {token.revoked_at && <div className="text-red-300">revoked: {token.revoked_at}</div>}
+              </div>
+              <Button variant="secondary" onClick={() => onRevokeToken(token.id)} disabled={saving}>
+                Revoke
+              </Button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 const KBTransferTab: React.FC<KBTransferTabProps> = ({

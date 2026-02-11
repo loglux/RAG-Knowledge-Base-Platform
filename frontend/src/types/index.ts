@@ -468,3 +468,18 @@ export interface SettingsMetadata {
   bm25_match_modes: string[]
   bm25_analyzers: string[]
 }
+
+export interface MCPToken {
+  id: string
+  name?: string | null
+  token_prefix: string
+  created_at: string
+  expires_at?: string | null
+  revoked_at?: string | null
+  last_used_at?: string | null
+}
+
+export interface MCPTokenCreateResponse {
+  token: string
+  record: MCPToken
+}
