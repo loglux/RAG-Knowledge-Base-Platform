@@ -553,6 +553,11 @@ class APIClient {
     return response.data
   }
 
+  async deleteMcpToken(tokenId: string): Promise<{ status: string; token_id: string }> {
+    const response = await this.client.delete<{ status: string; token_id: string }>(`/mcp-tokens/${tokenId}/purge`)
+    return response.data
+  }
+
   async changePostgresPassword(username: string, newPassword: string): Promise<any> {
     const response = await this.client.post('/system-settings/postgres-password', {
       username,

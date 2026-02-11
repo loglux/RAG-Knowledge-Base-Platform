@@ -15,13 +15,13 @@ import type {
 } from '../types/index'
 
 const MCP_TOOL_OPTIONS = [
-  { id: 'rag_query', label: 'rag_query' },
-  { id: 'list_knowledge_bases', label: 'list_knowledge_bases' },
-  { id: 'list_documents', label: 'list_documents' },
-  { id: 'retrieve_chunks', label: 'retrieve_chunks' },
-  { id: 'get_kb_retrieval_settings', label: 'get_kb_retrieval_settings' },
-  { id: 'set_kb_retrieval_settings', label: 'set_kb_retrieval_settings' },
-  { id: 'clear_kb_retrieval_settings', label: 'clear_kb_retrieval_settings' },
+  { id: 'rag_query', label: 'rag_query', description: 'Answer a question with RAG + sources.' },
+  { id: 'list_knowledge_bases', label: 'list_knowledge_bases', description: 'List available knowledge bases.' },
+  { id: 'list_documents', label: 'list_documents', description: 'List documents for a knowledge base.' },
+  { id: 'retrieve_chunks', label: 'retrieve_chunks', description: 'Retrieve relevant chunks without generation.' },
+  { id: 'get_kb_retrieval_settings', label: 'get_kb_retrieval_settings', description: 'Read KB retrieval settings.' },
+  { id: 'set_kb_retrieval_settings', label: 'set_kb_retrieval_settings', description: 'Update KB retrieval settings.' },
+  { id: 'clear_kb_retrieval_settings', label: 'clear_kb_retrieval_settings', description: 'Clear KB retrieval settings.' },
 ]
 
 type TabType = 'query' | 'kb-defaults' | 'ai-providers' | 'databases' | 'prompts' | 'kb-transfer' | 'mcp'
@@ -106,6 +106,7 @@ export function SettingsPage() {
   const [showVoyageKey, setShowVoyageKey] = useState(false)
   const [showAnthropicKey, setShowAnthropicKey] = useState(false)
   const [showDeepseekKey, setShowDeepseekKey] = useState(false)
+
 
   // System Settings (Databases)
   const [qdrantUrl, setQdrantUrl] = useState('')
@@ -357,6 +358,22 @@ export function SettingsPage() {
       setTimeout(() => setSuccess(null), 3000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to revoke MCP token')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeleteMcpToken = async (tokenId: string) => {
+    if (!window.confirm('Delete this token permanently? This cannot be undone.')) return
+    try {
+      setSaving(true)
+      setError(null)
+      await apiClient.deleteMcpToken(tokenId)
+      await loadMcpTokens()
+      setSuccess('Token deleted')
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete MCP token')
     } finally {
       setSaving(false)
     }
@@ -1121,6 +1138,7 @@ export function SettingsPage() {
             onSave={handleSaveMcpSettings}
             onCreateToken={handleCreateMcpToken}
             onRevokeToken={handleRevokeMcpToken}
+            onDeleteToken={handleDeleteMcpToken}
             saving={saving}
           />
         )}
@@ -1198,6 +1216,7 @@ type MCPSettingsTabProps = {
   onSave: () => void
   onCreateToken: () => void
   onRevokeToken: (tokenId: string) => void
+  onDeleteToken: (tokenId: string) => void
   saving: boolean
 }
 
@@ -1221,11 +1240,13 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
     onSave,
     onCreateToken,
     onRevokeToken,
+    onDeleteToken,
     saving,
   } = props
+  const [copySuccess, setCopySuccess] = useState<string | null>(null)
 
-  const endpointUrl =
-    typeof window !== 'undefined' ? `${window.location.origin}${mcpPath.startsWith('/') ? mcpPath : `/${mcpPath}`}` : mcpPath
+  const endpointBackend = import.meta.env.VITE_API_BASE_URL
+  const endpointProxy = `${window.location.origin}${mcpPath.startsWith('/') ? mcpPath : `/${mcpPath}`}`
 
   const toggleTool = (toolId: string) => {
     if (mcpToolsEnabled.includes(toolId)) {
@@ -1238,9 +1259,26 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
   const handleCopyToken = async () => {
     if (!mcpCreatedToken) return
     try {
-      await navigator.clipboard.writeText(mcpCreatedToken)
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(mcpCreatedToken)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = mcpCreatedToken
+        textarea.style.position = 'fixed'
+        textarea.style.top = '0'
+        textarea.style.left = '0'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.focus()
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+      }
+      setCopySuccess('Copied')
+      setTimeout(() => setCopySuccess(null), 2000)
     } catch {
-      // ignore
+      setCopySuccess('Copy failed')
+      setTimeout(() => setCopySuccess(null), 2000)
     }
   }
 
@@ -1283,8 +1321,19 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
           />
         </div>
 
-        <div className="text-sm text-gray-300">
-          Endpoint: <span className="text-gray-100">{endpointUrl}</span>
+        <div className="text-sm text-gray-300 space-y-1">
+          {endpointBackend && (
+            <div>
+              Backend endpoint:{' '}
+              <span className="text-gray-100">
+                {`${endpointBackend}${mcpPath.startsWith('/') ? mcpPath : `/${mcpPath}`}`}
+              </span>
+            </div>
+          )}
+          <div>
+            Proxy endpoint:{' '}
+            <span className="text-gray-100">{endpointProxy}</span>
+          </div>
         </div>
 
         <div className="flex justify-end">
@@ -1298,13 +1347,16 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
         <h3 className="text-lg font-semibold text-gray-100">Available Tools</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {MCP_TOOL_OPTIONS.map((tool) => (
-            <label key={tool.id} className="flex items-center gap-2 text-gray-300">
+            <label key={tool.id} className="flex items-start gap-2 text-gray-300" title={tool.description}>
               <input
                 type="checkbox"
                 checked={mcpToolsEnabled.includes(tool.id)}
                 onChange={() => toggleTool(tool.id)}
               />
-              <span>{tool.label}</span>
+              <span className="flex flex-col">
+                <span>{tool.label}</span>
+                <span className="text-xs text-gray-400">{tool.description}</span>
+              </span>
             </label>
           ))}
         </div>
@@ -1339,6 +1391,7 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
             <div className="font-mono text-sm text-gray-100 break-all">{mcpCreatedToken}</div>
             <div className="mt-3 flex gap-2">
               <Button variant="secondary" onClick={handleCopyToken}>Copy</Button>
+              {copySuccess && <span className="text-xs text-gray-400 self-center">{copySuccess}</span>}
               <Button variant="secondary" onClick={() => setMcpCreatedToken(null)}>Dismiss</Button>
             </div>
           </div>
@@ -1356,9 +1409,14 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
                 {token.expires_at && <div className="text-gray-400">expires: {token.expires_at}</div>}
                 {token.revoked_at && <div className="text-red-300">revoked: {token.revoked_at}</div>}
               </div>
-              <Button variant="secondary" onClick={() => onRevokeToken(token.id)} disabled={saving}>
-                Revoke
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="secondary" onClick={() => onRevokeToken(token.id)} disabled={saving}>
+                  Revoke
+                </Button>
+                <Button variant="secondary" onClick={() => onDeleteToken(token.id)} disabled={saving}>
+                  Delete
+                </Button>
+              </div>
             </div>
           ))}
         </div>

@@ -260,6 +260,7 @@ async def update_system_settings(
             )
             updated_count += 1
 
+
         # Update database URLs
         if payload.qdrant_url is not None:
             await SystemSettingsManager.save_setting(

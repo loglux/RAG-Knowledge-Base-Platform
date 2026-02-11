@@ -1,7 +1,7 @@
 # Web Framework
 fastapi==0.109.0
-uvicorn[standard]==0.27.0
-python-multipart==0.0.6
+uvicorn[standard]==0.35.0
+python-multipart==0.0.9
 
 # Database - SQLAlchemy with async support
 sqlalchemy[asyncio]==2.0.25
@@ -43,8 +43,8 @@ numpy==1.26.3
 scikit-learn==1.4.0
 
 # Utilities
-python-dotenv==1.0.1
+python-dotenv==1.1.0
 tenacity==8.2.3
-httpx==0.26.0
+httpx==0.28.1
 langchain-text-splitters==1.1.0
-mcp>=1.2.0
+fastmcp==2.14.5

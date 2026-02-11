@@ -11,6 +11,7 @@ from app.db.session import get_db
 from app.dependencies import get_current_admin_id
 from app.services.mcp_tokens import (
     create_mcp_token,
+    delete_mcp_token,
     list_mcp_tokens,
     revoke_mcp_token,
 )
@@ -94,3 +95,15 @@ async def revoke_token(
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
     return {"status": "revoked", "token_id": str(token_id)}
+
+
+@router.delete("/{token_id}/purge", response_model=dict)
+async def delete_token(
+    token_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    admin_id: int = Depends(get_current_admin_id),
+):
+    ok = await delete_mcp_token(db, token_id)
+    if not ok:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
+    return {"status": "deleted", "token_id": str(token_id)}

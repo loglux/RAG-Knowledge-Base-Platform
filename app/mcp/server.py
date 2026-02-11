@@ -7,7 +7,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 from app.config import settings
 from app.db.session import get_db_session
@@ -77,12 +77,7 @@ def _format_sources(sources: List[Dict[str, Any]]) -> str:
 
 
 def build_mcp_app() -> FastMCP:
-    mcp = FastMCP(
-        "RAG MCP Server",
-        stateless_http=True,
-        json_response=True,
-        streamable_http_path="/",
-    )
+    mcp = FastMCP("RAG MCP Server")
 
     @mcp.tool()
     async def rag_query(
@@ -341,8 +336,5 @@ def build_mcp_app() -> FastMCP:
 
 def get_mcp_app():
     mcp = build_mcp_app()
-    if hasattr(mcp, "streamable_http_app"):
-        return mcp.streamable_http_app()
-    if hasattr(mcp, "http_app"):
-        return mcp.http_app()
-    raise RuntimeError("FastMCP does not expose an HTTP app factory")
+    # Use root path so mounting at /mcp exposes /mcp (not /mcp/mcp).
+    return mcp.http_app(path="/", stateless_http=True, json_response=True)

@@ -41,3 +41,28 @@ class MCPAuthMiddleware(BaseHTTPMiddleware):
 
         request.state.mcp_admin_id = record.admin_user_id
         return await call_next(request)
+
+
+class MCPAcceptMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next) -> Response:
+        accept = request.headers.get("accept")
+        if accept is None:
+            normalized = ""
+        else:
+            normalized = accept.lower()
+
+        want_json = "application/json" in normalized
+        want_sse = "text/event-stream" in normalized
+
+        if not want_json or not want_sse:
+            headers = [(k, v) for (k, v) in request.scope.get("headers", []) if k.lower() != b"accept"]
+            merged = []
+            if accept:
+                merged.append(accept)
+            if not want_json:
+                merged.append("application/json")
+            if not want_sse:
+                merged.append("text/event-stream")
+            headers.append((b"accept", ", ".join(merged).encode("utf-8")))
+            request.scope["headers"] = headers
+        return await call_next(request)
