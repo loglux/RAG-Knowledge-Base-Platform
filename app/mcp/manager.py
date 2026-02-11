@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from starlette.routing import BaseRoute, Mount
 
 from app.config import settings
-from app.mcp.middleware import MCPAcceptMiddleware, MCPAuthMiddleware, MCPEnabledMiddleware
+from app.mcp.middleware import MCPAcceptMiddleware, MCPAuthMiddleware
 from app.mcp.server import get_mcp_app
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,6 @@ async def reload_mcp_routes(app: FastAPI) -> None:
         return
 
     try:
-        mcp_app.add_middleware(MCPEnabledMiddleware)
         mcp_app.add_middleware(MCPAcceptMiddleware)
         if not oauth_enabled:
             mcp_app.add_middleware(MCPAuthMiddleware)
