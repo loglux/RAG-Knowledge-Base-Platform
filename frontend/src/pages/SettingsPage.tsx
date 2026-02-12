@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { apiClient } from '../services/api'
 import { LLMSelector } from '../components/chat/LLMSelector'
@@ -31,6 +31,7 @@ type TabType = 'query' | 'kb-defaults' | 'ai-providers' | 'databases' | 'prompts
 
 export function SettingsPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { logout } = useAuth()
   const [activeTab, setActiveTab] = useState<TabType>('query')
 
@@ -177,6 +178,23 @@ export function SettingsPage() {
   useEffect(() => {
     loadAllSettings()
   }, [])
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const tab = params.get('tab') as TabType | null
+    if (!tab) return
+    const allowed: TabType[] = ['query', 'kb-defaults', 'ai-providers', 'databases', 'prompts', 'kb-transfer', 'mcp']
+    if (allowed.includes(tab) && tab !== activeTab) {
+      setActiveTab(tab)
+    }
+  }, [location.search, activeTab])
+
+  const handleTabSelect = (tab: TabType) => {
+    setActiveTab(tab)
+    const params = new URLSearchParams(location.search)
+    params.set('tab', tab)
+    navigate({ search: params.toString() }, { replace: true })
+  }
 
   useEffect(() => {
     if (activeTab !== 'kb-transfer') return
@@ -952,7 +970,7 @@ export function SettingsPage() {
       {/* Tab Navigation */}
       <div className="flex gap-2 border-b border-gray-700 mb-6 overflow-x-auto">
         <button
-          onClick={() => setActiveTab('query')}
+          onClick={() => handleTabSelect('query')}
           className={`px-6 py-3 font-medium whitespace-nowrap border-b-2 transition-colors ${
             activeTab === 'query'
               ? 'border-primary-500 text-primary-500'
@@ -962,7 +980,7 @@ export function SettingsPage() {
           Query Defaults
         </button>
         <button
-          onClick={() => setActiveTab('kb-defaults')}
+          onClick={() => handleTabSelect('kb-defaults')}
           className={`px-6 py-3 font-medium whitespace-nowrap border-b-2 transition-colors ${
             activeTab === 'kb-defaults'
               ? 'border-primary-500 text-primary-500'
@@ -972,7 +990,7 @@ export function SettingsPage() {
           KB Defaults
         </button>
         <button
-          onClick={() => setActiveTab('ai-providers')}
+          onClick={() => handleTabSelect('ai-providers')}
           className={`px-6 py-3 font-medium whitespace-nowrap border-b-2 transition-colors ${
             activeTab === 'ai-providers'
               ? 'border-primary-500 text-primary-500'
@@ -982,7 +1000,7 @@ export function SettingsPage() {
           AI Providers
         </button>
         <button
-          onClick={() => setActiveTab('databases')}
+          onClick={() => handleTabSelect('databases')}
           className={`px-6 py-3 font-medium whitespace-nowrap border-b-2 transition-colors ${
             activeTab === 'databases'
               ? 'border-primary-500 text-primary-500'
@@ -992,7 +1010,7 @@ export function SettingsPage() {
           Databases
         </button>
         <button
-          onClick={() => setActiveTab('prompts')}
+          onClick={() => handleTabSelect('prompts')}
           className={`px-6 py-3 font-medium whitespace-nowrap border-b-2 transition-colors ${
             activeTab === 'prompts'
               ? 'border-primary-500 text-primary-500'
@@ -1002,7 +1020,7 @@ export function SettingsPage() {
           Prompts
         </button>
         <button
-          onClick={() => setActiveTab('kb-transfer')}
+          onClick={() => handleTabSelect('kb-transfer')}
           className={`px-6 py-3 font-medium whitespace-nowrap border-b-2 transition-colors ${
             activeTab === 'kb-transfer'
               ? 'border-primary-500 text-primary-500'
@@ -1012,7 +1030,7 @@ export function SettingsPage() {
           KB Transfer
         </button>
         <button
-          onClick={() => setActiveTab('mcp')}
+          onClick={() => handleTabSelect('mcp')}
           className={`px-6 py-3 font-medium whitespace-nowrap border-b-2 transition-colors ${
             activeTab === 'mcp'
               ? 'border-primary-500 text-primary-500'
