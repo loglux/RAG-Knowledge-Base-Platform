@@ -1246,7 +1246,6 @@ export function SettingsPage() {
             mcpOAuthPassword={mcpOAuthPassword}
             setMcpOAuthPassword={setMcpOAuthPassword}
             mcpOAuthIssued={mcpOAuthIssued}
-            setMcpOAuthIssued={setMcpOAuthIssued}
             onSave={handleSaveMcpSettings}
             onCreateToken={handleCreateMcpToken}
             onRevokeToken={handleRevokeMcpToken}
@@ -1348,7 +1347,6 @@ type MCPSettingsTabProps = {
   mcpOAuthPassword: string
   setMcpOAuthPassword: (value: string) => void
   mcpOAuthIssued: OAuthTokenResponse | null
-  setMcpOAuthIssued: (value: OAuthTokenResponse | null) => void
   mcpOAuthEvents: MCPOAuthEvent[]
   mcpOAuthEventsLimit: number
   setMcpOAuthEventsLimit: (value: number) => void
@@ -1396,7 +1394,6 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
     mcpOAuthPassword,
     setMcpOAuthPassword,
     mcpOAuthIssued,
-    setMcpOAuthIssued,
     mcpOAuthEvents,
     mcpOAuthEventsLimit,
     setMcpOAuthEventsLimit,
