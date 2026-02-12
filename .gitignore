@@ -152,6 +152,7 @@ logs/
 docs/
 !docs/PRODUCTION_DEPLOYMENT.md
 !docs/GRAPH_PLAN.md
+docs/MCP_SECURITY_TEST_PLAN.local.md
 examples/
 scripts/
 !scripts/backup.sh

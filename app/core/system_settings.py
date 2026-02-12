@@ -25,8 +25,10 @@ class SystemSettingsManager:
         "ollama_base_url": "OLLAMA_BASE_URL",
         "mcp_enabled": "MCP_ENABLED",
         "mcp_path": "MCP_PATH",
+        "mcp_public_base_url": "MCP_PUBLIC_BASE_URL",
         "mcp_default_kb_id": "MCP_DEFAULT_KB_ID",
         "mcp_tools_enabled": "MCP_TOOLS_ENABLED",
+        "mcp_auth_mode": "MCP_AUTH_MODE",
         "mcp_access_token_ttl_minutes": "MCP_ACCESS_TOKEN_TTL_MINUTES",
         "mcp_refresh_token_ttl_days": "MCP_REFRESH_TOKEN_TTL_DAYS",
 

@@ -136,11 +136,6 @@ async def verify_mcp_token(db: AsyncSession, token: str) -> Optional[MCPToken]:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         token_type = payload.get("type")
-        if token_type == MCP_ACCESS_TOKEN_TYPE:
-            admin_id = payload.get("sub")
-            if not admin_id:
-                return None
-            return SimpleNamespace(admin_user_id=int(admin_id))
         if token_type != MCP_TOKEN_TYPE:
             return None
     except JWTError:
@@ -158,6 +153,19 @@ async def verify_mcp_token(db: AsyncSession, token: str) -> Optional[MCPToken]:
     record.last_used_at = datetime.utcnow()
     await db.commit()
     return record
+
+
+async def verify_mcp_access_token(token: str) -> Optional[SimpleNamespace]:
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("type") != MCP_ACCESS_TOKEN_TYPE:
+            return None
+        admin_id = payload.get("sub")
+        if not admin_id:
+            return None
+        return SimpleNamespace(admin_user_id=int(admin_id))
+    except JWTError:
+        return None
 
 
 async def store_mcp_refresh_token(

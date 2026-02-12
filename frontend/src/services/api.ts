@@ -39,6 +39,7 @@ import type {
   MCPToken,
   MCPTokenCreateResponse,
   MCPRefreshToken,
+  MCPOAuthEvent,
   OAuthTokenResponse,
 } from '../types/index'
 
@@ -561,6 +562,13 @@ class APIClient {
 
   async listMcpRefreshTokens(): Promise<MCPRefreshToken[]> {
     const response = await this.client.get<MCPRefreshToken[]>('/mcp-refresh-tokens/')
+    return response.data
+  }
+
+  async listMcpOAuthEvents(limit = 20): Promise<MCPOAuthEvent[]> {
+    const response = await this.client.get<MCPOAuthEvent[]>('/mcp-oauth-events/', {
+      params: { limit }
+    })
     return response.data
   }
 

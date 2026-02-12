@@ -13,6 +13,7 @@ import type {
   SelfCheckPromptVersionSummary,
   MCPToken,
   MCPRefreshToken,
+  MCPOAuthEvent,
   OAuthTokenResponse
 } from '../types/index'
 
@@ -128,8 +129,10 @@ export function SettingsPage() {
   // MCP Settings
   const [mcpEnabled, setMcpEnabled] = useState(false)
   const [mcpPath, setMcpPath] = useState('/mcp')
+  const [mcpPublicBaseUrl, setMcpPublicBaseUrl] = useState('')
   const [mcpDefaultKbId, setMcpDefaultKbId] = useState('')
   const [mcpToolsEnabled, setMcpToolsEnabled] = useState<string[]>(MCP_TOOL_OPTIONS.map((t) => t.id))
+  const [mcpAuthMode, setMcpAuthMode] = useState<'bearer' | 'refresh' | 'oauth2'>('bearer')
   const [mcpTokens, setMcpTokens] = useState<MCPToken[]>([])
   const [mcpTokenName, setMcpTokenName] = useState('')
   const [mcpTokenTTL, setMcpTokenTTL] = useState<number | ''>('')
@@ -141,6 +144,9 @@ export function SettingsPage() {
   const [mcpOAuthPassword, setMcpOAuthPassword] = useState('')
   const [mcpOAuthIssued, setMcpOAuthIssued] = useState<OAuthTokenResponse | null>(null)
   const [mcpOAuthLoading, setMcpOAuthLoading] = useState(false)
+  const [mcpOAuthEvents, setMcpOAuthEvents] = useState<MCPOAuthEvent[]>([])
+  const [mcpOAuthEventsLimit, setMcpOAuthEventsLimit] = useState(20)
+  const [mcpOAuthEventsFilter, setMcpOAuthEventsFilter] = useState('all')
 
   // KB Transfer
   const [kbList, setKbList] = useState<KnowledgeBase[]>([])
@@ -181,7 +187,8 @@ export function SettingsPage() {
     if (activeTab !== 'mcp') return
     loadMcpTokens()
     loadMcpRefreshTokens()
-  }, [activeTab])
+    loadMcpOAuthEvents()
+  }, [activeTab, mcpOAuthEventsLimit])
 
   const loadAllSettings = async () => {
     try {
@@ -234,9 +241,16 @@ export function SettingsPage() {
         setMcpEnabled(systemSettings.mcp_enabled)
       }
       if (systemSettings.mcp_path) setMcpPath(systemSettings.mcp_path)
+      if (systemSettings.mcp_public_base_url) setMcpPublicBaseUrl(systemSettings.mcp_public_base_url)
       if (systemSettings.mcp_default_kb_id) setMcpDefaultKbId(systemSettings.mcp_default_kb_id)
       if (systemSettings.mcp_tools_enabled && Array.isArray(systemSettings.mcp_tools_enabled)) {
         setMcpToolsEnabled(systemSettings.mcp_tools_enabled)
+      }
+      if (systemSettings.mcp_auth_mode) {
+        const mode = String(systemSettings.mcp_auth_mode).toLowerCase()
+        if (mode === 'bearer' || mode === 'refresh' || mode === 'oauth2') {
+          setMcpAuthMode(mode)
+        }
       }
       if (systemSettings.qdrant_url) setQdrantUrl(systemSettings.qdrant_url)
       if (systemSettings.qdrant_api_key) setQdrantApiKey(systemSettings.qdrant_api_key)
@@ -327,6 +341,15 @@ export function SettingsPage() {
     }
   }
 
+  const loadMcpOAuthEvents = async () => {
+    try {
+      const events = await apiClient.listMcpOAuthEvents(mcpOAuthEventsLimit)
+      setMcpOAuthEvents(events)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load MCP OAuth events')
+    }
+  }
+
   const handleSaveMcpSettings = async () => {
     try {
       setSaving(true)
@@ -336,8 +359,10 @@ export function SettingsPage() {
       const payload: any = {
         mcp_enabled: mcpEnabled,
         mcp_path: mcpPath,
+        mcp_public_base_url: mcpPublicBaseUrl || null,
         mcp_default_kb_id: mcpDefaultKbId || null,
         mcp_tools_enabled: mcpToolsEnabled,
+        mcp_auth_mode: mcpAuthMode,
       }
       if (mcpAccessTokenTtlMinutes !== '') {
         payload.mcp_access_token_ttl_minutes = Number(mcpAccessTokenTtlMinutes)
@@ -1191,18 +1216,22 @@ export function SettingsPage() {
         )}
 
         {activeTab === 'mcp' && (
-          <MCPSettingsTab
-            mcpEnabled={mcpEnabled}
-            setMcpEnabled={setMcpEnabled}
-            mcpPath={mcpPath}
-            setMcpPath={setMcpPath}
-            mcpDefaultKbId={mcpDefaultKbId}
-            setMcpDefaultKbId={setMcpDefaultKbId}
-            mcpToolsEnabled={mcpToolsEnabled}
-            setMcpToolsEnabled={setMcpToolsEnabled}
-            mcpTokens={mcpTokens}
-            mcpTokenName={mcpTokenName}
-            setMcpTokenName={setMcpTokenName}
+            <MCPSettingsTab
+              mcpEnabled={mcpEnabled}
+              setMcpEnabled={setMcpEnabled}
+              mcpPath={mcpPath}
+              setMcpPath={setMcpPath}
+              mcpPublicBaseUrl={mcpPublicBaseUrl}
+              setMcpPublicBaseUrl={setMcpPublicBaseUrl}
+              mcpDefaultKbId={mcpDefaultKbId}
+              setMcpDefaultKbId={setMcpDefaultKbId}
+              mcpToolsEnabled={mcpToolsEnabled}
+              setMcpToolsEnabled={setMcpToolsEnabled}
+              mcpAuthMode={mcpAuthMode}
+              setMcpAuthMode={setMcpAuthMode}
+              mcpTokens={mcpTokens}
+              mcpTokenName={mcpTokenName}
+              setMcpTokenName={setMcpTokenName}
             mcpTokenTTL={mcpTokenTTL}
             setMcpTokenTTL={setMcpTokenTTL}
             mcpCreatedToken={mcpCreatedToken}
@@ -1226,6 +1255,12 @@ export function SettingsPage() {
             onRevokeRefreshToken={handleRevokeRefreshToken}
             saving={saving}
             oauthLoading={mcpOAuthLoading}
+            mcpOAuthEvents={mcpOAuthEvents}
+            mcpOAuthEventsLimit={mcpOAuthEventsLimit}
+            setMcpOAuthEventsLimit={setMcpOAuthEventsLimit}
+            mcpOAuthEventsFilter={mcpOAuthEventsFilter}
+            setMcpOAuthEventsFilter={setMcpOAuthEventsFilter}
+            onRefreshOAuthEvents={loadMcpOAuthEvents}
           />
         )}
       </div>
@@ -1288,10 +1323,14 @@ type MCPSettingsTabProps = {
   setMcpEnabled: (value: boolean) => void
   mcpPath: string
   setMcpPath: (value: string) => void
+  mcpPublicBaseUrl: string
+  setMcpPublicBaseUrl: (value: string) => void
   mcpDefaultKbId: string
   setMcpDefaultKbId: (value: string) => void
   mcpToolsEnabled: string[]
   setMcpToolsEnabled: (value: string[]) => void
+  mcpAuthMode: 'bearer' | 'refresh' | 'oauth2'
+  setMcpAuthMode: (value: 'bearer' | 'refresh' | 'oauth2') => void
   mcpTokens: MCPToken[]
   mcpTokenName: string
   setMcpTokenName: (value: string) => void
@@ -1310,6 +1349,12 @@ type MCPSettingsTabProps = {
   setMcpOAuthPassword: (value: string) => void
   mcpOAuthIssued: OAuthTokenResponse | null
   setMcpOAuthIssued: (value: OAuthTokenResponse | null) => void
+  mcpOAuthEvents: MCPOAuthEvent[]
+  mcpOAuthEventsLimit: number
+  setMcpOAuthEventsLimit: (value: number) => void
+  mcpOAuthEventsFilter: string
+  setMcpOAuthEventsFilter: (value: string) => void
+  onRefreshOAuthEvents: () => void
   onSave: () => void
   onCreateToken: () => void
   onRevokeToken: (tokenId: string) => void
@@ -1326,10 +1371,14 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
     setMcpEnabled,
     mcpPath,
     setMcpPath,
+    mcpPublicBaseUrl,
+    setMcpPublicBaseUrl,
     mcpDefaultKbId,
     setMcpDefaultKbId,
     mcpToolsEnabled,
     setMcpToolsEnabled,
+    mcpAuthMode,
+    setMcpAuthMode,
     mcpTokens,
     mcpTokenName,
     setMcpTokenName,
@@ -1348,6 +1397,12 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
     setMcpOAuthPassword,
     mcpOAuthIssued,
     setMcpOAuthIssued,
+    mcpOAuthEvents,
+    mcpOAuthEventsLimit,
+    setMcpOAuthEventsLimit,
+    mcpOAuthEventsFilter,
+    setMcpOAuthEventsFilter,
+    onRefreshOAuthEvents,
     onSave,
     onCreateToken,
     onRevokeToken,
@@ -1359,8 +1414,12 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
   } = props
   const [copySuccess, setCopySuccess] = useState<string | null>(null)
 
-  const endpointBackend = import.meta.env.VITE_API_BASE_URL
   const endpointProxy = `${window.location.origin}${mcpPath.startsWith('/') ? mcpPath : `/${mcpPath}`}`
+  const mcpPathNormalized = mcpPath.startsWith('/') ? mcpPath : `/${mcpPath}`
+  let normalizedBaseUrl = mcpPublicBaseUrl.trim().replace(/\/$/, '')
+  if (normalizedBaseUrl.endsWith(mcpPathNormalized)) {
+    normalizedBaseUrl = normalizedBaseUrl.slice(0, -mcpPathNormalized.length).replace(/\/$/, '')
+  }
 
   const toggleTool = (toolId: string) => {
     if (mcpToolsEnabled.includes(toolId)) {
@@ -1457,6 +1516,20 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
         </div>
 
         <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">Public API Base URL</label>
+          <input
+            type="text"
+            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            placeholder="https://rag.example.com"
+            value={mcpPublicBaseUrl}
+            onChange={(e) => setMcpPublicBaseUrl(e.target.value)}
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Used for OAuth metadata and endpoint display. Leave empty to rely on proxy URL.
+          </p>
+        </div>
+
+        <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">Default KB ID (Optional)</label>
           <input
             type="text"
@@ -1468,17 +1541,42 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
         </div>
 
         <div className="text-sm text-gray-300 space-y-1">
-          {endpointBackend && (
+          {normalizedBaseUrl && (
             <div>
-              Backend endpoint:{' '}
+              MCP endpoint:{' '}
               <span className="text-gray-100">
-                {`${endpointBackend}${mcpPath.startsWith('/') ? mcpPath : `/${mcpPath}`}`}
+                {`${normalizedBaseUrl}${mcpPath.startsWith('/') ? mcpPath : `/${mcpPath}`}`}
               </span>
             </div>
           )}
           <div>
             Proxy endpoint:{' '}
             <span className="text-gray-100">{endpointProxy}</span>
+          </div>
+        </div>
+
+        <div className="pt-2 space-y-2">
+          <div className="text-sm font-medium text-gray-300">MCP Auth Mode</div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {[
+              { value: 'bearer', label: 'Bearer', help: 'Static MCP tokens (AuthMCP).' },
+              { value: 'refresh', label: 'Refresh Token', help: 'Access + refresh tokens (AuthMCP).' },
+              { value: 'oauth2', label: 'OAuth2 PKCE', help: 'Direct clients with authorization code flow.' },
+            ].map((mode) => (
+              <label key={mode.value} className="flex items-start gap-2 text-gray-300">
+                <input
+                  type="radio"
+                  name="mcpAuthMode"
+                  value={mode.value}
+                  checked={mcpAuthMode === mode.value}
+                  onChange={() => setMcpAuthMode(mode.value as 'bearer' | 'refresh' | 'oauth2')}
+                />
+                <span className="flex flex-col">
+                  <span className="font-medium">{mode.label}</span>
+                  <span className="text-xs text-gray-400">{mode.help}</span>
+                </span>
+              </label>
+            ))}
           </div>
         </div>
 
@@ -1508,8 +1606,9 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
         </div>
       </div>
 
-      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 space-y-4">
-        <h3 className="text-lg font-semibold text-gray-100">MCP Tokens</h3>
+      {mcpAuthMode === 'bearer' && (
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 space-y-4">
+          <h3 className="text-lg font-semibold text-gray-100">MCP Tokens</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <input
@@ -1566,9 +1665,11 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
             </div>
           ))}
         </div>
-      </div>
+        </div>
+      )}
 
-      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 space-y-4">
+      {mcpAuthMode === 'refresh' && (
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 space-y-4">
         <div>
           <h3 className="text-lg font-semibold text-gray-100">OAuth (Gateway)</h3>
           <p className="text-sm text-gray-400">
@@ -1672,7 +1773,99 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
             </div>
           ))}
         </div>
-      </div>
+        </div>
+      )}
+
+      {mcpAuthMode === 'oauth2' && (
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 space-y-3">
+          <h3 className="text-lg font-semibold text-gray-100">OAuth2 (PKCE)</h3>
+          <p className="text-sm text-gray-400">
+            Direct clients use Authorization Code + PKCE to obtain access tokens.
+          </p>
+          <div className="text-sm text-gray-300 space-y-1">
+            {normalizedBaseUrl && (
+              <div>
+                Authorize URL:{' '}
+                <span className="text-gray-100">{`${normalizedBaseUrl}/authorize`}</span>
+              </div>
+            )}
+            {normalizedBaseUrl && (
+              <div>
+                Token URL:{' '}
+                <span className="text-gray-100">{`${normalizedBaseUrl}/token`}</span>
+              </div>
+            )}
+            {!normalizedBaseUrl && (
+              <div className="text-gray-400">
+                Set Public API Base URL to show OAuth endpoints.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {mcpAuthMode !== 'bearer' && (
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 space-y-3">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-100">Recent OAuth Events</h3>
+            <p className="text-sm text-gray-400">Last successful OAuth activity.</p>
+          </div>
+          <div className="flex flex-wrap gap-3 items-end">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Filter</label>
+              <select
+                className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                value={mcpOAuthEventsFilter}
+                onChange={(e) => setMcpOAuthEventsFilter(e.target.value)}
+              >
+                <option value="all">All</option>
+                <option value="authorize">authorize</option>
+                <option value="token">token</option>
+                <option value="refresh">refresh</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Limit</label>
+              <select
+                className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                value={mcpOAuthEventsLimit}
+                onChange={(e) => setMcpOAuthEventsLimit(Number(e.target.value))}
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+            <Button variant="secondary" onClick={onRefreshOAuthEvents}>
+              Refresh
+            </Button>
+          </div>
+          {mcpOAuthEvents.length === 0 && (
+            <div className="text-sm text-gray-400">No OAuth events recorded yet.</div>
+          )}
+          {mcpOAuthEvents.length > 0 && (
+            <div className="space-y-2">
+              {mcpOAuthEvents
+                .filter((event) => mcpOAuthEventsFilter === 'all' || event.event_type === mcpOAuthEventsFilter)
+                .map((event) => (
+                <div key={event.id} className="bg-gray-900 rounded-lg p-3 border border-gray-700 text-sm text-gray-200">
+                  <div className="flex flex-wrap gap-2 text-gray-300">
+                    <span className="font-semibold">{event.event_type}</span>
+                    {event.admin_username && <span>admin: {event.admin_username}</span>}
+                    {event.client_id && <span>client: {event.client_id}</span>}
+                    {event.ip_address && <span>ip: {event.ip_address}</span>}
+                  </div>
+                  <div className="text-gray-400">time: {formatDateTime(event.created_at)}</div>
+                  {event.user_agent && (
+                    <div className="text-gray-500 break-words">ua: {event.user_agent}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

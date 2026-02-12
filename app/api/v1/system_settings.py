@@ -52,8 +52,10 @@ class SystemSettingsResponse(BaseModel):
     ollama_base_url: Optional[str] = Field(None, description="Ollama API base URL")
     mcp_enabled: Optional[bool] = Field(None, description="Enable MCP endpoint")
     mcp_path: Optional[str] = Field(None, description="MCP endpoint path")
+    mcp_public_base_url: Optional[str] = Field(None, description="Public base URL for MCP")
     mcp_default_kb_id: Optional[str] = Field(None, description="Default KB for MCP tools")
     mcp_tools_enabled: Optional[list[str]] = Field(None, description="Enabled MCP tools")
+    mcp_auth_mode: Optional[str] = Field(None, description="MCP auth mode (bearer | refresh | oauth2)")
     mcp_access_token_ttl_minutes: Optional[int] = Field(None, description="MCP OAuth access token TTL (minutes)")
     mcp_refresh_token_ttl_days: Optional[int] = Field(None, description="MCP OAuth refresh token TTL (days)")
 
@@ -79,8 +81,10 @@ class SystemSettingsUpdate(BaseModel):
     ollama_base_url: Optional[str] = Field(None, description="Ollama API base URL")
     mcp_enabled: Optional[bool] = Field(None, description="Enable MCP endpoint")
     mcp_path: Optional[str] = Field(None, description="MCP endpoint path")
+    mcp_public_base_url: Optional[str] = Field(None, description="Public base URL for MCP")
     mcp_default_kb_id: Optional[str] = Field(None, description="Default KB for MCP tools")
     mcp_tools_enabled: Optional[list[str]] = Field(None, description="Enabled MCP tools")
+    mcp_auth_mode: Optional[str] = Field(None, description="MCP auth mode (bearer | refresh | oauth2)")
     mcp_access_token_ttl_minutes: Optional[int] = Field(None, description="MCP OAuth access token TTL (minutes)")
     mcp_refresh_token_ttl_days: Optional[int] = Field(None, description="MCP OAuth refresh token TTL (days)")
 
@@ -131,8 +135,10 @@ async def get_system_settings(db: AsyncSession = Depends(get_db)):
             ollama_base_url=settings_dict.get("ollama_base_url"),  # Not sensitive
             mcp_enabled=_coerce_bool(settings_dict.get("mcp_enabled")),
             mcp_path=settings_dict.get("mcp_path"),
+            mcp_public_base_url=settings_dict.get("mcp_public_base_url"),
             mcp_default_kb_id=settings_dict.get("mcp_default_kb_id"),
             mcp_tools_enabled=_coerce_list(settings_dict.get("mcp_tools_enabled")),
+            mcp_auth_mode=settings_dict.get("mcp_auth_mode"),
             mcp_access_token_ttl_minutes=(
                 int(settings_dict.get("mcp_access_token_ttl_minutes"))
                 if settings_dict.get("mcp_access_token_ttl_minutes") is not None
@@ -255,6 +261,18 @@ async def update_system_settings(
             updated_count += 1
             mcp_updated = True
 
+        if payload.mcp_public_base_url is not None:
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="mcp_public_base_url",
+                value=payload.mcp_public_base_url,
+                category="mcp",
+                description="Public base URL for MCP endpoints",
+                is_encrypted=False,
+            )
+            updated_count += 1
+            mcp_updated = True
+
         if payload.mcp_default_kb_id is not None:
             await SystemSettingsManager.save_setting(
                 db=db,
@@ -275,6 +293,18 @@ async def update_system_settings(
                 value=json.dumps(payload.mcp_tools_enabled),
                 category="mcp",
                 description="Enabled MCP tools",
+                is_encrypted=False,
+            )
+            updated_count += 1
+            mcp_updated = True
+
+        if payload.mcp_auth_mode is not None:
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="mcp_auth_mode",
+                value=payload.mcp_auth_mode,
+                category="mcp",
+                description="MCP auth mode (bearer | refresh | oauth2)",
                 is_encrypted=False,
             )
             updated_count += 1

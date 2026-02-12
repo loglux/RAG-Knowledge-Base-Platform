@@ -136,8 +136,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include OAuth router (no API prefix)
+# Include OAuth routers (no API prefix)
 app.include_router(oauth.router)
+app.include_router(oauth.public_router)
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_PREFIX)

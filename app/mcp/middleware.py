@@ -9,7 +9,7 @@ from starlette.responses import JSONResponse, Response
 from app.config import settings
 from app.db.session import get_db_session
 from app.core.system_settings import SystemSettingsManager
-from app.services.mcp_tokens import verify_mcp_token
+from app.services.mcp_tokens import verify_mcp_token, verify_mcp_access_token
 
 
 async def _get_mcp_enabled() -> bool:
@@ -18,6 +18,14 @@ async def _get_mcp_enabled() -> bool:
     if raw is None:
         return bool(settings.MCP_ENABLED)
     return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+async def _get_mcp_auth_mode() -> str:
+    async with get_db_session() as db:
+        raw = await SystemSettingsManager.get_setting(db, "mcp_auth_mode")
+    if raw is None or not str(raw).strip():
+        return (settings.MCP_AUTH_MODE or "bearer").strip().lower()
+    return str(raw).strip().lower()
 
 
 class MCPAuthMiddleware(BaseHTTPMiddleware):
@@ -33,8 +41,12 @@ class MCPAuthMiddleware(BaseHTTPMiddleware):
         if not token:
             return JSONResponse({"detail": "Unauthorized"}, status_code=401)
 
-        async with get_db_session() as db:
-            record = await verify_mcp_token(db, token)
+        mode = await _get_mcp_auth_mode()
+        if mode == "bearer":
+            async with get_db_session() as db:
+                record = await verify_mcp_token(db, token)
+        else:
+            record = await verify_mcp_access_token(token)
 
         if record is None:
             return JSONResponse({"detail": "Unauthorized"}, status_code=401)

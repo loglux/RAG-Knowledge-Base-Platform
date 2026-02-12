@@ -499,3 +499,14 @@ export interface MCPRefreshToken {
   expires_at: string
   revoked_at?: string | null
 }
+
+export interface MCPOAuthEvent {
+  id: string
+  event_type: string
+  client_id?: string | null
+  admin_user_id?: number | null
+  admin_username?: string | null
+  ip_address?: string | null
+  user_agent?: string | null
+  created_at: string
+}

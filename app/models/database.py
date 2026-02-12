@@ -711,6 +711,72 @@ class MCPRefreshToken(Base):
     admin_user: Mapped["AdminUser"] = relationship("AdminUser")
 
 
+class MCPAuthCode(Base):
+    """Authorization codes for MCP OAuth2 (PKCE) flow."""
+
+    __tablename__ = "mcp_auth_codes"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        nullable=False
+    )
+    admin_user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("admin_users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
+    )
+    client_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    redirect_uri: Mapped[str] = mapped_column(String(2048), nullable=False)
+    code_hash: Mapped[str] = mapped_column(
+        String(64),
+        unique=True,
+        nullable=False,
+        index=True,
+        comment="SHA256 hash of the authorization code"
+    )
+    code_challenge: Mapped[str] = mapped_column(String(255), nullable=False)
+    code_challenge_method: Mapped[str] = mapped_column(String(16), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    admin_user: Mapped["AdminUser"] = relationship("AdminUser")
+
+
+class MCPAuthEvent(Base):
+    """Audit events for MCP OAuth flows."""
+
+    __tablename__ = "mcp_auth_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        nullable=False
+    )
+    admin_user_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("admin_users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
+    event_type: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        index=True,
+        comment="authorize | token | refresh"
+    )
+    client_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    user_agent: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+    admin_user: Mapped[Optional["AdminUser"]] = relationship("AdminUser")
+
+
 class SystemSettings(Base):
     """System configuration settings - stores API keys, database URLs, etc."""
 

@@ -202,6 +202,10 @@ class Settings(BaseSettings):
     # MCP (Model Context Protocol)
     MCP_ENABLED: bool = Field(default=False, description="Enable MCP endpoint")
     MCP_PATH: str = Field(default="/mcp", description="MCP endpoint path")
+    MCP_PUBLIC_BASE_URL: Optional[str] = Field(
+        default=None,
+        description="Public base URL for MCP (scheme+host, optional path prefix)"
+    )
     MCP_DEFAULT_KB_ID: Optional[str] = Field(default=None, description="Default knowledge base ID for MCP tools")
     MCP_TOOLS_ENABLED: List[str] = Field(
         default=[
@@ -214,6 +218,10 @@ class Settings(BaseSettings):
             "clear_kb_retrieval_settings",
         ],
         description="Enabled MCP tool names"
+    )
+    MCP_AUTH_MODE: str = Field(
+        default="bearer",
+        description="MCP auth mode: bearer | refresh | oauth2"
     )
 
     @field_validator("MCP_TOOLS_ENABLED", mode="before")
