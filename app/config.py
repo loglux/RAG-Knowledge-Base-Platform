@@ -387,6 +387,13 @@ async def load_settings_from_db() -> None:
                 # Update global settings instance
                 settings.update_from_dict(merged)
 
+                # Reset cached services so they pick up new settings (e.g., API keys)
+                try:
+                    from app.services.rag import close_rag_service
+                    await close_rag_service()
+                except Exception:
+                    pass
+
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.info("Settings loaded from database and applied")

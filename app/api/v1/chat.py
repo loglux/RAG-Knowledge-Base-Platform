@@ -200,7 +200,7 @@ async def chat_query(
 
         # Resolve BM25 settings (request > KB override > global defaults > hard defaults)
         settings_result = await db.execute(select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1))
-        app_settings = settings_result.scalar_one_or_none()
+        app_settings_row = settings_result.scalar_one_or_none()
         bm25_defaults = _bm25_defaults()
 
         def _resolve_bm25(field: str):
@@ -210,8 +210,8 @@ async def chat_query(
             kb_val = getattr(kb, field, None)
             if kb_val is not None:
                 return kb_val
-            if app_settings is not None:
-                app_val = getattr(app_settings, field, None)
+            if app_settings_row is not None:
+                app_val = getattr(app_settings_row, field, None)
                 if app_val is not None:
                     return app_val
             return bm25_defaults[field]
@@ -220,6 +220,8 @@ async def chat_query(
         bm25_min_should_match = _resolve_bm25("bm25_min_should_match")
         bm25_use_phrase = _resolve_bm25("bm25_use_phrase")
         bm25_analyzer = _resolve_bm25("bm25_analyzer")
+        llm_provider = request.llm_provider or (app_settings_row.llm_provider if app_settings_row else None)
+        llm_model = request.llm_model or (app_settings_row.llm_model if app_settings_row else None)
 
         rag_response = await rag_service.query(
             question=request.question,
@@ -238,8 +240,8 @@ async def chat_query(
             max_tokens=request.max_tokens,
             max_context_chars=request.max_context_chars,
             score_threshold=request.score_threshold,
-            llm_model=request.llm_model,
-            llm_provider=request.llm_provider,
+            llm_model=llm_model,
+            llm_provider=llm_provider,
             conversation_history=history_dicts,
             use_structure=request.use_structure,
             use_mmr=request.use_mmr,
@@ -260,8 +262,8 @@ async def chat_query(
                 "temperature": request.temperature,
                 "max_context_chars": request.max_context_chars,
                 "score_threshold": request.score_threshold,
-                "llm_model": request.llm_model,
-                "llm_provider": request.llm_provider,
+                "llm_model": llm_model,
+                "llm_provider": llm_provider,
                 "use_structure": request.use_structure,
                 "retrieval_mode": request.retrieval_mode,
                 "lexical_top_k": request.lexical_top_k,

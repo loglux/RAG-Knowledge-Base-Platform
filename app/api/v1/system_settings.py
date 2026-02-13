@@ -420,6 +420,13 @@ async def update_system_settings(
         from app.config import load_settings_from_db
         await load_settings_from_db()
 
+        # Ensure cached LLM services pick up new settings (e.g., API keys)
+        try:
+            from app.services.rag import close_rag_service
+            await close_rag_service()
+        except Exception:
+            pass
+
         if mcp_updated:
             try:
                 from app.mcp.manager import reload_mcp_routes
