@@ -550,6 +550,11 @@ class APIClient {
     return response.data
   }
 
+  async testProviderKey(payload: { provider: string; api_key?: string | null; base_url?: string | null }): Promise<any> {
+    const response = await this.client.post('/system-settings/test-provider', payload)
+    return response.data
+  }
+
   async listMcpTokens(): Promise<MCPToken[]> {
     const response = await this.client.get<MCPToken[]>('/mcp-tokens/')
     return response.data

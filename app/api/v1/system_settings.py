@@ -5,6 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
+import httpx
 
 from app.db.session import get_db
 from app.core.system_settings import SystemSettingsManager
@@ -106,6 +107,21 @@ class PostgresPasswordUpdate(BaseModel):
     new_password: str = Field(..., min_length=8, description="New password (min 8 characters)")
 
 
+class ProviderTestRequest(BaseModel):
+    """Test connectivity for a provider API key/base URL."""
+    provider: str = Field(..., description="Provider name: openai|anthropic|deepseek|voyage|ollama")
+    api_key: Optional[str] = Field(None, description="API key to test (optional, uses stored key if omitted)")
+    base_url: Optional[str] = Field(None, description="Base URL override for providers that support it")
+
+
+class ProviderTestResponse(BaseModel):
+    """Result of provider connectivity test."""
+    provider: str
+    success: bool
+    status_code: int
+    message: str
+
+
 def _mask_sensitive(value: Optional[str], show_chars: int = 4) -> Optional[str]:
     """Mask sensitive value, showing only last N characters."""
     if not value:
@@ -113,6 +129,28 @@ def _mask_sensitive(value: Optional[str], show_chars: int = 4) -> Optional[str]:
     if len(value) <= show_chars:
         return "*" * len(value)
     return "*" * (len(value) - show_chars) + value[-show_chars:]
+
+
+def _is_masked(value: Optional[str]) -> bool:
+    if not value:
+        return False
+    return "*" in value
+
+
+async def _resolve_provider_key(db: AsyncSession, provider: str, api_key: Optional[str]) -> Optional[str]:
+    if api_key and not _is_masked(api_key):
+        return api_key.strip()
+
+    key_map = {
+        "openai": "openai_api_key",
+        "anthropic": "anthropic_api_key",
+        "deepseek": "deepseek_api_key",
+        "voyage": "voyage_api_key",
+    }
+    db_key = key_map.get(provider)
+    if not db_key:
+        return None
+    return await SystemSettingsManager.get_setting(db, db_key)
 
 
 @router.get("/", response_model=SystemSettingsResponse)
@@ -484,4 +522,95 @@ async def change_postgres_password(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to change PostgreSQL password: {str(e)}"
+        )
+
+
+@router.post("/test-provider", response_model=ProviderTestResponse)
+async def test_provider_key(
+    payload: ProviderTestRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    provider = (payload.provider or "").strip().lower()
+    if provider not in {"openai", "anthropic", "deepseek", "voyage", "ollama"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported provider"
+        )
+
+    api_key = await _resolve_provider_key(db, provider, payload.api_key)
+    base_url = (payload.base_url or "").strip()
+
+    if provider != "ollama" and not api_key:
+        return ProviderTestResponse(
+            provider=provider,
+            success=False,
+            status_code=400,
+            message="API key is missing",
+        )
+
+    if provider == "ollama":
+        if not base_url:
+            base_url = await SystemSettingsManager.get_setting(db, "ollama_base_url") or ""
+        if not base_url:
+            return ProviderTestResponse(
+                provider=provider,
+                success=False,
+                status_code=400,
+                message="Ollama base URL is missing",
+            )
+        url = base_url.rstrip("/") + "/api/tags"
+        headers = {}
+    elif provider == "openai":
+        url = "https://api.openai.com/v1/models"
+        headers = {"Authorization": f"Bearer {api_key}"}
+    elif provider == "deepseek":
+        base = base_url or "https://api.deepseek.com"
+        url = base.rstrip("/") + "/models"
+        headers = {"Authorization": f"Bearer {api_key}"}
+    elif provider == "voyage":
+        url = "https://api.voyageai.com/v1/embeddings"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+    else:  # anthropic
+        url = "https://api.anthropic.com/v1/models"
+        headers = {
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+        }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            if provider == "voyage":
+                from app.config import settings
+                response = await client.post(
+                    url,
+                    headers=headers,
+                    json={
+                        "model": settings.VOYAGE_EMBEDDING_MODEL,
+                        "input": ["ping"],
+                    },
+                )
+            else:
+                response = await client.get(url, headers=headers)
+        success = 200 <= response.status_code < 300
+        if success:
+            message = "Connection OK"
+        elif response.status_code in (401, 403):
+            message = "Unauthorized (check API key)"
+        else:
+            message = f"Unexpected response: {response.status_code}"
+        return ProviderTestResponse(
+            provider=provider,
+            success=success,
+            status_code=response.status_code,
+            message=message,
+        )
+    except httpx.RequestError as exc:
+        return ProviderTestResponse(
+            provider=provider,
+            success=False,
+            status_code=0,
+            message=f"Request failed: {exc.__class__.__name__}",
         )

@@ -110,6 +110,7 @@ export function SettingsPage() {
   const [showVoyageKey, setShowVoyageKey] = useState(false)
   const [showAnthropicKey, setShowAnthropicKey] = useState(false)
   const [showDeepseekKey, setShowDeepseekKey] = useState(false)
+  const [providerTests, setProviderTests] = useState<Record<string, { status: 'idle' | 'loading' | 'ok' | 'error'; message?: string }>>({})
 
 
   // System Settings (Databases)
@@ -869,6 +870,36 @@ export function SettingsPage() {
     }
   }
 
+  const handleTestProvider = async (provider: string, apiKey?: string, baseUrl?: string) => {
+    setError(null)
+    setSuccess(null)
+    setProviderTests(prev => ({
+      ...prev,
+      [provider]: { status: 'loading' }
+    }))
+
+    const payload: { provider: string; api_key?: string | null; base_url?: string | null } = { provider }
+    if (apiKey && !apiKey.startsWith('*')) payload.api_key = apiKey
+    if (baseUrl) payload.base_url = baseUrl
+
+    try {
+      const result = await apiClient.testProviderKey(payload)
+      setProviderTests(prev => ({
+        ...prev,
+        [provider]: {
+          status: result?.success ? 'ok' : 'error',
+          message: result?.message || (result?.success ? 'Connection OK' : 'Connection failed')
+        }
+      }))
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Connection failed'
+      setProviderTests(prev => ({
+        ...prev,
+        [provider]: { status: 'error', message }
+      }))
+    }
+  }
+
   const handleSaveDatabases = async () => {
     try {
       setSaving(true)
@@ -1139,6 +1170,8 @@ export function SettingsPage() {
             maxFileSizeMb={maxFileSizeMb}
             setMaxFileSizeMb={setMaxFileSizeMb}
             onSave={handleSaveAIProviders}
+            onTestProvider={handleTestProvider}
+            providerTests={providerTests}
             saving={saving}
           />
         )}
@@ -2594,8 +2627,18 @@ function AIProvidersTab(props: any) {
     ollamaBaseUrl, setOllamaBaseUrl,
     systemName, setSystemName,
     maxFileSizeMb, setMaxFileSizeMb,
-    onSave, saving
+    onSave, saving,
+    onTestProvider,
+    providerTests
   } = props
+
+  const renderTestStatus = (provider: string) => {
+    const info = providerTests?.[provider]
+    if (!info || info.status === 'idle') return null
+    const color = info.status === 'ok' ? 'text-green-400' : info.status === 'loading' ? 'text-gray-400' : 'text-red-400'
+    const label = info.status === 'loading' ? 'Testing...' : (info.message || (info.status === 'ok' ? 'OK' : 'Failed'))
+    return <span className={`text-xs ${color}`}>{label}</span>
+  }
 
   return (
     <div className="space-y-6">
@@ -2631,8 +2674,18 @@ function AIProvidersTab(props: any) {
             >
               {showOpenaiKey ? 'Hide' : 'Show'}
             </button>
+            <button
+              type="button"
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              onClick={() => onTestProvider('openai', openaiApiKey)}
+            >
+              Test
+            </button>
           </div>
-          <p className="text-xs text-gray-400 mt-1">Used for embeddings and chat (GPT models)</p>
+          <div className="mt-1 flex items-center gap-2">
+            <p className="text-xs text-gray-400">Used for embeddings and chat (GPT models)</p>
+            {renderTestStatus('openai')}
+          </div>
         </div>
 
         <div className="mb-6">
@@ -2652,8 +2705,18 @@ function AIProvidersTab(props: any) {
             >
               {showVoyageKey ? 'Hide' : 'Show'}
             </button>
+            <button
+              type="button"
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              onClick={() => onTestProvider('voyage', voyageApiKey)}
+            >
+              Test
+            </button>
           </div>
-          <p className="text-xs text-gray-400 mt-1">Alternative embedding provider</p>
+          <div className="mt-1 flex items-center gap-2">
+            <p className="text-xs text-gray-400">Alternative embedding provider</p>
+            {renderTestStatus('voyage')}
+          </div>
         </div>
 
         <div className="mb-6">
@@ -2673,8 +2736,18 @@ function AIProvidersTab(props: any) {
             >
               {showAnthropicKey ? 'Hide' : 'Show'}
             </button>
+            <button
+              type="button"
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              onClick={() => onTestProvider('anthropic', anthropicApiKey)}
+            >
+              Test
+            </button>
           </div>
-          <p className="text-xs text-gray-400 mt-1">Used for Claude models</p>
+          <div className="mt-1 flex items-center gap-2">
+            <p className="text-xs text-gray-400">Used for Claude models</p>
+            {renderTestStatus('anthropic')}
+          </div>
         </div>
 
         <div className="mb-6">
@@ -2694,8 +2767,18 @@ function AIProvidersTab(props: any) {
             >
               {showDeepseekKey ? 'Hide' : 'Show'}
             </button>
+            <button
+              type="button"
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              onClick={() => onTestProvider('deepseek', deepseekApiKey)}
+            >
+              Test
+            </button>
           </div>
-          <p className="text-xs text-gray-400 mt-1">Used for DeepSeek chat and reasoner models</p>
+          <div className="mt-1 flex items-center gap-2">
+            <p className="text-xs text-gray-400">Used for DeepSeek chat and reasoner models</p>
+            {renderTestStatus('deepseek')}
+          </div>
         </div>
 
       </div>
@@ -2706,14 +2789,26 @@ function AIProvidersTab(props: any) {
 
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-300 mb-2">Ollama API URL (Optional)</label>
-          <input
-            type="text"
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-            placeholder="http://localhost:11434 or https://your-cloud-ollama.com"
-            value={ollamaBaseUrl}
-            onChange={(e) => setOllamaBaseUrl(e.target.value)}
-          />
-          <p className="text-xs text-gray-400 mt-1">Ollama server URL (local or cloud-hosted)</p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+              placeholder="http://localhost:11434 or https://your-cloud-ollama.com"
+              value={ollamaBaseUrl}
+              onChange={(e) => setOllamaBaseUrl(e.target.value)}
+            />
+            <button
+              type="button"
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              onClick={() => onTestProvider('ollama', undefined, ollamaBaseUrl)}
+            >
+              Test
+            </button>
+          </div>
+          <div className="mt-1 flex items-center gap-2">
+            <p className="text-xs text-gray-400">Ollama server URL (local or cloud-hosted)</p>
+            {renderTestStatus('ollama')}
+          </div>
         </div>
       </div>
 
