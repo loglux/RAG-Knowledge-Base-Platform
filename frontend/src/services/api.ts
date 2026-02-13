@@ -44,11 +44,15 @@ import type {
 } from '../types/index'
 
 const ACCESS_TOKEN_KEY = 'kb_access_token'
+const REFRESH_LOCK_KEY = 'kb_refresh_lock'
+const REFRESH_CHANNEL_NAME = 'kb_auth_channel'
+const REFRESH_LOCK_TTL_MS = 15000
 
 class APIClient {
   private client: AxiosInstance
   private refreshPromise: Promise<boolean> | null = null
   private oauthClient: AxiosInstance
+  private refreshChannel: BroadcastChannel | null = null
 
   constructor() {
     const baseURL = import.meta.env.VITE_API_BASE_URL || ''
@@ -69,6 +73,16 @@ class APIClient {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
     })
+
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      this.refreshChannel = new BroadcastChannel(REFRESH_CHANNEL_NAME)
+      this.refreshChannel.addEventListener('message', (event) => {
+        const data = event.data || {}
+        if (data.type === 'refresh_token' && typeof data.token === 'string') {
+          this.setAccessToken(data.token)
+        }
+      })
+    }
 
     this.client.interceptors.request.use((config) => {
       const token = this.getAccessToken()
@@ -131,6 +145,73 @@ class APIClient {
     }
   }
 
+  private getRefreshLock(): { owner: string; ts: number } | null {
+    try {
+      const raw = localStorage.getItem(REFRESH_LOCK_KEY)
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      if (!parsed || typeof parsed.ts !== 'number' || typeof parsed.owner !== 'string') return null
+      return parsed
+    } catch {
+      return null
+    }
+  }
+
+  private setRefreshLock(owner: string) {
+    try {
+      localStorage.setItem(REFRESH_LOCK_KEY, JSON.stringify({ owner, ts: Date.now() }))
+    } catch {
+      // ignore
+    }
+  }
+
+  private clearRefreshLock(owner: string) {
+    try {
+      const current = this.getRefreshLock()
+      if (!current || current.owner === owner) {
+        localStorage.removeItem(REFRESH_LOCK_KEY)
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  private waitForRefreshSignal(timeoutMs = REFRESH_LOCK_TTL_MS): Promise<boolean> {
+    return new Promise((resolve) => {
+      let done = false
+      const timer = setTimeout(() => {
+        if (done) return
+        done = true
+        resolve(false)
+      }, timeoutMs)
+
+      const onMessage = (event: MessageEvent) => {
+        if (done) return
+        const data = event.data || {}
+        if (data.type === 'refresh_token') {
+          done = true
+          clearTimeout(timer)
+          resolve(true)
+        }
+      }
+
+      if (this.refreshChannel) {
+        this.refreshChannel.addEventListener('message', onMessage, { once: true })
+      } else {
+        const storageListener = (e: StorageEvent) => {
+          if (done) return
+          if (e.key === ACCESS_TOKEN_KEY && e.newValue) {
+            done = true
+            clearTimeout(timer)
+            window.removeEventListener('storage', storageListener)
+            resolve(true)
+          }
+        }
+        window.addEventListener('storage', storageListener)
+      }
+    })
+  }
+
   private handleAuthFailure() {
     this.clearAccessToken()
     if (typeof window !== 'undefined') {
@@ -154,13 +235,27 @@ class APIClient {
     }
 
     this.refreshPromise = (async () => {
+      const owner = Math.random().toString(36).slice(2)
+      const existing = this.getRefreshLock()
+      if (existing && Date.now() - existing.ts < REFRESH_LOCK_TTL_MS) {
+        const waited = await this.waitForRefreshSignal()
+        if (waited && this.getAccessToken()) {
+          return true
+        }
+      }
+
+      this.setRefreshLock(owner)
       try {
         const response = await this.client.post<TokenResponse>('/auth/refresh')
         this.setAccessToken(response.data.access_token)
+        if (this.refreshChannel) {
+          this.refreshChannel.postMessage({ type: 'refresh_token', token: response.data.access_token })
+        }
         return true
       } catch {
         return false
       } finally {
+        this.clearRefreshLock(owner)
         this.refreshPromise = null
       }
     })()
