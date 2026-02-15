@@ -124,6 +124,7 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - ./logs:/app/logs
+      - ./secrets:/app/secrets
       - ./docker/entrypoint.sh:/entrypoint.sh:ro
     secrets:
       - db_password

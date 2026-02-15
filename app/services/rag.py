@@ -59,36 +59,6 @@ class RAGService:
     Orchestrates retrieval from vector store and generation with LLM.
     """
 
-    # System prompt for RAG (kept for reference)
-    SYSTEM_PROMPT_LEGACY = """You are a helpful AI assistant that answers questions based on the provided context from a knowledge base.
-
-Your task:
-1. First, understand the FULL CONVERSATION HISTORY to grasp what the user is asking about
-2. Pay attention to pronouns (it, this, that, these) - they often refer to topics from previous messages
-3. Use the knowledge base context to provide accurate, detailed answers
-4. Answer based ONLY on information from the knowledge base context
-5. Be concise unless the user asks to show/quote content or examples
-6. Reference specific sources when appropriate (e.g., "According to Source 1...")
-
-Important:
-- The conversation may contain follow-up questions - use previous messages to understand the current question
-- Pronouns like "it", "this", "that" refer to topics mentioned earlier in the conversation
-- Do NOT make up information not present in the context
-- If the context doesn't contain enough information, say so clearly
-- If the user asks to show a question, return the full verbatim text from the context.
-- If the requested item spans multiple context chunks, return all relevant verbatim excerpts,
-  even if they come from multiple chunks, until the item is complete.
-- Do not invent missing parts or add commentary.
-"""
-    # System prompt for RAG (incremental update, no longer used at runtime)
-    SYSTEM_PROMPT = """Identity:
-You are a retrieval assistant for a knowledge base. You answer ONLY from the provided context.
-
-""" + SYSTEM_PROMPT_LEGACY + """
-
-    Context follows below.
-"""
-
     CHAT_USER_TEMPLATE = """<context>
 {context}
 </context>
@@ -208,22 +178,22 @@ Retrieved Context:
             if document_ids:
                 document_filter = {"document_id": document_ids if len(document_ids) > 1 else document_ids[0]}
 
-            logger.warning(f"[DEBUG] RAG query with use_structure={use_structure}, db={db is not None}, kb_id={kb_id}")
+            logger.debug(f"RAG query with use_structure={use_structure}, db={db is not None}, kb_id={kb_id}")
 
             if use_structure:
                 if not db or not kb_id:
                     logger.warning("use_structure=True but db or kb_id not provided, falling back to semantic search")
                 else:
-                    logger.warning("[DEBUG] Extracting structure filters...")
+                    logger.debug("Extracting structure filters...")
                     chunk_filters = await self._extract_structure_filters(
                         question=question,
                         kb_id=kb_id,
                         db=db
                     )
                     if chunk_filters:
-                        logger.warning(f"[DEBUG] Structure-based search: {chunk_filters}")
+                        logger.debug(f"Structure-based search: {chunk_filters}")
                     else:
-                        logger.warning("[DEBUG] Structure filters returned None, using semantic search")
+                        logger.debug("Structure filters returned None, using semantic search")
 
             if document_filter and chunk_filters and "document_id" in chunk_filters:
                 if chunk_filters["document_id"] not in document_ids:
@@ -621,11 +591,11 @@ Retrieved Context:
             documents = result.scalars().all()
 
             if not documents:
-                logger.warning("[DEBUG] No completed documents in KB")
+                logger.debug("No completed documents in KB")
                 return None
 
             doc_names = [doc.filename for doc in documents]
-            logger.warning(f"[DEBUG] KB documents: {doc_names}")
+            logger.debug(f"KB documents: {doc_names}")
 
             # 2. Extract intent using LLM
             intent_extractor = get_query_intent_extractor()
@@ -635,7 +605,7 @@ Retrieved Context:
                 use_cache=True  # Use fast pattern fallback
             )
 
-            logger.warning(f"[DEBUG] Intent extracted: type={intent.intent_type}, confidence={intent.confidence}, doc={intent.document_name}, section={intent.section_type} {intent.section_number}")
+            logger.debug(f"Intent extracted: type={intent.intent_type}, confidence={intent.confidence}, doc={intent.document_name}, section={intent.section_type} {intent.section_number}")
 
             logger.info(
                 f"Extracted intent: type={intent.intent_type}, "
@@ -666,10 +636,10 @@ Retrieved Context:
                 # No specific document mentioned - find best matching document
                 if len(documents) == 1:
                     target_doc = documents[0]
-                    logger.warning(f"[DEBUG] Using single document: {target_doc.filename}")
+                    logger.debug(f"Using single document: {target_doc.filename}")
                 else:
                     # Multiple documents - match document type to query section type
-                    logger.warning(f"[DEBUG] Multiple documents ({len(documents)}), finding best match for section_type={intent.section_type}")
+                    logger.debug(f"Multiple documents ({len(documents)}), finding best match for section_type={intent.section_type}")
 
                     # Map section types to document types
                     section_to_doc_type = {
@@ -682,34 +652,34 @@ Retrieved Context:
 
                     # First pass: try to find document with matching type AND structure
                     if preferred_doc_type:
-                        logger.warning(f"[DEBUG] Looking for document_type={preferred_doc_type}")
+                        logger.debug(f"Looking for document_type={preferred_doc_type}")
                         for doc in documents:
                             analyzer = get_document_analyzer()
                             structure = await analyzer.get_structure(doc.id, db)
                             if structure and structure.document_type == preferred_doc_type:
                                 target_doc = doc
-                                logger.warning(f"[DEBUG] Found matching document: {doc.filename} (type={structure.document_type})")
+                                logger.debug(f"Found matching document: {doc.filename} (type={structure.document_type})")
                                 break
 
                     # Second pass: if no match, take any document with structure
                     if not target_doc:
-                        logger.warning(f"[DEBUG] No matching type found, trying any document with structure")
+                        logger.debug("No matching type found, trying any document with structure")
                         for doc in documents:
                             analyzer = get_document_analyzer()
                             structure = await analyzer.get_structure(doc.id, db)
                             if structure and structure.toc_json:
                                 target_doc = doc
-                                logger.warning(f"[DEBUG] Found document with structure: {doc.filename}")
+                                logger.debug(f"Found document with structure: {doc.filename}")
                                 break
 
                     # Last resort: use first document
                     if not target_doc:
                         target_doc = documents[0]
-                        logger.warning(f"[DEBUG] No document with structure, using first: {target_doc.filename}")
+                        logger.debug(f"No document with structure, using first: {target_doc.filename}")
 
             # If we still don't have a document, try to locate one by section match
             if not target_doc and intent.section_type and (intent.section_number is not None or intent.section_id):
-                logger.warning("[DEBUG] No document selected, scanning for matching section across documents")
+                logger.debug("No document selected, scanning for matching section across documents")
                 analyzer = get_document_analyzer()
                 for doc in documents:
                     structure = await analyzer.get_structure(doc.id, db)
@@ -726,11 +696,11 @@ Retrieved Context:
                     if candidate:
                         target_doc = doc
                         preselected_section = candidate
-                        logger.warning(f"[DEBUG] Found section match in document: {doc.filename}")
+                        logger.debug(f"Found section match in document: {doc.filename}")
                         break
 
             if not target_doc:
-                logger.warning("[DEBUG] No specific document identified, using semantic search")
+                logger.debug("No specific document identified, using semantic search")
                 return None
 
             # 5. Get document structure

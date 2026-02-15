@@ -1,6 +1,9 @@
 """FastAPI application entry point."""
 import logging
+import os
+import secrets
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncGenerator, Callable
 
 from fastapi import FastAPI
@@ -25,6 +28,37 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+# In Docker: /app/secrets/secret_key (mounted volume)
+# Local dev: <project_root>/secrets/secret_key
+SECRET_KEY_FILE = Path(
+    os.environ.get("SECRET_KEY_FILE", Path(__file__).resolve().parent.parent / "secrets" / "secret_key")
+)
+
+
+def _ensure_secret_key() -> None:
+    """Load or auto-generate SECRET_KEY from secrets/secret_key file."""
+    default_marker = "change-this"
+
+    # 1. If already set to a real value (e.g. via env var), keep it
+    if default_marker not in settings.SECRET_KEY:
+        return
+
+    # 2. Try to read from file
+    if SECRET_KEY_FILE.is_file():
+        key = SECRET_KEY_FILE.read_text().strip()
+        if key:
+            settings.SECRET_KEY = key
+            logger.info("SECRET_KEY loaded from %s", SECRET_KEY_FILE)
+            return
+
+    # 3. Generate, persist, apply
+    SECRET_KEY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    key = secrets.token_hex(32)
+    SECRET_KEY_FILE.write_text(key)
+    os.chmod(SECRET_KEY_FILE, 0o600)
+    settings.SECRET_KEY = key
+    logger.info("Generated new SECRET_KEY → %s", SECRET_KEY_FILE)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator:
@@ -33,11 +67,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
 
     Handles startup and shutdown events.
     """
-    # Startup
+    # Startup — ensure SECRET_KEY is set
+    _ensure_secret_key()
+
     logger.info(f"Starting Knowledge Base Platform in {settings.ENVIRONMENT} mode")
-    logger.info(f"Database: {settings.DATABASE_URL.split('@')[1] if '@' in settings.DATABASE_URL else 'configured'}")
     logger.info(f"Qdrant: {settings.QDRANT_URL}")
-    logger.info(f"OpenAI Model: {settings.OPENAI_CHAT_MODEL}")
+    logger.info(f"LLM Provider: {settings.LLM_PROVIDER}")
 
     # CRITICAL: Initialize database engine with correct credentials
     from app.db.session import init_engine, get_db_session, recreate_engine
