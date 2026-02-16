@@ -329,7 +329,7 @@ class Settings(BaseSettings):
         for key, value in updates.items():
             if hasattr(self, key):
                 # Convert to appropriate type
-                field_type = self.model_fields[key].annotation
+                field_type = self.__class__.model_fields[key].annotation
                 if field_type == int:
                     value = int(value)
                 elif field_type == float:
