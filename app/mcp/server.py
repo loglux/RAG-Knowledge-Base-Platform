@@ -2,20 +2,21 @@
 
 import json
 import logging
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
+from fastmcp import FastMCP
 from sqlalchemy import select
 
-from fastmcp import FastMCP
-
 from app.config import settings
-from app.db.session import get_db_session
-from app.models.database import KnowledgeBase as KnowledgeBaseModel, Document as DocumentModel, AppSettings as AppSettingsModel
-from app.services.rag import get_rag_service
-from app.services.retrieval_settings import resolve_retrieval_settings, load_kb_retrieval_settings
 from app.core.retrieval import get_retrieval_engine
 from app.core.system_settings import SystemSettingsManager
+from app.db.session import get_db_session
+from app.models.database import AppSettings as AppSettingsModel
+from app.models.database import Document as DocumentModel
+from app.models.database import KnowledgeBase as KnowledgeBaseModel
+from app.services.rag import get_rag_service
+from app.services.retrieval_settings import load_kb_retrieval_settings, resolve_retrieval_settings
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +107,9 @@ def build_mcp_app() -> FastMCP:
             app_settings = settings_result.scalar_one_or_none()
 
             overrides = options or {}
-            effective = resolve_retrieval_settings(kb=kb, app_settings=app_settings, overrides=overrides)
+            effective = resolve_retrieval_settings(
+                kb=kb, app_settings=app_settings, overrides=overrides
+            )
 
             rag_service = get_rag_service()
             response = await rag_service.query(
@@ -224,7 +227,9 @@ def build_mcp_app() -> FastMCP:
             app_settings = settings_result.scalar_one_or_none()
 
             overrides = options or {}
-            effective = resolve_retrieval_settings(kb=kb, app_settings=app_settings, overrides=overrides)
+            effective = resolve_retrieval_settings(
+                kb=kb, app_settings=app_settings, overrides=overrides
+            )
 
             retrieval_engine = get_retrieval_engine()
             mode = effective.get("retrieval_mode")
@@ -261,7 +266,9 @@ def build_mcp_app() -> FastMCP:
                 )
 
             chunks = retrieval_result.chunks
-            context = retrieval_engine._assemble_context(chunks, max_length=effective.get("max_context_chars"))
+            context = retrieval_engine._assemble_context(
+                chunks, max_length=effective.get("max_context_chars")
+            )
 
         if not chunks:
             return "No results."
@@ -302,7 +309,9 @@ def build_mcp_app() -> FastMCP:
         return json.dumps(payload, ensure_ascii=False, indent=2)
 
     @mcp.tool()
-    async def set_kb_retrieval_settings(knowledge_base_id: str, settings_payload: Dict[str, Any]) -> str:
+    async def set_kb_retrieval_settings(
+        knowledge_base_id: str, settings_payload: Dict[str, Any]
+    ) -> str:
         """Set retrieval settings for a knowledge base."""
         disabled = await _ensure_tool_enabled("set_kb_retrieval_settings")
         if disabled:

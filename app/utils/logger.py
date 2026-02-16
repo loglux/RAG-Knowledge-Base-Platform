@@ -1,4 +1,5 @@
 """Logging configuration for the application."""
+
 import logging
 import sys
 from typing import Optional
@@ -7,9 +8,7 @@ from app.config import settings
 
 
 def setup_logger(
-    name: str,
-    level: Optional[str] = None,
-    format_string: Optional[str] = None
+    name: str, level: Optional[str] = None, format_string: Optional[str] = None
 ) -> logging.Logger:
     """
     Configure and return a logger instance.
@@ -47,8 +46,7 @@ def setup_logger(
         if settings.is_development:
             # Verbose format for development
             format_string = (
-                "%(asctime)s - %(name)s - %(levelname)s - "
-                "%(filename)s:%(lineno)d - %(message)s"
+                "%(asctime)s - %(name)s - %(levelname)s - " "%(filename)s:%(lineno)d - %(message)s"
             )
         else:
             # Concise format for production

@@ -1,33 +1,38 @@
 """QA-based auto-tuning endpoints."""
+
+import asyncio
 import csv
 import io
 import json
 import logging
-import asyncio
-from typing import Optional, List
+from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, status
-from sqlalchemy import select, func
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
-from app.models.database import KnowledgeBase as KnowledgeBaseModel, QASample, QAEvalRun, QAEvalResult
+from app.db.session import get_db, get_db_session
+from app.models.database import KnowledgeBase as KnowledgeBaseModel
+from app.models.database import (
+    QAEvalResult,
+    QAEvalRun,
+    QASample,
+)
 from app.models.schemas import (
-    QASampleUploadResponse,
+    QAEvalResultResponse,
+    QAEvalRunDetailResponse,
     QAEvalRunRequest,
     QAEvalRunResponse,
-    QAEvalRunDetailResponse,
-    QAEvalResultResponse,
+    QASampleUploadResponse,
 )
 from app.services.qa_eval import (
-    GoldEvalConfig,
-    replace_gold_samples,
-    create_gold_run,
-    run_gold_evaluation_on_run,
     NO_ANSWER_SENTINEL,
+    GoldEvalConfig,
+    create_gold_run,
+    replace_gold_samples,
+    run_gold_evaluation_on_run,
 )
-from app.db.session import get_db_session
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +123,9 @@ async def upload_gold_samples(
 ):
     kb = await db.get(KnowledgeBaseModel, kb_id)
     if not kb:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge base not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge base not found"
+        )
 
     content = (await file.read()).decode("utf-8", errors="ignore")
     filename = (file.filename or "").lower()
@@ -134,7 +141,9 @@ async def upload_gold_samples(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     if not samples:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No valid samples found")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="No valid samples found"
+        )
 
     if replace_existing:
         added = await replace_gold_samples(db, kb_id, samples)
@@ -159,14 +168,18 @@ async def get_gold_sample_count(
 ):
     kb = await db.get(KnowledgeBaseModel, kb_id)
     if not kb:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge base not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge base not found"
+        )
 
     count = await db.scalar(
         select(func.count()).select_from(
-            select(QASample.id).where(
+            select(QASample.id)
+            .where(
                 QASample.knowledge_base_id == kb_id,
                 QASample.sample_type == "gold",
-            ).subquery()
+            )
+            .subquery()
         )
     )
     return {"knowledge_base_id": kb_id, "count": count}
@@ -183,11 +196,17 @@ async def run_gold_eval(
 ):
     kb = await db.get(KnowledgeBaseModel, kb_id)
     if not kb:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge base not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge base not found"
+        )
 
     config = GoldEvalConfig(
         top_k=payload.top_k,
-        retrieval_mode=payload.retrieval_mode.value if hasattr(payload.retrieval_mode, "value") else str(payload.retrieval_mode),
+        retrieval_mode=(
+            payload.retrieval_mode.value
+            if hasattr(payload.retrieval_mode, "value")
+            else str(payload.retrieval_mode)
+        ),
         lexical_top_k=payload.lexical_top_k,
         dense_weight=payload.hybrid_dense_weight,
         lexical_weight=payload.hybrid_lexical_weight,
@@ -259,7 +278,9 @@ async def list_eval_runs(
 ):
     kb = await db.get(KnowledgeBaseModel, kb_id)
     if not kb:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge base not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge base not found"
+        )
 
     result = await db.execute(
         select(QAEvalRun)
@@ -374,11 +395,11 @@ async def delete_all_eval_runs(
 ):
     kb = await db.get(KnowledgeBaseModel, kb_id)
     if not kb:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge base not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge base not found"
+        )
 
-    result = await db.execute(
-        select(QAEvalRun).where(QAEvalRun.knowledge_base_id == kb_id)
-    )
+    result = await db.execute(select(QAEvalRun).where(QAEvalRun.knowledge_base_id == kb_id))
     runs = result.scalars().all()
     for run in runs:
         await db.delete(run)

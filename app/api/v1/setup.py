@@ -1,14 +1,15 @@
 """Setup wizard API endpoints."""
+
 import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
-from app.services.setup_manager import SetupManager, SetupError
 from app.core.system_settings import SystemSettingsManager
+from app.db.session import get_db
+from app.services.setup_manager import SetupError, SetupManager
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ router = APIRouter(prefix="/setup", tags=["setup"])
 # Pydantic schemas
 class AdminCreateRequest(BaseModel):
     """Request to create admin user."""
+
     username: str = Field(..., min_length=3, max_length=50, description="Admin username")
     password: str = Field(..., min_length=8, description="Admin password (min 8 characters)")
     email: Optional[str] = Field(None, description="Admin email (optional)")
@@ -25,15 +27,19 @@ class AdminCreateRequest(BaseModel):
 
 class APIKeysRequest(BaseModel):
     """Request to save API keys."""
+
     openai_api_key: Optional[str] = Field(None, description="OpenAI API key")
     voyage_api_key: Optional[str] = Field(None, description="VoyageAI API key")
     anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key")
     deepseek_api_key: Optional[str] = Field(None, description="DeepSeek API key")
-    ollama_base_url: Optional[str] = Field(None, description="Ollama API base URL (e.g., http://localhost:11434)")
+    ollama_base_url: Optional[str] = Field(
+        None, description="Ollama API base URL (e.g., http://localhost:11434)"
+    )
 
 
 class DatabaseSettingsRequest(BaseModel):
     """Request to save database settings."""
+
     qdrant_url: Optional[str] = Field(None, description="Qdrant HTTP URL")
     qdrant_api_key: Optional[str] = Field(None, description="Qdrant API key")
     opensearch_url: Optional[str] = Field(None, description="OpenSearch HTTP URL")
@@ -43,6 +49,7 @@ class DatabaseSettingsRequest(BaseModel):
 
 class SystemSettingsRequest(BaseModel):
     """Request to save system settings."""
+
     system_name: Optional[str] = Field(None, description="System name")
     max_file_size_mb: Optional[int] = Field(None, ge=1, le=1000, description="Max file size in MB")
     max_chunk_size: Optional[int] = Field(None, ge=100, le=10000, description="Max chunk size")
@@ -51,11 +58,13 @@ class SystemSettingsRequest(BaseModel):
 
 class SetupCompleteRequest(BaseModel):
     """Request to mark setup as complete."""
+
     admin_id: Optional[int] = Field(None, description="Admin user ID who completed setup")
 
 
 class PostgresPasswordRequest(BaseModel):
     """Request to change PostgreSQL password."""
+
     username: str = Field(..., description="PostgreSQL username (usually kb_user)")
     new_password: Optional[str] = Field(None, description="New password (leave empty to generate)")
     generate_password: bool = Field(default=False, description="Generate secure random password")
@@ -63,12 +72,14 @@ class PostgresPasswordRequest(BaseModel):
 
 class PostgresPasswordResponse(BaseModel):
     """Response with new PostgreSQL credentials."""
+
     username: str
     password: str
     message: str
 
 
 # API Endpoints
+
 
 @router.get("/status")
 async def get_setup_status(db: AsyncSession = Depends(get_db)):
@@ -79,24 +90,18 @@ async def get_setup_status(db: AsyncSession = Depends(get_db)):
     """
     try:
         status_info = await SetupManager.get_setup_status(db)
-        return {
-            "success": True,
-            "data": status_info
-        }
+        return {"success": True, "data": status_info}
 
     except Exception as e:
         logger.error(f"Failed to get setup status: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get setup status: {str(e)}"
+            detail=f"Failed to get setup status: {str(e)}",
         )
 
 
 @router.post("/admin")
-async def create_admin_user(
-    request: AdminCreateRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def create_admin_user(request: AdminCreateRequest, db: AsyncSession = Depends(get_db)):
     """
     Create initial admin user.
 
@@ -108,7 +113,7 @@ async def create_admin_user(
         if is_complete:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Setup is already complete. Admin user already exists."
+                detail="Setup is already complete. Admin user already exists.",
             )
 
         # Create admin
@@ -127,20 +132,17 @@ async def create_admin_user(
                 "email": admin.email,
                 "created_at": admin.created_at.isoformat(),
             },
-            "message": "Admin user created successfully"
+            "message": "Admin user created successfully",
         }
 
     except SetupError as e:
         logger.error(f"Setup error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to create admin user: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create admin user: {str(e)}"
+            detail=f"Failed to create admin user: {str(e)}",
         )
 
 
@@ -159,20 +161,19 @@ async def generate_password_preview():
                 "password": password,
                 "length": len(password),
             },
-            "message": "Generated secure password. This is just a preview - not applied yet."
+            "message": "Generated secure password. This is just a preview - not applied yet.",
         }
     except Exception as e:
         logger.error(f"Failed to generate password: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate password: {str(e)}"
+            detail=f"Failed to generate password: {str(e)}",
         )
 
 
 @router.post("/postgres-password", response_model=PostgresPasswordResponse)
 async def change_postgres_password(
-    request: PostgresPasswordRequest,
-    db: AsyncSession = Depends(get_db)
+    request: PostgresPasswordRequest, db: AsyncSession = Depends(get_db)
 ):
     """
     Change PostgreSQL password or generate a new secure password.
@@ -192,7 +193,7 @@ async def change_postgres_password(
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Either provide new_password or set generate_password=true"
+                detail="Either provide new_password or set generate_password=true",
             )
 
         # Change password
@@ -205,30 +206,24 @@ async def change_postgres_password(
         return PostgresPasswordResponse(
             username=result["username"],
             password=result["password"],
-            message="PostgreSQL password changed successfully. IMPORTANT: Save these credentials!"
+            message="PostgreSQL password changed successfully. IMPORTANT: Save these credentials!",
         )
 
     except SetupError as e:
         logger.error(f"Setup error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to change PostgreSQL password: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to change PostgreSQL password: {str(e)}"
+            detail=f"Failed to change PostgreSQL password: {str(e)}",
         )
 
 
 @router.post("/api-keys")
-async def save_api_keys(
-    request: APIKeysRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def save_api_keys(request: APIKeysRequest, db: AsyncSession = Depends(get_db)):
     """
     Save API keys for external services.
 
@@ -236,16 +231,18 @@ async def save_api_keys(
     """
     try:
         # Validate at least one provider is configured
-        if not any([
-            request.openai_api_key,
-            request.voyage_api_key,
-            request.anthropic_api_key,
-            request.deepseek_api_key,
-            request.ollama_base_url,
-        ]):
+        if not any(
+            [
+                request.openai_api_key,
+                request.voyage_api_key,
+                request.anthropic_api_key,
+                request.deepseek_api_key,
+                request.ollama_base_url,
+            ]
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="At least one AI provider (API key or Ollama URL) must be configured"
+                detail="At least one AI provider (API key or Ollama URL) must be configured",
             )
 
         # Save keys
@@ -258,31 +255,24 @@ async def save_api_keys(
             ollama_base_url=request.ollama_base_url,
         )
 
-        return {
-            "success": True,
-            "message": "API keys saved successfully"
-        }
+        return {"success": True, "message": "API keys saved successfully"}
 
     except SetupError as e:
         logger.error(f"Setup error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to save API keys: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to save API keys: {str(e)}"
+            detail=f"Failed to save API keys: {str(e)}",
         )
 
 
 @router.post("/database")
 async def save_database_settings(
-    request: DatabaseSettingsRequest,
-    db: AsyncSession = Depends(get_db)
+    request: DatabaseSettingsRequest, db: AsyncSession = Depends(get_db)
 ):
     """
     Save database connection settings.
@@ -299,30 +289,21 @@ async def save_database_settings(
             opensearch_password=request.opensearch_password,
         )
 
-        return {
-            "success": True,
-            "message": "Database settings saved successfully"
-        }
+        return {"success": True, "message": "Database settings saved successfully"}
 
     except SetupError as e:
         logger.error(f"Setup error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to save database settings: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to save database settings: {str(e)}"
+            detail=f"Failed to save database settings: {str(e)}",
         )
 
 
 @router.post("/system")
-async def save_system_settings(
-    request: SystemSettingsRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def save_system_settings(request: SystemSettingsRequest, db: AsyncSession = Depends(get_db)):
     """
     Save general system settings.
 
@@ -337,30 +318,21 @@ async def save_system_settings(
             chunk_overlap=request.chunk_overlap,
         )
 
-        return {
-            "success": True,
-            "message": "System settings saved successfully"
-        }
+        return {"success": True, "message": "System settings saved successfully"}
 
     except SetupError as e:
         logger.error(f"Setup error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error(f"Failed to save system settings: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to save system settings: {str(e)}"
+            detail=f"Failed to save system settings: {str(e)}",
         )
 
 
 @router.post("/complete")
-async def complete_setup(
-    request: SetupCompleteRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def complete_setup(request: SetupCompleteRequest, db: AsyncSession = Depends(get_db)):
     """
     Mark setup as complete.
 
@@ -379,7 +351,7 @@ async def complete_setup(
         if not api_keys_configured:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="At least one API key must be configured before completing setup"
+                detail="At least one API key must be configured before completing setup",
             )
 
         # Mark setup as complete
@@ -388,22 +360,16 @@ async def complete_setup(
             updated_by=request.admin_id,
         )
 
-        return {
-            "success": True,
-            "message": "Setup completed successfully. System is ready to use."
-        }
+        return {"success": True, "message": "Setup completed successfully. System is ready to use."}
 
     except SetupError as e:
         logger.error(f"Setup error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Failed to complete setup: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to complete setup: {str(e)}"
+            detail=f"Failed to complete setup: {str(e)}",
         )

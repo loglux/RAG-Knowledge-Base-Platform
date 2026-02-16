@@ -3,24 +3,25 @@ Ollama Embeddings Service.
 
 Handles generation of text embeddings using Ollama API (local models).
 """
+
 import asyncio
 import logging
 from typing import List, Optional
+
 import httpx
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
 )
 
 from app.config import settings
 from app.core.embeddings_base import (
     BaseEmbeddingService,
-    EmbeddingResult,
     EmbeddingProvider,
+    EmbeddingResult,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -71,14 +72,15 @@ class OllamaEmbeddingService(BaseEmbeddingService):
         # Create client with connection limits to avoid overwhelming Ollama server
         limits = httpx.Limits(
             max_connections=1,  # Process one at a time
-            max_keepalive_connections=1  # Keep only one connection alive
+            max_keepalive_connections=1,  # Keep only one connection alive
         )
         self.client = httpx.AsyncClient(
-            timeout=60.0,  # Increased timeout for slow models
-            limits=limits
+            timeout=60.0, limits=limits  # Increased timeout for slow models
         )
 
-        logger.info(f"Initialized OllamaEmbeddingService with model: {self.model} at {self.base_url}")
+        logger.info(
+            f"Initialized OllamaEmbeddingService with model: {self.model} at {self.base_url}"
+        )
 
     @retry(
         stop=stop_after_attempt(5),
@@ -113,7 +115,7 @@ class OllamaEmbeddingService(BaseEmbeddingService):
                 json={
                     "model": self.model,
                     "input": text,
-                }
+                },
             )
             if response.status_code >= 400:
                 logger.error(

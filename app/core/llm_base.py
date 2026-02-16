@@ -3,14 +3,17 @@ Base classes for LLM providers.
 
 Provides abstract interface for different LLM services (OpenAI, Anthropic, Ollama).
 """
+
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any
 from enum import Enum
+from typing import List, Optional
+
 from pydantic import BaseModel, Field
 
 
 class LLMProvider(str, Enum):
     """Supported LLM providers."""
+
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
     DEEPSEEK = "deepseek"
@@ -19,6 +22,7 @@ class LLMProvider(str, Enum):
 
 class LLMModel(BaseModel):
     """LLM model configuration."""
+
     provider: LLMProvider
     model_name: str
     context_window: int
@@ -282,12 +286,14 @@ LLM_MODELS = {
 
 class Message(BaseModel):
     """Chat message."""
+
     role: str = Field(..., description="Message role: system, user, or assistant")
     content: str = Field(..., description="Message content")
 
 
 class LLMResponse(BaseModel):
     """LLM response."""
+
     content: str = Field(..., description="Generated text")
     model: str = Field(..., description="Model used")
     input_tokens: Optional[int] = Field(None, description="Input tokens used")

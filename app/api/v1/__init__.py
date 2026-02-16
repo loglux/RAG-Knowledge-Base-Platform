@@ -1,25 +1,26 @@
 """API v1 router configuration."""
+
 from fastapi import APIRouter, Depends
 
 from app.api.v1 import (
-    health,
-    knowledge_bases,
-    kb_transfer,
-    documents,
-    chat,
-    retrieve,
-    embeddings,
-    ollama,
-    llm,
-    settings,
-    prompts,
-    setup,
-    system_settings,
     auth,
     auto_tune,
-    mcp_tokens,
-    mcp_refresh_tokens,
+    chat,
+    documents,
+    embeddings,
+    health,
+    kb_transfer,
+    knowledge_bases,
+    llm,
     mcp_oauth_events,
+    mcp_refresh_tokens,
+    mcp_tokens,
+    ollama,
+    prompts,
+    retrieve,
+    settings,
+    setup,
+    system_settings,
 )
 from app.dependencies import get_current_user_id
 
@@ -33,14 +34,18 @@ api_router.include_router(setup.router, tags=["setup"])  # Setup wizard (no auth
 api_router.include_router(auth.router)
 
 # Protected routers
-protected_router.include_router(knowledge_bases.router, prefix="/knowledge-bases", tags=["knowledge-bases"])
+protected_router.include_router(
+    knowledge_bases.router, prefix="/knowledge-bases", tags=["knowledge-bases"]
+)
 protected_router.include_router(kb_transfer.router)
 protected_router.include_router(documents.router, prefix="/documents", tags=["documents"])
 protected_router.include_router(chat.router, prefix="/chat", tags=["chat"])
 protected_router.include_router(retrieve.router, prefix="/retrieve", tags=["retrieve"])
 protected_router.include_router(settings.router, prefix="/settings", tags=["settings"])
 protected_router.include_router(prompts.router, prefix="/prompts", tags=["prompts"])
-protected_router.include_router(system_settings.router, prefix="/system-settings", tags=["system-settings"])
+protected_router.include_router(
+    system_settings.router, prefix="/system-settings", tags=["system-settings"]
+)
 protected_router.include_router(embeddings.router, prefix="/embeddings", tags=["embeddings"])
 protected_router.include_router(ollama.router, prefix="/ollama", tags=["ollama"])
 protected_router.include_router(llm.router, prefix="/llm", tags=["llm"])

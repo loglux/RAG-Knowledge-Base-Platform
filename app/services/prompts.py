@@ -1,15 +1,14 @@
 """Prompt version helpers."""
+
 from typing import Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.database import (
-    AppSettings as AppSettingsModel,
-    PromptVersion as PromptVersionModel,
-    SelfCheckPromptVersion as SelfCheckPromptVersionModel,
-)
+from app.models.database import AppSettings as AppSettingsModel
+from app.models.database import PromptVersion as PromptVersionModel
+from app.models.database import SelfCheckPromptVersion as SelfCheckPromptVersionModel
 
 
 async def get_active_chat_prompt(db: AsyncSession) -> Tuple[Optional[str], Optional[UUID]]:

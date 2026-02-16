@@ -8,34 +8,32 @@ Handles the complete pipeline of document ingestion:
 4. Store in vector database
 5. Update document status
 """
+
 import logging
-import hashlib
-from typing import Optional, List, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.database import Document, KnowledgeBase, AppSettings
-from app.models.enums import DocumentStatus
 from app.core.embeddings_factory import get_embedding_service
-from app.core.embeddings_base import BaseEmbeddingService
+from app.core.lexical_store import OpenSearchStore, get_lexical_store
 from app.core.vector_store import (
-    get_vector_store,
     QdrantVectorStore,
-    VectorStoreException,
+    get_vector_store,
 )
-from app.core.lexical_store import get_lexical_store, OpenSearchStore
-from app.services.chunking import get_chunking_service, ChunkingService, Chunk
+from app.models.database import AppSettings, Document, KnowledgeBase
+from app.models.enums import DocumentStatus
+from app.services.chunking import Chunk, ChunkingService, get_chunking_service
 from app.services.duplicate_chunks import compute_duplicate_chunks_for_document, json_dumps
-
 
 logger = logging.getLogger(__name__)
 
 
 class DocumentProcessingError(Exception):
     """Base exception for document processing errors."""
+
     pass
 
 
@@ -121,12 +119,17 @@ class DocumentProcessor:
 
             # 7. Create chunking service with KB-specific settings
             from app.services.chunking import get_chunking_service
+
             await self._update_progress(document, "Preparing to chunk...", 15, db)
 
             chunking_service = get_chunking_service(
                 chunk_size=kb.chunk_size,
                 chunk_overlap=kb.chunk_overlap,
-                strategy_name=kb.chunking_strategy.value if hasattr(kb.chunking_strategy, 'value') else str(kb.chunking_strategy),
+                strategy_name=(
+                    kb.chunking_strategy.value
+                    if hasattr(kb.chunking_strategy, "value")
+                    else str(kb.chunking_strategy)
+                ),
                 llm_model=app_settings.llm_model if app_settings else None,
                 llm_provider=app_settings.llm_provider if app_settings else None,
             )
@@ -156,7 +159,9 @@ class DocumentProcessor:
                 max(chunk_sizes),
                 sum(chunk_sizes) / len(chunk_sizes),
             )
-            await self._update_progress(document, f"Chunking completed ({len(chunks)} chunks)", 30, db)
+            await self._update_progress(
+                document, f"Chunking completed ({len(chunks)} chunks)", 30, db
+            )
 
             # 8. Generate embeddings for all chunks with progress updates
             logger.info(
@@ -171,18 +176,20 @@ class DocumentProcessor:
 
             # Process embeddings in batches with progress updates
             for i in range(0, len(chunk_texts), batch_size):
-                batch = chunk_texts[i:i + batch_size]
+                batch = chunk_texts[i : i + batch_size]
                 batch_num = i // batch_size + 1
                 total_batches = (total_chunks + batch_size - 1) // batch_size
 
                 # Update progress for this batch
                 processed_so_far = i
-                progress_in_embedding = int(35 + (40 * processed_so_far / total_chunks))  # 35% to 75%
+                progress_in_embedding = int(
+                    35 + (40 * processed_so_far / total_chunks)
+                )  # 35% to 75%
                 await self._update_progress(
                     document,
                     f"Generating embeddings ({processed_so_far}/{total_chunks})",
                     progress_in_embedding,
-                    db
+                    db,
                 )
 
                 # Generate embeddings for this batch
@@ -194,7 +201,9 @@ class DocumentProcessor:
                 embedding_results.extend(batch_results)
 
             logger.info(f"Generated {len(embedding_results)} embeddings")
-            await self._update_progress(document, f"Embeddings created ({len(embedding_results)})", 75, db)
+            await self._update_progress(
+                document, f"Embeddings created ({len(embedding_results)})", 75, db
+            )
 
             # 9. Prepare vectors and payloads for Qdrant
             vectors = [result.embedding for result in embedding_results]
@@ -256,15 +265,15 @@ class DocumentProcessor:
             document.processed_at = datetime.utcnow()
             document.processing_stage = "Completed"
             document.progress_percentage = 100
-            await self._update_document_status(
-                document, DocumentStatus.COMPLETED, db
-            )
+            await self._update_document_status(document, DocumentStatus.COMPLETED, db)
 
             # 13. Optionally compute duplicate chunks (post-index)
             if detect_duplicates:
                 try:
                     await self._update_progress(document, "Analyzing duplicate chunks...", 98, db)
-                    summary = await compute_duplicate_chunks_for_document(document.id, kb.collection_name)
+                    summary = await compute_duplicate_chunks_for_document(
+                        document.id, kb.collection_name
+                    )
                     document.duplicate_chunks_json = json_dumps(summary)
                     await db.commit()
                     await db.refresh(document)
@@ -274,8 +283,7 @@ class DocumentProcessor:
             # 14. Recalculate KB statistics (prevents desync from incremental updates)
             total_chunks = await db.scalar(
                 select(func.coalesce(func.sum(Document.chunk_count), 0)).where(
-                    Document.knowledge_base_id == kb.id,
-                    Document.is_deleted == False
+                    Document.knowledge_base_id == kb.id, Document.is_deleted == False
                 )
             )
             kb.total_chunks = total_chunks or 0
@@ -308,9 +316,7 @@ class DocumentProcessor:
             except Exception as update_error:
                 logger.error(f"Failed to update document status: {update_error}")
 
-            raise DocumentProcessingError(
-                f"Document processing failed: {e}"
-            ) from e
+            raise DocumentProcessingError(f"Document processing failed: {e}") from e
 
     async def reprocess_document(
         self,
@@ -357,9 +363,7 @@ class DocumentProcessor:
 
         except Exception as e:
             logger.error(f"Failed to reprocess document {document_id}: {e}")
-            raise DocumentProcessingError(
-                f"Document reprocessing failed: {e}"
-            ) from e
+            raise DocumentProcessingError(f"Document reprocessing failed: {e}") from e
 
     async def delete_document_vectors(
         self,
@@ -386,9 +390,7 @@ class DocumentProcessor:
 
         except Exception as e:
             logger.error(f"Failed to delete vectors for document {document_id}: {e}")
-            raise DocumentProcessingError(
-                f"Failed to delete document vectors: {e}"
-            ) from e
+            raise DocumentProcessingError(f"Failed to delete document vectors: {e}") from e
 
     async def _load_document(
         self,
@@ -396,9 +398,7 @@ class DocumentProcessor:
         db: AsyncSession,
     ) -> Document:
         """Load document from database."""
-        result = await db.execute(
-            select(Document).where(Document.id == document_id)
-        )
+        result = await db.execute(select(Document).where(Document.id == document_id))
         document = result.scalar_one_or_none()
 
         if not document:
@@ -412,9 +412,7 @@ class DocumentProcessor:
         db: AsyncSession,
     ) -> KnowledgeBase:
         """Load knowledge base from database."""
-        result = await db.execute(
-            select(KnowledgeBase).where(KnowledgeBase.id == kb_id)
-        )
+        result = await db.execute(select(KnowledgeBase).where(KnowledgeBase.id == kb_id))
         kb = result.scalar_one_or_none()
 
         if not kb:
@@ -512,20 +510,16 @@ class DocumentProcessor:
                 "document_id": str(document.id),
                 "knowledge_base_id": str(kb.id),
                 "chunk_index": chunk.index,
-
                 # Content
                 "text": chunk.content,
                 "char_count": chunk.char_count,
                 "word_count": chunk.word_count,
-
                 # Position in original document
                 "start_char": chunk.start_char,
                 "end_char": chunk.end_char,
-
                 # Document metadata
                 "filename": document.filename,
                 "file_type": document.file_type,
-
                 # Timestamps
                 "indexed_at": datetime.utcnow().isoformat(),
             }

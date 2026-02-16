@@ -4,14 +4,15 @@ Text Chunking Service.
 Handles splitting text documents into chunks for embedding and indexing.
 Supports multiple chunking strategies.
 """
+
 import logging
 import re
 from abc import ABC, abstractmethod
 from typing import List, Optional
+
 from pydantic import BaseModel, Field
 
 from app.config import settings
-
 
 logger = logging.getLogger(__name__)
 
@@ -176,9 +177,9 @@ class FixedSizeChunking(ChunkingStrategy):
             Normalized text
         """
         # Replace multiple spaces/tabs with single space, but preserve newlines
-        text = re.sub(r'[ \t]+', ' ', text)
+        text = re.sub(r"[ \t]+", " ", text)
         # Replace 3+ newlines with 2 newlines (preserve paragraph breaks)
-        text = re.sub(r'\n{3,}', '\n\n', text)
+        text = re.sub(r"\n{3,}", "\n\n", text)
         # Remove leading/trailing whitespace
         text = text.strip()
         return text
@@ -203,7 +204,7 @@ class FixedSizeChunking(ChunkingStrategy):
         search_text = text[search_start:end]
 
         # Try to find sentence boundary (. ! ? followed by space or newline)
-        sentence_pattern = r'[.!?][\s\n]'
+        sentence_pattern = r"[.!?][\s\n]"
         matches = list(re.finditer(sentence_pattern, search_text))
         if matches:
             # Take the last match
@@ -211,14 +212,14 @@ class FixedSizeChunking(ChunkingStrategy):
             return search_start + last_match.end()
 
         # Try to find paragraph boundary (double newline)
-        if '\n\n' in search_text:
-            last_para = search_text.rfind('\n\n')
+        if "\n\n" in search_text:
+            last_para = search_text.rfind("\n\n")
             if last_para > 0:
                 return search_start + last_para + 2
 
         # Try to find word boundary (space)
-        if ' ' in search_text:
-            last_space = search_text.rfind(' ')
+        if " " in search_text:
+            last_space = search_text.rfind(" ")
             if last_space > 0:
                 return search_start + last_space + 1
 
@@ -275,10 +276,10 @@ class RecursiveChunking(ChunkingStrategy):
                 # Hierarchical separators: paragraph → line → sentence → word → char
                 separators=[
                     "\n\n",  # Paragraph boundaries
-                    "\n",    # Line boundaries
-                    ". ",    # Sentence boundaries
-                    " ",     # Word boundaries
-                    "",      # Character-level (fallback)
+                    "\n",  # Line boundaries
+                    ". ",  # Sentence boundaries
+                    " ",  # Word boundaries
+                    "",  # Character-level (fallback)
                 ],
             )
         except Exception as e:
@@ -424,32 +425,33 @@ class SemanticChunking(ChunkingStrategy):
 
         # Import NLTK and configure data path
         try:
-            import nltk
             import os
 
+            import nltk
+
             # Use NLTK data from volume (persists across container restarts)
-            nltk_data_dir = '/app/nltk_data'
+            nltk_data_dir = "/app/nltk_data"
             if os.path.exists(nltk_data_dir) and nltk_data_dir not in nltk.data.path:
                 nltk.data.path.insert(0, nltk_data_dir)
 
             try:
-                nltk.data.find('tokenizers/punkt_tab')
+                nltk.data.find("tokenizers/punkt_tab")
             except LookupError:
                 logger.info("Downloading NLTK punkt_tab tokenizer to volume...")
                 os.makedirs(nltk_data_dir, exist_ok=True)
-                nltk.download('punkt_tab', download_dir=nltk_data_dir, quiet=True)
+                nltk.download("punkt_tab", download_dir=nltk_data_dir, quiet=True)
 
             self.nltk = nltk
         except ImportError:
             raise ImportError(
-                "nltk is required for SemanticChunking. "
-                "Install it with: pip install nltk"
+                "nltk is required for SemanticChunking. " "Install it with: pip install nltk"
             )
 
         # Import numpy and sklearn
         try:
             import numpy as np
             from sklearn.metrics.pairwise import cosine_similarity
+
             self.np = np
             self.cosine_similarity = cosine_similarity
         except ImportError:
@@ -475,7 +477,9 @@ class SemanticChunking(ChunkingStrategy):
         Returns:
             List of Chunk objects with semantic boundaries
         """
-        logger.info(f"[SemanticChunking] split() called with text length: {len(text) if text else 0}")
+        logger.info(
+            f"[SemanticChunking] split() called with text length: {len(text) if text else 0}"
+        )
 
         if not text or not text.strip():
             logger.warning("Empty text provided for chunking")
@@ -485,12 +489,17 @@ class SemanticChunking(ChunkingStrategy):
         logger.info(f"[SemanticChunking] Initializing embeddings service...")
         if self.embeddings_service is None:
             from app.core.embeddings_factory import get_embedding_service
+
             self.embeddings_service = get_embedding_service()
-            logger.info(f"[SemanticChunking] Embeddings service initialized: {type(self.embeddings_service).__name__}")
+            logger.info(
+                f"[SemanticChunking] Embeddings service initialized: {type(self.embeddings_service).__name__}"
+            )
         else:
             logger.info(f"[SemanticChunking] Using existing embeddings service")
 
-        logger.info(f"[SemanticChunking] Checking LLM client (use_contextual={self.use_contextual_embeddings})...")
+        logger.info(
+            f"[SemanticChunking] Checking LLM client (use_contextual={self.use_contextual_embeddings})..."
+        )
         if self.use_contextual_embeddings and self.llm_client is None:
             # Check if LLM model is configured in global settings
             if not self.llm_model:
@@ -500,23 +509,27 @@ class SemanticChunking(ChunkingStrategy):
                 )
                 self.use_contextual_embeddings = False
             elif self.llm_provider and self.llm_provider.lower() == "anthropic":
+                import os
+
                 import anthropic
-                import os
-                self.llm_client = anthropic.Anthropic(
-                    api_key=os.getenv("ANTHROPIC_API_KEY")
+
+                self.llm_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+                logger.info(
+                    f"[SemanticChunking] Anthropic client initialized for model: {self.llm_model}"
                 )
-                logger.info(f"[SemanticChunking] Anthropic client initialized for model: {self.llm_model}")
             elif self.llm_provider and self.llm_provider.lower() == "openai":
-                from openai import OpenAI
                 import os
-                self.llm_client = OpenAI(
-                    api_key=os.getenv("OPENAI_API_KEY")
-                )
+
+                from openai import OpenAI
+
+                self.llm_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
                 logger.warning(
                     "[SemanticChunking] OpenAI contextual embeddings enabled without explicit prompt caching control. "
                     "Ingest may be slower and more expensive."
                 )
-                logger.info(f"[SemanticChunking] OpenAI client initialized for model: {self.llm_model}")
+                logger.info(
+                    f"[SemanticChunking] OpenAI client initialized for model: {self.llm_model}"
+                )
             else:
                 logger.warning(
                     f"Contextual embeddings provider not supported: {self.llm_provider}. "
@@ -539,9 +552,10 @@ class SemanticChunking(ChunkingStrategy):
         Uses ThreadPoolExecutor to avoid blocking the event loop when called
         from async context (FastAPI background tasks).
         """
-        import requests
-        import json
         from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        import requests
+
         from app.core.embeddings_base import EmbeddingProvider
 
         # Get provider info from embeddings_service
@@ -557,7 +571,7 @@ class SemanticChunking(ChunkingStrategy):
                     response = requests.post(
                         f"{self.embeddings_service.base_url}/api/embeddings",
                         json={"model": model, "prompt": text},
-                        timeout=30
+                        timeout=30,
                     )
                     response.raise_for_status()
                     embedding = response.json()["embedding"]
@@ -565,14 +579,15 @@ class SemanticChunking(ChunkingStrategy):
                 elif provider == EmbeddingProvider.OPENAI:
                     # Direct HTTP request to OpenAI
                     import os
+
                     response = requests.post(
                         "https://api.openai.com/v1/embeddings",
                         headers={
                             "Authorization": f"Bearer {os.getenv('OPENAI_API_KEY')}",
-                            "Content-Type": "application/json"
+                            "Content-Type": "application/json",
                         },
                         json={"input": text, "model": model},
-                        timeout=30
+                        timeout=30,
                     )
                     response.raise_for_status()
                     embedding = response.json()["data"][0]["embedding"]
@@ -580,14 +595,15 @@ class SemanticChunking(ChunkingStrategy):
                 elif provider == EmbeddingProvider.VOYAGE:
                     # Direct HTTP request to Voyage
                     import os
+
                     response = requests.post(
                         "https://api.voyageai.com/v1/embeddings",
                         headers={
                             "Authorization": f"Bearer {os.getenv('VOYAGE_API_KEY')}",
-                            "Content-Type": "application/json"
+                            "Content-Type": "application/json",
                         },
                         json={"input": text, "model": model},
-                        timeout=30
+                        timeout=30,
                     )
                     response.raise_for_status()
                     embedding = response.json()["data"][0]["embedding"]
@@ -609,8 +625,7 @@ class SemanticChunking(ChunkingStrategy):
         with ThreadPoolExecutor(max_workers=10) as executor:
             # Submit all tasks with their index
             future_to_idx = {
-                executor.submit(get_single_embedding, text): idx
-                for idx, text in enumerate(texts)
+                executor.submit(get_single_embedding, text): idx for idx, text in enumerate(texts)
             }
 
             # Collect results in original order
@@ -626,7 +641,8 @@ class SemanticChunking(ChunkingStrategy):
 
         # Ensure NLTK data path is set (use volume path)
         import os
-        nltk_data_path = '/app/nltk_data'
+
+        nltk_data_path = "/app/nltk_data"
         if os.path.exists(nltk_data_path) and nltk_data_path not in self.nltk.data.path:
             self.nltk.data.path.insert(0, nltk_data_path)
 
@@ -649,7 +665,9 @@ class SemanticChunking(ChunkingStrategy):
         # Step 2: Embed sentences (SYNC)
         logger.info(f"[SemanticChunking] Step 2: Embedding {len(sentences)} sentences (sync)...")
         sentence_embeddings = self._get_embeddings_sync(sentences)
-        logger.info(f"[SemanticChunking] Step 2 complete: got {len(sentence_embeddings)} embeddings")
+        logger.info(
+            f"[SemanticChunking] Step 2 complete: got {len(sentence_embeddings)} embeddings"
+        )
 
         # Step 3: Find semantic boundaries
         logger.info(f"[SemanticChunking] Step 3: Finding semantic boundaries...")
@@ -659,7 +677,9 @@ class SemanticChunking(ChunkingStrategy):
         # Step 4: Group sentences into chunks
         logger.info(f"[SemanticChunking] Step 4: Grouping sentences into chunks...")
         initial_chunks = self._group_sentences(sentences, boundaries, text)
-        logger.info(f"[SemanticChunking] Step 4 complete: created {len(initial_chunks)} initial chunks")
+        logger.info(
+            f"[SemanticChunking] Step 4 complete: created {len(initial_chunks)} initial chunks"
+        )
 
         # Step 5: Balance chunks
         logger.info(f"[SemanticChunking] Step 5: Balancing chunks...")
@@ -667,10 +687,10 @@ class SemanticChunking(ChunkingStrategy):
         chunk_embeddings = self._get_embeddings_sync(chunk_texts)
         logger.info(f"[SemanticChunking] Step 5a: embedded {len(chunk_embeddings)} chunks")
 
-        balanced_chunks = self._balance_chunks(
-            initial_chunks, chunk_embeddings, text
+        balanced_chunks = self._balance_chunks(initial_chunks, chunk_embeddings, text)
+        logger.info(
+            f"[SemanticChunking] Step 5 complete: balanced to {len(balanced_chunks)} chunks"
         )
-        logger.info(f"[SemanticChunking] Step 5 complete: balanced to {len(balanced_chunks)} chunks")
 
         # Step 6: Skip contextual descriptions for now (requires async LLM calls)
         logger.info(f"[SemanticChunking] Step 6: Skipping contextual embeddings in sync mode")
@@ -690,7 +710,8 @@ class SemanticChunking(ChunkingStrategy):
         """Async implementation of semantic chunking."""
         # Ensure NLTK data path is set (important when running in ThreadPoolExecutor)
         import os
-        nltk_data_path = '/app/nltk_data'
+
+        nltk_data_path = "/app/nltk_data"
         if os.path.exists(nltk_data_path) and nltk_data_path not in self.nltk.data.path:
             self.nltk.data.path.insert(0, nltk_data_path)
 
@@ -713,7 +734,9 @@ class SemanticChunking(ChunkingStrategy):
         # Step 2: Embed sentences
         logger.info(f"[SemanticChunking] Step 2: Embedding {len(sentences)} sentences...")
         sentence_embeddings = await self._embed_sentences(sentences)
-        logger.info(f"[SemanticChunking] Step 2 complete: got {len(sentence_embeddings)} embeddings")
+        logger.info(
+            f"[SemanticChunking] Step 2 complete: got {len(sentence_embeddings)} embeddings"
+        )
 
         # Step 3: Find semantic boundaries
         logger.info(f"[SemanticChunking] Step 3: Finding semantic boundaries...")
@@ -723,23 +746,25 @@ class SemanticChunking(ChunkingStrategy):
         # Step 4: Group sentences into chunks
         logger.info(f"[SemanticChunking] Step 4: Grouping sentences into chunks...")
         initial_chunks = self._group_sentences(sentences, boundaries, text)
-        logger.info(f"[SemanticChunking] Step 4 complete: created {len(initial_chunks)} initial chunks")
+        logger.info(
+            f"[SemanticChunking] Step 4 complete: created {len(initial_chunks)} initial chunks"
+        )
 
         # Step 5: Balance chunks (merge small, split large)
         logger.info(f"[SemanticChunking] Step 5: Balancing chunks...")
         chunk_embeddings = await self._embed_chunks(initial_chunks)
         logger.info(f"[SemanticChunking] Step 5a: embedded {len(chunk_embeddings)} chunks")
-        balanced_chunks = self._balance_chunks(
-            initial_chunks, chunk_embeddings, text
+        balanced_chunks = self._balance_chunks(initial_chunks, chunk_embeddings, text)
+        logger.info(
+            f"[SemanticChunking] Step 5 complete: balanced to {len(balanced_chunks)} chunks"
         )
-        logger.info(f"[SemanticChunking] Step 5 complete: balanced to {len(balanced_chunks)} chunks")
 
         # Step 6: Add contextual descriptions (if enabled)
         if self.use_contextual_embeddings:
-            logger.info(f"[SemanticChunking] Step 6: Adding contextual descriptions for {len(balanced_chunks)} chunks...")
-            balanced_chunks = await self._add_contextual_descriptions(
-                balanced_chunks, text
+            logger.info(
+                f"[SemanticChunking] Step 6: Adding contextual descriptions for {len(balanced_chunks)} chunks..."
             )
+            balanced_chunks = await self._add_contextual_descriptions(balanced_chunks, text)
             logger.info(f"[SemanticChunking] Step 6 complete: contextual descriptions added")
         else:
             logger.info(f"[SemanticChunking] Step 6: Contextual embeddings disabled, skipping")
@@ -758,8 +783,8 @@ class SemanticChunking(ChunkingStrategy):
     def _split_sentences(self, text: str) -> List[str]:
         """Split text into sentences using NLTK."""
         # Detect language (simple heuristic: check for Cyrillic characters)
-        has_cyrillic = any('\u0400' <= c <= '\u04FF' for c in text[:1000])
-        language = 'russian' if has_cyrillic else 'english'
+        has_cyrillic = any("\u0400" <= c <= "\u04ff" for c in text[:1000])
+        language = "russian" if has_cyrillic else "english"
 
         sentences = self.nltk.sent_tokenize(text, language=language)
         logger.debug(f"Split into {len(sentences)} sentences")
@@ -798,8 +823,7 @@ class SemanticChunking(ChunkingStrategy):
             std_sim = self.np.std(similarities)
             threshold = mean_sim - 1.0 * std_sim
             logger.debug(
-                f"Adaptive threshold: {threshold:.4f} "
-                f"(mean={mean_sim:.4f}, std={std_sim:.4f})"
+                f"Adaptive threshold: {threshold:.4f} " f"(mean={mean_sim:.4f}, std={std_sim:.4f})"
             )
         else:
             threshold = self.sentence_similarity_threshold
@@ -833,11 +857,13 @@ class SemanticChunking(ChunkingStrategy):
                     start_pos = current_start
                 end_pos = start_pos + len(chunk_content)
 
-                chunks.append({
-                    "content": chunk_content,
-                    "start_char": start_pos,
-                    "end_char": end_pos,
-                })
+                chunks.append(
+                    {
+                        "content": chunk_content,
+                        "start_char": start_pos,
+                        "end_char": end_pos,
+                    }
+                )
                 current_chunk = []
                 current_start = end_pos
 
@@ -907,11 +933,13 @@ class SemanticChunking(ChunkingStrategy):
             if len(temp_content) > self.max_chunk_size and temp_sentences:
                 # Save current accumulation
                 content = " ".join(temp_sentences)
-                split_chunks.append({
-                    "content": content,
-                    "start_char": current_start,
-                    "end_char": current_start + len(content),
-                })
+                split_chunks.append(
+                    {
+                        "content": content,
+                        "start_char": current_start,
+                        "end_char": current_start + len(content),
+                    }
+                )
                 current_start += len(content) + 1
                 temp_sentences = [sent]
             else:
@@ -920,11 +948,13 @@ class SemanticChunking(ChunkingStrategy):
         # Add remaining sentences
         if temp_sentences:
             content = " ".join(temp_sentences)
-            split_chunks.append({
-                "content": content,
-                "start_char": current_start,
-                "end_char": current_start + len(content),
-            })
+            split_chunks.append(
+                {
+                    "content": content,
+                    "start_char": current_start,
+                    "end_char": current_start + len(content),
+                }
+            )
 
         return split_chunks
 
@@ -1137,9 +1167,7 @@ def get_chunking_service(
 
     strategy_class = strategy_map.get(strategy_name)
     if not strategy_class:
-        logger.warning(
-            f"Unknown chunking strategy '{strategy_name}', falling back to 'simple'"
-        )
+        logger.warning(f"Unknown chunking strategy '{strategy_name}', falling back to 'simple'")
         strategy_class = FixedSizeChunking
 
     # Create strategy instance

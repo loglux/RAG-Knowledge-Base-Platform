@@ -1,16 +1,16 @@
 """Database session management with async SQLAlchemy."""
+
 from typing import AsyncGenerator, Optional
 
 from sqlalchemy.ext.asyncio import (
-    AsyncSession,
     AsyncEngine,
-    create_async_engine,
+    AsyncSession,
     async_sessionmaker,
+    create_async_engine,
 )
 from sqlalchemy.pool import NullPool
 
 from app.config import settings
-
 
 # Global engine and session factory (initialized lazily)
 engine: Optional[AsyncEngine] = None
@@ -141,6 +141,7 @@ async def recreate_engine(new_database_url: str) -> None:
     global engine, AsyncSessionLocal
 
     import logging
+
     logger = logging.getLogger(__name__)
 
     try:

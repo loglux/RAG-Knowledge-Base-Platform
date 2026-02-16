@@ -1,4 +1,5 @@
 """FastAPI application entry point."""
+
 import logging
 import os
 import secrets
@@ -10,20 +11,18 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.api import oauth
+from app.api.v1 import api_router
 from app.config import settings
 from app.db.session import close_db
-from app.api.v1 import api_router
-from app.api import oauth
 from app.mcp.manager import reload_mcp_routes
 from app.mcp.server import get_mcp_app
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler()
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler()],
 )
 
 logger = logging.getLogger(__name__)
@@ -31,7 +30,9 @@ logger = logging.getLogger(__name__)
 # In Docker: /app/secrets/secret_key (mounted volume)
 # Local dev: <project_root>/secrets/secret_key
 SECRET_KEY_FILE = Path(
-    os.environ.get("SECRET_KEY_FILE", Path(__file__).resolve().parent.parent / "secrets" / "secret_key")
+    os.environ.get(
+        "SECRET_KEY_FILE", Path(__file__).resolve().parent.parent / "secrets" / "secret_key"
+    )
 )
 
 
@@ -75,9 +76,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     logger.info(f"LLM Provider: {settings.LLM_PROVIDER}")
 
     # CRITICAL: Initialize database engine with correct credentials
-    from app.db.session import init_engine, get_db_session, recreate_engine
-    from sqlalchemy import text
     import asyncpg
+    from sqlalchemy import text
+
+    from app.db.session import get_db_session, init_engine
 
     logger.info("Initializing database connection...")
 
@@ -101,7 +103,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
 
     # Load settings from database (overrides .env)
     try:
-        from app.config import load_settings_from_db, is_setup_complete
+        from app.config import is_setup_complete, load_settings_from_db
 
         logger.info("Loading settings from database...")
         await load_settings_from_db()
@@ -127,6 +129,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     logger.info("Shutting down Knowledge Base Platform")
     await close_db()
 
+
 def build_combined_lifespan(
     primary: Callable,
     secondary: Callable | None,
@@ -141,6 +144,7 @@ def build_combined_lifespan(
                 yield
 
     return _combined
+
 
 # Build MCP app early so we can combine lifespans.
 mcp_app = None
@@ -181,6 +185,7 @@ app.include_router(api_router, prefix=settings.API_PREFIX)
 if mcp_app is not None:
     app.state.mcp_app = mcp_app
 
+
 @app.middleware("http")
 async def mcp_slash_middleware(request, call_next):
     mount_path = settings.MCP_PATH if settings.MCP_PATH.startswith("/") else f"/{settings.MCP_PATH}"
@@ -188,6 +193,7 @@ async def mcp_slash_middleware(request, call_next):
     if request.url.path == mount_path:
         request.scope["path"] = mount_path + "/"
     return await call_next(request)
+
 
 @app.get("/", tags=["root"])
 async def root():
@@ -210,8 +216,8 @@ async def not_found_handler(request, exc):
         content={
             "detail": "Endpoint not found",
             "path": str(request.url.path),
-            "suggestion": "Check /docs for available endpoints"
-        }
+            "suggestion": "Check /docs for available endpoints",
+        },
     )
 
 

@@ -1,15 +1,14 @@
 """Global application settings endpoints."""
+
 from fastapi import APIRouter, Depends
-from sqlalchemy import select, desc
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings as app_settings
 from app.db.session import get_db
-from app.models.database import (
-    AppSettings as AppSettingsModel,
-    PromptVersion as PromptVersionModel,
-    SelfCheckPromptVersion as SelfCheckPromptVersionModel,
-)
+from app.models.database import AppSettings as AppSettingsModel
+from app.models.database import PromptVersion as PromptVersionModel
+from app.models.database import SelfCheckPromptVersion as SelfCheckPromptVersionModel
 from app.models.schemas import AppSettingsResponse, AppSettingsUpdate
 
 router = APIRouter()
@@ -69,7 +68,9 @@ async def get_app_settings(db: AsyncSession = Depends(get_db)):
             row.active_prompt_version_id = prompt.id
     if row.active_self_check_prompt_version_id is None:
         prompt_result = await db.execute(
-            select(SelfCheckPromptVersionModel).order_by(desc(SelfCheckPromptVersionModel.created_at)).limit(1)
+            select(SelfCheckPromptVersionModel)
+            .order_by(desc(SelfCheckPromptVersionModel.created_at))
+            .limit(1)
         )
         prompt = prompt_result.scalar_one_or_none()
         if prompt:
@@ -130,7 +131,9 @@ async def update_app_settings(
             row.active_prompt_version_id = prompt.id
     if row.active_self_check_prompt_version_id is None:
         prompt_result = await db.execute(
-            select(SelfCheckPromptVersionModel).order_by(desc(SelfCheckPromptVersionModel.created_at)).limit(1)
+            select(SelfCheckPromptVersionModel)
+            .order_by(desc(SelfCheckPromptVersionModel.created_at))
+            .limit(1)
         )
         prompt = prompt_result.scalar_one_or_none()
         if prompt:
@@ -188,7 +191,9 @@ async def reset_app_settings(db: AsyncSession = Depends(get_db)):
             row.active_prompt_version_id = prompt.id
     if row.active_self_check_prompt_version_id is None:
         prompt_result = await db.execute(
-            select(SelfCheckPromptVersionModel).order_by(desc(SelfCheckPromptVersionModel.created_at)).limit(1)
+            select(SelfCheckPromptVersionModel)
+            .order_by(desc(SelfCheckPromptVersionModel.created_at))
+            .limit(1)
         )
         prompt = prompt_result.scalar_one_or_none()
         if prompt:

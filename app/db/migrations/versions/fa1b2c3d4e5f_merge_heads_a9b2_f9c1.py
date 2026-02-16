@@ -4,9 +4,10 @@ Revision ID: fa1b2c3d4e5f
 Revises: a9b2c3d4e5f7, f9c1a2b3c4d5
 Create Date: 2026-02-06
 """
-from typing import Union, Sequence
 
-from alembic import op
+from typing import Sequence, Union
+
+from alembic import op  # noqa: F401
 
 # revision identifiers, used by Alembic.
 revision: str = "fa1b2c3d4e5f"

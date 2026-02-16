@@ -3,7 +3,7 @@
 import hashlib
 from datetime import datetime, timedelta
 from types import SimpleNamespace
-from typing import Optional, List
+from typing import List, Optional
 from uuid import UUID, uuid4
 
 from jose import JWTError, jwt
@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.models.database import MCPToken, MCPRefreshToken
+from app.models.database import MCPRefreshToken, MCPToken
 
 MCP_TOKEN_TYPE = "mcp"
 MCP_ACCESS_TOKEN_TYPE = "mcp_access"
@@ -69,7 +69,9 @@ def _utcnow() -> datetime:
     return datetime.utcnow()
 
 
-def create_mcp_access_token(admin_id: int, expires_in_minutes: Optional[int] = None) -> tuple[str, int]:
+def create_mcp_access_token(
+    admin_id: int, expires_in_minutes: Optional[int] = None
+) -> tuple[str, int]:
     if expires_in_minutes is None:
         raise ValueError("MCP access token TTL is not configured")
     ttl_minutes = expires_in_minutes
@@ -84,7 +86,9 @@ def create_mcp_access_token(admin_id: int, expires_in_minutes: Optional[int] = N
     return token, ttl_minutes * 60
 
 
-def create_mcp_refresh_token(admin_id: int, expires_in_days: Optional[int] = None) -> tuple[str, str, datetime]:
+def create_mcp_refresh_token(
+    admin_id: int, expires_in_days: Optional[int] = None
+) -> tuple[str, str, datetime]:
     jti = str(uuid4())
     if expires_in_days is None:
         raise ValueError("MCP refresh token TTL is not configured")

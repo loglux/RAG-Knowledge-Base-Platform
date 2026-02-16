@@ -3,21 +3,22 @@ Document Structure Analyzer Service.
 
 Analyzes document structure using LLM to create table of contents.
 """
-import logging
+
 import json
+import logging
 import re
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.database import Document, DocumentStructure
-from app.models.schemas import TOCSection, DocumentStructureAnalysis
-from app.core.llm_factory import create_llm_service
-from app.core.llm_base import Message
-from app.core.vector_store import get_vector_store
 from app.config import settings
+from app.core.llm_base import Message
+from app.core.llm_factory import create_llm_service
+from app.core.vector_store import get_vector_store
+from app.models.database import Document, DocumentStructure
+from app.models.schemas import DocumentStructureAnalysis, TOCSection
 
 logger = logging.getLogger(__name__)
 
@@ -120,9 +121,7 @@ Return ONLY valid JSON in this exact format:
             Exception: If analysis fails
         """
         # Get document from DB
-        result = await db.execute(
-            select(Document).where(Document.id == document_id)
-        )
+        result = await db.execute(select(Document).where(Document.id == document_id))
         document = result.scalar_one_or_none()
 
         if not document:
@@ -132,11 +131,7 @@ Return ONLY valid JSON in this exact format:
 
         # Get chunks from Qdrant
         vector_store = get_vector_store()
-        chunks = await self._get_document_chunks(
-            vector_store,
-            collection_name,
-            document_id
-        )
+        chunks = await self._get_document_chunks(vector_store, collection_name, document_id)
 
         if not chunks:
             raise ValueError(f"No chunks found for document {document_id}")
@@ -149,16 +144,17 @@ Return ONLY valid JSON in this exact format:
         logger.info(f"Using {model} for document structure analysis ({len(chunks)} chunks)")
         llm_service = create_llm_service(model=model)
         prompt = self.ANALYSIS_PROMPT.format(
-            filename=document.filename,
-            total_chunks=len(chunks),
-            content=content_sample
+            filename=document.filename, total_chunks=len(chunks), content=content_sample
         )
 
         try:
             response = await llm_service.generate(
                 messages=[
-                    Message(role="system", content="You are a document structure analyzer. Return only valid JSON."),
-                    Message(role="user", content=prompt)
+                    Message(
+                        role="system",
+                        content="You are a document structure analyzer. Return only valid JSON.",
+                    ),
+                    Message(role="user", content=prompt),
                 ],
                 temperature=settings.STRUCTURE_ANALYSIS_LLM_TEMPERATURE,
             )
@@ -171,7 +167,7 @@ Return ONLY valid JSON in this exact format:
                 document_type=analysis_data["document_type"],
                 description=analysis_data["description"],
                 sections=[TOCSection(**section) for section in analysis_data["sections"]],
-                total_sections=len(analysis_data["sections"])
+                total_sections=len(analysis_data["sections"]),
             )
 
             logger.info(
@@ -197,7 +193,7 @@ Return ONLY valid JSON in this exact format:
         document_id: UUID,
         analysis: DocumentStructureAnalysis,
         db: AsyncSession,
-        approved: bool = False
+        approved: bool = False,
     ) -> DocumentStructure:
         """
         Save analyzed structure to database.
@@ -217,9 +213,7 @@ Return ONLY valid JSON in this exact format:
 
         # Check if structure already exists
         result = await db.execute(
-            select(DocumentStructure).where(
-                DocumentStructure.document_id == document_id
-            )
+            select(DocumentStructure).where(DocumentStructure.document_id == document_id)
         )
         existing = result.scalar_one_or_none()
 
@@ -235,7 +229,7 @@ Return ONLY valid JSON in this exact format:
                 document_id=document_id,
                 toc_json=toc_json,
                 document_type=analysis.document_type,
-                approved_by_user=approved
+                approved_by_user=approved,
             )
             db.add(structure)
 
@@ -246,23 +240,16 @@ Return ONLY valid JSON in this exact format:
         return structure
 
     async def get_structure(
-        self,
-        document_id: UUID,
-        db: AsyncSession
+        self, document_id: UUID, db: AsyncSession
     ) -> Optional[DocumentStructure]:
         """Get document structure from database."""
         result = await db.execute(
-            select(DocumentStructure).where(
-                DocumentStructure.document_id == document_id
-            )
+            select(DocumentStructure).where(DocumentStructure.document_id == document_id)
         )
         return result.scalar_one_or_none()
 
     async def _get_document_chunks(
-        self,
-        vector_store,
-        collection_name: str,
-        document_id: UUID
+        self, vector_store, collection_name: str, document_id: UUID
     ) -> List[Dict[str, Any]]:
         """
         Retrieve ALL document chunks from Qdrant with pagination.
@@ -277,26 +264,23 @@ Return ONLY valid JSON in this exact format:
             points, next_offset = await vector_store.client.scroll(
                 collection_name=collection_name,
                 scroll_filter={
-                    "must": [
-                        {
-                            "key": "document_id",
-                            "match": {"value": str(document_id)}
-                        }
-                    ]
+                    "must": [{"key": "document_id", "match": {"value": str(document_id)}}]
                 },
                 limit=settings.STRUCTURE_ANALYSIS_QDRANT_PAGE_SIZE,
                 offset=next_offset,
                 with_payload=True,
-                with_vectors=False
+                with_vectors=False,
             )
 
             for point in points:
                 payload = point.payload
-                chunks.append({
-                    "index": payload.get("chunk_index", 0),
-                    "text": payload.get("text", ""),
-                    "metadata": payload
-                })
+                chunks.append(
+                    {
+                        "index": payload.get("chunk_index", 0),
+                        "text": payload.get("text", ""),
+                        "metadata": payload,
+                    }
+                )
 
             # Break if no more results
             if next_offset is None:
@@ -355,12 +339,12 @@ Return ONLY valid JSON in this exact format:
         """Parse LLM JSON response."""
         # Try to extract JSON from response
         # Sometimes LLM adds markdown code blocks
-        json_match = re.search(r'```json\s*(\{.*?\})\s*```', response, re.DOTALL)
+        json_match = re.search(r"```json\s*(\{.*?\})\s*```", response, re.DOTALL)
         if json_match:
             json_str = json_match.group(1)
         else:
             # Try to find JSON object
-            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            json_match = re.search(r"\{.*\}", response, re.DOTALL)
             if json_match:
                 json_str = json_match.group(0)
             else:

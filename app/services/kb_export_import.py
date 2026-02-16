@@ -1,34 +1,32 @@
 """KB export/import helpers (MVP)."""
+
 from __future__ import annotations
 
 import json
 import os
-import tarfile
-import zipfile
-import tempfile
 import shutil
+import tarfile
+import tempfile
+import zipfile
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional
 from uuid import UUID, uuid4
 
+from opensearchpy.helpers import async_bulk
+from qdrant_client.models import Distance, FieldCondition, Filter, MatchValue, PointStruct
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from qdrant_client.models import Filter, FieldCondition, MatchValue, PointStruct, Distance
-from opensearchpy.helpers import async_bulk
 
 from app.api.v1.knowledge_bases import kb_id_to_collection_name
-from app.core.vector_store import get_vector_store
 from app.core.lexical_store import get_lexical_store
-from app.models.database import (
-    KnowledgeBase as KnowledgeBaseModel,
-    Document as DocumentModel,
-    DocumentStructure as DocumentStructureModel,
-    Conversation as ConversationModel,
-    ChatMessage as ChatMessageModel,
-)
-from app.models.enums import DocumentStatus, ChunkingStrategy, FileType
+from app.core.vector_store import get_vector_store
+from app.models.database import ChatMessage as ChatMessageModel
+from app.models.database import Conversation as ConversationModel
+from app.models.database import Document as DocumentModel
+from app.models.database import DocumentStructure as DocumentStructureModel
+from app.models.database import KnowledgeBase as KnowledgeBaseModel
+from app.models.enums import ChunkingStrategy, DocumentStatus, FileType
 from app.models.schemas import KBExportInclude, KBImportOptions
-
 
 EXPORT_VERSION = "1.0"
 
@@ -116,32 +114,34 @@ async def export_kbs(
 
     kb_rows = []
     for kb in kbs:
-        kb_rows.append({
-            "id": str(kb.id),
-            "name": kb.name,
-            "description": kb.description,
-            "collection_name": kb.collection_name,
-            "embedding_model": kb.embedding_model,
-            "embedding_provider": kb.embedding_provider,
-            "embedding_dimension": kb.embedding_dimension,
-            "chunk_size": kb.chunk_size,
-            "chunk_overlap": kb.chunk_overlap,
-            "chunking_strategy": kb.chunking_strategy.value if kb.chunking_strategy else None,
-            "upsert_batch_size": kb.upsert_batch_size,
-            "bm25_match_mode": kb.bm25_match_mode,
-            "bm25_min_should_match": kb.bm25_min_should_match,
-            "bm25_use_phrase": kb.bm25_use_phrase,
-            "bm25_analyzer": kb.bm25_analyzer,
-            "structure_llm_model": kb.structure_llm_model,
-            "use_llm_chat_titles": kb.use_llm_chat_titles,
-            "retrieval_settings_json": kb.retrieval_settings_json,
-            "document_count": kb.document_count,
-            "total_chunks": kb.total_chunks,
-            "user_id": str(kb.user_id) if kb.user_id else None,
-            "created_at": _dt(kb.created_at),
-            "updated_at": _dt(kb.updated_at),
-            "is_deleted": kb.is_deleted,
-        })
+        kb_rows.append(
+            {
+                "id": str(kb.id),
+                "name": kb.name,
+                "description": kb.description,
+                "collection_name": kb.collection_name,
+                "embedding_model": kb.embedding_model,
+                "embedding_provider": kb.embedding_provider,
+                "embedding_dimension": kb.embedding_dimension,
+                "chunk_size": kb.chunk_size,
+                "chunk_overlap": kb.chunk_overlap,
+                "chunking_strategy": kb.chunking_strategy.value if kb.chunking_strategy else None,
+                "upsert_batch_size": kb.upsert_batch_size,
+                "bm25_match_mode": kb.bm25_match_mode,
+                "bm25_min_should_match": kb.bm25_min_should_match,
+                "bm25_use_phrase": kb.bm25_use_phrase,
+                "bm25_analyzer": kb.bm25_analyzer,
+                "structure_llm_model": kb.structure_llm_model,
+                "use_llm_chat_titles": kb.use_llm_chat_titles,
+                "retrieval_settings_json": kb.retrieval_settings_json,
+                "document_count": kb.document_count,
+                "total_chunks": kb.total_chunks,
+                "user_id": str(kb.user_id) if kb.user_id else None,
+                "created_at": _dt(kb.created_at),
+                "updated_at": _dt(kb.updated_at),
+                "is_deleted": kb.is_deleted,
+            }
+        )
     _write_jsonl(os.path.join(db_dir, "knowledge_bases.jsonl"), kb_rows)
 
     documents = []
@@ -154,28 +154,32 @@ async def export_kbs(
         doc_result = await db.execute(doc_query)
         doc_rows = doc_result.scalars().all()
         for doc in doc_rows:
-            documents.append({
-                "id": str(doc.id),
-                "knowledge_base_id": str(doc.knowledge_base_id),
-                "filename": doc.filename,
-                "file_type": doc.file_type.value if doc.file_type else None,
-                "file_size": doc.file_size,
-                "content": doc.content,
-                "content_hash": doc.content_hash,
-                "status": doc.status.value if doc.status else None,
-                "embeddings_status": doc.embeddings_status.value if doc.embeddings_status else None,
-                "bm25_status": doc.bm25_status.value if doc.bm25_status else None,
-                "error_message": doc.error_message,
-                "processing_stage": doc.processing_stage,
-                "progress_percentage": doc.progress_percentage,
-                "chunk_count": doc.chunk_count,
-                "vector_ids": doc.vector_ids,
-                "user_id": str(doc.user_id) if doc.user_id else None,
-                "created_at": _dt(doc.created_at),
-                "updated_at": _dt(doc.updated_at),
-                "processed_at": _dt(doc.processed_at),
-                "is_deleted": doc.is_deleted,
-            })
+            documents.append(
+                {
+                    "id": str(doc.id),
+                    "knowledge_base_id": str(doc.knowledge_base_id),
+                    "filename": doc.filename,
+                    "file_type": doc.file_type.value if doc.file_type else None,
+                    "file_size": doc.file_size,
+                    "content": doc.content,
+                    "content_hash": doc.content_hash,
+                    "status": doc.status.value if doc.status else None,
+                    "embeddings_status": (
+                        doc.embeddings_status.value if doc.embeddings_status else None
+                    ),
+                    "bm25_status": doc.bm25_status.value if doc.bm25_status else None,
+                    "error_message": doc.error_message,
+                    "processing_stage": doc.processing_stage,
+                    "progress_percentage": doc.progress_percentage,
+                    "chunk_count": doc.chunk_count,
+                    "vector_ids": doc.vector_ids,
+                    "user_id": str(doc.user_id) if doc.user_id else None,
+                    "created_at": _dt(doc.created_at),
+                    "updated_at": _dt(doc.updated_at),
+                    "processed_at": _dt(doc.processed_at),
+                    "is_deleted": doc.is_deleted,
+                }
+            )
     _write_jsonl(os.path.join(db_dir, "documents.jsonl"), documents)
 
     structures = []
@@ -191,15 +195,17 @@ async def export_kbs(
             struct_rows = []
 
         for struct in struct_rows:
-            structures.append({
-                "id": str(struct.id),
-                "document_id": str(struct.document_id),
-                "toc_json": struct.toc_json,
-                "document_type": struct.document_type,
-                "approved_by_user": struct.approved_by_user,
-                "created_at": _dt(struct.created_at),
-                "updated_at": _dt(struct.updated_at),
-            })
+            structures.append(
+                {
+                    "id": str(struct.id),
+                    "document_id": str(struct.document_id),
+                    "toc_json": struct.toc_json,
+                    "document_type": struct.document_type,
+                    "approved_by_user": struct.approved_by_user,
+                    "created_at": _dt(struct.created_at),
+                    "updated_at": _dt(struct.updated_at),
+                }
+            )
     _write_jsonl(os.path.join(db_dir, "document_structures.jsonl"), structures)
 
     conversations = []
@@ -214,16 +220,18 @@ async def export_kbs(
         convo_ids = [c.id for c in convo_rows]
 
         for convo in convo_rows:
-            conversations.append({
-                "id": str(convo.id),
-                "knowledge_base_id": str(convo.knowledge_base_id),
-                "title": convo.title,
-                "settings_json": convo.settings_json,
-                "user_id": str(convo.user_id) if convo.user_id else None,
-                "created_at": _dt(convo.created_at),
-                "updated_at": _dt(convo.updated_at),
-                "is_deleted": convo.is_deleted,
-            })
+            conversations.append(
+                {
+                    "id": str(convo.id),
+                    "knowledge_base_id": str(convo.knowledge_base_id),
+                    "title": convo.title,
+                    "settings_json": convo.settings_json,
+                    "user_id": str(convo.user_id) if convo.user_id else None,
+                    "created_at": _dt(convo.created_at),
+                    "updated_at": _dt(convo.updated_at),
+                    "is_deleted": convo.is_deleted,
+                }
+            )
 
         if convo_ids:
             msg_query = select(ChatMessageModel).where(
@@ -235,18 +243,22 @@ async def export_kbs(
             msg_rows = []
 
         for msg in msg_rows:
-            messages.append({
-                "id": str(msg.id),
-                "conversation_id": str(msg.conversation_id),
-                "role": msg.role,
-                "content": msg.content,
-                "sources_json": msg.sources_json,
-                "model": msg.model,
-                "use_self_check": msg.use_self_check,
-                "prompt_version_id": str(msg.prompt_version_id) if msg.prompt_version_id else None,
-                "message_index": msg.message_index,
-                "created_at": _dt(msg.created_at),
-            })
+            messages.append(
+                {
+                    "id": str(msg.id),
+                    "conversation_id": str(msg.conversation_id),
+                    "role": msg.role,
+                    "content": msg.content,
+                    "sources_json": msg.sources_json,
+                    "model": msg.model,
+                    "use_self_check": msg.use_self_check,
+                    "prompt_version_id": (
+                        str(msg.prompt_version_id) if msg.prompt_version_id else None
+                    ),
+                    "message_index": msg.message_index,
+                    "created_at": _dt(msg.created_at),
+                }
+            )
 
         _write_jsonl(os.path.join(db_dir, "conversations.jsonl"), conversations)
         _write_jsonl(os.path.join(db_dir, "chat_messages.jsonl"), messages)
@@ -265,10 +277,12 @@ async def export_kbs(
                     result = await client.scroll(
                         collection_name=kb.collection_name,
                         scroll_filter=Filter(
-                            must=[FieldCondition(
-                                key="knowledge_base_id",
-                                match=MatchValue(value=str(kb.id)),
-                            )]
+                            must=[
+                                FieldCondition(
+                                    key="knowledge_base_id",
+                                    match=MatchValue(value=str(kb.id)),
+                                )
+                            ]
                         ),
                         limit=200,
                         offset=next_offset,
@@ -368,9 +382,7 @@ async def export_chats_markdown(
     convo_ids = [c.id for c in convo_rows]
 
     if convo_ids:
-        msg_query = select(ChatMessageModel).where(
-            ChatMessageModel.conversation_id.in_(convo_ids)
-        )
+        msg_query = select(ChatMessageModel).where(ChatMessageModel.conversation_id.in_(convo_ids))
         msg_result = await db.execute(msg_query)
         msg_rows = msg_result.scalars().all()
     else:
@@ -484,7 +496,7 @@ async def import_kbs(
             struct_rows = []
             convo_rows = []
             msg_rows = []
-    
+
         target_kb = None
         if options.target_kb_id:
             if options.mode != "merge":
@@ -497,12 +509,14 @@ async def import_kbs(
             target_kb = existing_result.scalar_one_or_none()
             if not target_kb:
                 raise KBExportImportError(f"Target KB not found: {options.target_kb_id}")
-    
+
         kb_id_map: Dict[str, str] = {}
         doc_id_map: Dict[str, str] = {}
         for kb in kb_rows:
             old_id = kb["id"]
-            new_id = str(target_kb.id) if target_kb else (str(uuid4()) if options.remap_ids else old_id)
+            new_id = (
+                str(target_kb.id) if target_kb else (str(uuid4()) if options.remap_ids else old_id)
+            )
             kb_id_map[old_id] = new_id
         for doc in doc_rows:
             old_id = doc["id"]
@@ -516,7 +530,9 @@ async def import_kbs(
             collection_name = (
                 target_kb.collection_name
                 if target_kb
-                else (kb_id_to_collection_name(kb_id) if options.remap_ids else kb["collection_name"])
+                else (
+                    kb_id_to_collection_name(kb_id) if options.remap_ids else kb["collection_name"]
+                )
             )
 
             existing = None
@@ -575,8 +591,11 @@ async def import_kbs(
                     embedding_dimension=kb["embedding_dimension"],
                     chunk_size=kb["chunk_size"],
                     chunk_overlap=kb["chunk_overlap"],
-                    chunking_strategy=ChunkingStrategy(kb["chunking_strategy"])
-                    if kb.get("chunking_strategy") else None,
+                    chunking_strategy=(
+                        ChunkingStrategy(kb["chunking_strategy"])
+                        if kb.get("chunking_strategy")
+                        else None
+                    ),
                     upsert_batch_size=kb["upsert_batch_size"],
                     bm25_match_mode=kb.get("bm25_match_mode"),
                     bm25_min_should_match=kb.get("bm25_min_should_match"),
@@ -593,7 +612,7 @@ async def import_kbs(
 
         # Ensure KBs exist in DB before inserting dependent records (e.g., conversations).
         await db.flush()
-    
+
         for doc in doc_rows:
             doc_id = UUID(doc_id_map[doc["id"]])
             kb_id = UUID(kb_id_map[doc["knowledge_base_id"]])
@@ -606,7 +625,9 @@ async def import_kbs(
 
             file_type = FileType(doc["file_type"]) if doc.get("file_type") else None
             status = DocumentStatus(doc["status"]) if doc.get("status") else None
-            embeddings_status = DocumentStatus(doc["embeddings_status"]) if doc.get("embeddings_status") else None
+            embeddings_status = (
+                DocumentStatus(doc["embeddings_status"]) if doc.get("embeddings_status") else None
+            )
             bm25_status = DocumentStatus(doc["bm25_status"]) if doc.get("bm25_status") else None
 
             if existing:
@@ -648,7 +669,9 @@ async def import_kbs(
             doc_id = UUID(doc_id_map[struct["document_id"]])
             if options.mode == "merge" and not options.remap_ids:
                 existing_result = await db.execute(
-                    select(DocumentStructureModel).where(DocumentStructureModel.document_id == doc_id)
+                    select(DocumentStructureModel).where(
+                        DocumentStructureModel.document_id == doc_id
+                    )
                 )
                 existing = existing_result.scalar_one_or_none()
             else:
@@ -750,7 +773,11 @@ async def import_kbs(
                 if target_kb:
                     new_collection = target_kb.collection_name
                 else:
-                    new_collection = kb_id_to_collection_name(UUID(new_kb_id)) if options.remap_ids else old_collection
+                    new_collection = (
+                        kb_id_to_collection_name(UUID(new_kb_id))
+                        if options.remap_ids
+                        else old_collection
+                    )
 
                 await vector_store.create_collection(
                     collection_name=new_collection,
@@ -773,11 +800,13 @@ async def import_kbs(
                         if old_doc_id in doc_id_map:
                             payload["document_id"] = doc_id_map[old_doc_id]
                         payload["knowledge_base_id"] = new_kb_id
-                        batch.append(PointStruct(
-                            id=record["id"],
-                            vector=record["vector"],
-                            payload=payload,
-                        ))
+                        batch.append(
+                            PointStruct(
+                                id=record["id"],
+                                vector=record["vector"],
+                                payload=payload,
+                            )
+                        )
                         if len(batch) >= 200:
                             await client.upsert(collection_name=new_collection, points=batch)
                             batch = []
@@ -810,12 +839,14 @@ async def import_kbs(
                         source["knowledge_base_id"] = new_kb_id
                         chunk_index = source.get("chunk_index")
                         chunk_id = f"{new_doc_id}:{chunk_index}"
-                        actions.append({
-                            "_op_type": "index",
-                            "_index": index_name,
-                            "_id": chunk_id,
-                            **source,
-                        })
+                        actions.append(
+                            {
+                                "_op_type": "index",
+                                "_index": index_name,
+                                "_id": chunk_id,
+                                **source,
+                            }
+                        )
                         if len(actions) >= 500:
                             await async_bulk(client, actions, request_timeout=60)
                             actions = []

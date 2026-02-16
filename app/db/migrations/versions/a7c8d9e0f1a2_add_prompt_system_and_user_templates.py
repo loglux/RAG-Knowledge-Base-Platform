@@ -4,12 +4,12 @@ Revision ID: a7c8d9e0f1a2
 Revises: a6c4d2e9f1b3
 Create Date: 2026-02-05
 """
-from typing import Sequence, Union
+
 import uuid
+from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "a7c8d9e0f1a2"
@@ -59,35 +59,25 @@ def upgrade() -> None:
     op.add_column("prompt_versions", sa.Column("user_template", sa.Text(), nullable=True))
 
     # Backfill existing rows
-    op.execute(
-        sa.text(
-            """
+    op.execute(sa.text("""
             UPDATE prompt_versions
             SET system_content = content
             WHERE system_content IS NULL;
-            """
-        )
-    )
-    op.execute(
-        sa.text(
-            """
+            """))
+    op.execute(sa.text("""
             UPDATE prompt_versions
             SET user_template = :template
             WHERE user_template IS NULL;
-            """
-        ).bindparams(template=DEFAULT_USER_TEMPLATE)
-    )
+            """).bindparams(template=DEFAULT_USER_TEMPLATE))
 
     # Seed default prompt version if none exist
     prompt_id = str(uuid.uuid4())
     op.execute(
-        sa.text(
-            """
+        sa.text("""
             INSERT INTO prompt_versions (id, name, content, system_content, user_template, created_by, created_at)
             SELECT CAST(:prompt_id AS uuid), 'Default Prompt', :system_content, :system_content, :user_template, NULL, now()
             WHERE NOT EXISTS (SELECT 1 FROM prompt_versions);
-            """
-        ).bindparams(
+            """).bindparams(
             prompt_id=prompt_id,
             system_content=DEFAULT_SYSTEM_PROMPT,
             user_template=DEFAULT_USER_TEMPLATE,
@@ -100,30 +90,22 @@ def upgrade() -> None:
     op.drop_column("prompt_versions", "content")
 
     # Ensure app_settings has an active prompt if missing
-    op.execute(
-        sa.text(
-            """
+    op.execute(sa.text("""
             UPDATE app_settings
             SET active_prompt_version_id = (
                 SELECT id FROM prompt_versions ORDER BY created_at DESC LIMIT 1
             )
             WHERE active_prompt_version_id IS NULL;
-            """
-        )
-    )
+            """))
 
 
 def downgrade() -> None:
     """Revert migration."""
     op.add_column("prompt_versions", sa.Column("content", sa.Text(), nullable=True))
-    op.execute(
-        sa.text(
-            """
+    op.execute(sa.text("""
             UPDATE prompt_versions
             SET content = system_content
             WHERE content IS NULL;
-            """
-        )
-    )
+            """))
     op.drop_column("prompt_versions", "user_template")
     op.drop_column("prompt_versions", "system_content")

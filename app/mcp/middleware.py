@@ -1,15 +1,13 @@
 """MCP authentication middleware."""
 
-from typing import Optional
-
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from app.config import settings
-from app.db.session import get_db_session
 from app.core.system_settings import SystemSettingsManager
-from app.services.mcp_tokens import verify_mcp_token, verify_mcp_access_token
+from app.db.session import get_db_session
+from app.services.mcp_tokens import verify_mcp_access_token, verify_mcp_token
 
 
 async def _get_mcp_enabled() -> bool:
@@ -67,7 +65,9 @@ class MCPAcceptMiddleware(BaseHTTPMiddleware):
         want_sse = "text/event-stream" in normalized
 
         if not want_json or not want_sse:
-            headers = [(k, v) for (k, v) in request.scope.get("headers", []) if k.lower() != b"accept"]
+            headers = [
+                (k, v) for (k, v) in request.scope.get("headers", []) if k.lower() != b"accept"
+            ]
             merged = []
             if accept:
                 merged.append(accept)

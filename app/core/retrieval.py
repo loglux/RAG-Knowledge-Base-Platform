@@ -3,18 +3,17 @@ Retrieval Engine for RAG.
 
 Handles semantic search and context retrieval from vector store.
 """
+
 import logging
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.core.embeddings_factory import get_embedding_service
-from app.core.embeddings_base import BaseEmbeddingService
-from app.core.vector_store import get_vector_store, QdrantVectorStore, SearchResult
-from app.core.lexical_store import get_lexical_store, OpenSearchStore
 from app.config import settings
-
+from app.core.embeddings_factory import get_embedding_service
+from app.core.lexical_store import OpenSearchStore, get_lexical_store
+from app.core.vector_store import QdrantVectorStore, SearchResult, get_vector_store
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +109,9 @@ class RetrievalEngine:
         # Dense search
         dense_results = await self.vector_store.search(
             collection_name=collection_name,
-            query_vector=await get_embedding_service(model=embedding_model).generate_embedding(query),
+            query_vector=await get_embedding_service(model=embedding_model).generate_embedding(
+                query
+            ),
             limit=dense_limit,
             score_threshold=score_threshold,
             filter_conditions=filters,
@@ -453,7 +454,9 @@ class RetrievalEngine:
             metadata = dict(chunk.metadata or {})
             metadata.update(
                 {
-                    "source_type": "hybrid" if (dense_chunk and lexical_chunk) else metadata.get("source_type"),
+                    "source_type": (
+                        "hybrid" if (dense_chunk and lexical_chunk) else metadata.get("source_type")
+                    ),
                     "dense_score_raw": getattr(dense_chunk, "score", None),
                     "lexical_score_raw": getattr(lexical_chunk, "score", None),
                     "dense_score_norm": dense_norm.get(key, 0.0),
@@ -497,8 +500,7 @@ class RetrievalEngine:
         for i, chunk in enumerate(chunks):
             # Format chunk with metadata
             chunk_text = (
-                f"[Source {i+1}: {chunk.filename}, chunk {chunk.chunk_index}]\n"
-                f"{chunk.text}\n"
+                f"[Source {i+1}: {chunk.filename}, chunk {chunk.chunk_index}]\n" f"{chunk.text}\n"
             )
 
             chunk_length = len(chunk_text)
@@ -516,9 +518,7 @@ class RetrievalEngine:
 
         context = "\n".join(context_parts)
 
-        logger.debug(
-            f"Assembled context: {len(context)} chars from {len(context_parts)} chunks"
-        )
+        logger.debug(f"Assembled context: {len(context)} chars from {len(context_parts)} chunks")
 
         return context
 

@@ -4,13 +4,13 @@ Revision ID: a8b1c2d3e4f6
 Revises: a7c8d9e0f1a2
 Create Date: 2026-02-05
 """
-from typing import Sequence, Union
+
 import uuid
+from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
-
 
 # revision identifiers, used by Alembic.
 revision: str = "a8b1c2d3e4f6"
@@ -56,7 +56,9 @@ def upgrade() -> None:
         ),
         sa.Column("created_at", sa.DateTime(), nullable=False),
     )
-    op.create_index("ix_self_check_prompt_versions_created_by", "self_check_prompt_versions", ["created_by"])
+    op.create_index(
+        "ix_self_check_prompt_versions_created_by", "self_check_prompt_versions", ["created_by"]
+    )
 
     op.add_column(
         "app_settings",
@@ -78,30 +80,24 @@ def upgrade() -> None:
 
     prompt_id = str(uuid.uuid4())
     op.execute(
-        sa.text(
-            """
+        sa.text("""
             INSERT INTO self_check_prompt_versions (id, name, system_content, user_template, created_by, created_at)
             SELECT CAST(:prompt_id AS uuid), 'Self-Check Prompt', :system_content, :user_template, NULL, now()
             WHERE NOT EXISTS (SELECT 1 FROM self_check_prompt_versions);
-            """
-        ).bindparams(
+            """).bindparams(
             prompt_id=prompt_id,
             system_content=DEFAULT_SELF_CHECK_SYSTEM_PROMPT,
             user_template=DEFAULT_SELF_CHECK_USER_TEMPLATE,
         )
     )
 
-    op.execute(
-        sa.text(
-            """
+    op.execute(sa.text("""
             UPDATE app_settings
             SET active_self_check_prompt_version_id = (
                 SELECT id FROM self_check_prompt_versions ORDER BY created_at DESC LIMIT 1
             )
             WHERE active_self_check_prompt_version_id IS NULL;
-            """
-        )
-    )
+            """))
 
 
 def downgrade() -> None:
@@ -112,5 +108,7 @@ def downgrade() -> None:
         type_="foreignkey",
     )
     op.drop_column("app_settings", "active_self_check_prompt_version_id")
-    op.drop_index("ix_self_check_prompt_versions_created_by", table_name="self_check_prompt_versions")
+    op.drop_index(
+        "ix_self_check_prompt_versions_created_by", table_name="self_check_prompt_versions"
+    )
     op.drop_table("self_check_prompt_versions")

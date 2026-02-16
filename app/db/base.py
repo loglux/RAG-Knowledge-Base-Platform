@@ -1,25 +1,24 @@
 """Import all models here for Alembic to detect them."""
 
 # Import Base first
-from app.models.database import Base
-
 # Import all models so Alembic can detect them
 from app.models.database import (
-    KnowledgeBase,
+    AppSettings,
+    Base,
+    ChatMessage,
+    Conversation,
     Document,
     DocumentStructure,
-    Conversation,
-    ChatMessage,
-    PromptVersion,
-    SelfCheckPromptVersion,
-    AppSettings,
-    MCPToken,
-    MCPRefreshToken,
+    KnowledgeBase,
     MCPAuthCode,
     MCPAuthEvent,
-    QASample,
-    QAEvalRun,
+    MCPRefreshToken,
+    MCPToken,
+    PromptVersion,
     QAEvalResult,
+    QAEvalRun,
+    QASample,
+    SelfCheckPromptVersion,
 )
 
 __all__ = [

@@ -3,6 +3,7 @@ OpenSearch Lexical Store Service.
 
 Provides BM25-based lexical search over chunk text.
 """
+
 import logging
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 class LexicalStoreException(Exception):
     """Base exception for lexical store operations."""
+
     pass
 
 
@@ -256,7 +258,9 @@ class OpenSearchStore:
             ]
         except OpenSearchException as e:
             if analyzer_name:
-                logger.warning(f"OpenSearch query failed with analyzer '{analyzer_name}', retrying without analyzer: {e}")
+                logger.warning(
+                    f"OpenSearch query failed with analyzer '{analyzer_name}', retrying without analyzer: {e}"
+                )
                 try:
                     match_body.pop("analyzer", None)
                     for clause in should_clauses:
@@ -273,7 +277,9 @@ class OpenSearchStore:
                     ]
                 except OpenSearchException as retry_err:
                     logger.error(f"OpenSearch query failed after analyzer retry: {retry_err}")
-                    raise LexicalStoreException(f"OpenSearch query failed: {retry_err}") from retry_err
+                    raise LexicalStoreException(
+                        f"OpenSearch query failed: {retry_err}"
+                    ) from retry_err
             logger.error(f"OpenSearch query failed: {e}")
             raise LexicalStoreException(f"OpenSearch query failed: {e}") from e
 

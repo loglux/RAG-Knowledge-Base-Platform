@@ -1,14 +1,14 @@
 """JWT auth utilities."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta
 from typing import Optional
 from uuid import uuid4
 
-from jose import jwt, JWTError
+from jose import jwt
 
 from app.config import settings
-
 
 ACCESS_TOKEN_TYPE = "access"
 REFRESH_TOKEN_TYPE = "refresh"

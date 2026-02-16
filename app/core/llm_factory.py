@@ -3,16 +3,16 @@ Factory for creating LLM services.
 
 Provides unified interface for creating LLM services from different providers.
 """
+
 import logging
 from typing import Optional
 
 from app.config import settings
 from app.core.llm_base import (
+    LLM_MODELS,
     BaseLLMService,
     LLMProvider,
-    LLM_MODELS,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -57,12 +57,14 @@ def create_llm_service(
     # Create appropriate service based on provider
     if provider_enum == LLMProvider.OPENAI:
         from app.core.llm_openai import OpenAILLMService
+
         return OpenAILLMService(
             api_key=api_key or settings.OPENAI_API_KEY,
             model=model or settings.OPENAI_CHAT_MODEL,
         )
     elif provider_enum == LLMProvider.ANTHROPIC:
         from app.core.llm_anthropic import AnthropicLLMService
+
         anthropic_key = api_key or settings.ANTHROPIC_API_KEY
         if not anthropic_key:
             raise ValueError(
@@ -75,6 +77,7 @@ def create_llm_service(
         )
     elif provider_enum == LLMProvider.DEEPSEEK:
         from app.core.llm_deepseek import DeepSeekLLMService
+
         deepseek_key = api_key or settings.DEEPSEEK_API_KEY
         if not deepseek_key:
             raise ValueError(
@@ -88,6 +91,7 @@ def create_llm_service(
         )
     elif provider_enum == LLMProvider.OLLAMA:
         from app.core.llm_ollama import OllamaLLMService
+
         ollama_url = settings.OLLAMA_BASE_URL
         if not ollama_url:
             raise ValueError(
@@ -160,8 +164,4 @@ def get_models_by_provider(provider: LLMProvider) -> list:
     Returns:
         List of model names for the provider
     """
-    return [
-        model
-        for model, config in LLM_MODELS.items()
-        if config.provider == provider
-    ]
+    return [model for model, config in LLM_MODELS.items() if config.provider == provider]

@@ -1,28 +1,29 @@
 """OAuth-style token endpoint for MCP clients."""
-from typing import Optional
-from datetime import datetime, timedelta
+
 import base64
 import hashlib
 import secrets
+from datetime import datetime, timedelta
+from typing import Optional
 
 import bcrypt
-from fastapi import APIRouter, Depends, Form, HTTPException, status, Request
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
 from app.core.system_settings import SystemSettingsManager
+from app.db.session import get_db
 from app.models.database import AdminUser, MCPAuthCode
+from app.services.mcp_oauth_events import record_mcp_oauth_event
 from app.services.mcp_tokens import (
     create_mcp_access_token,
     create_mcp_refresh_token,
-    store_mcp_refresh_token,
     revoke_mcp_refresh_token,
+    store_mcp_refresh_token,
     validate_mcp_refresh_token,
 )
-from app.services.mcp_oauth_events import record_mcp_oauth_event
 
 router = APIRouter(prefix="/oauth", tags=["oauth"])
 public_router = APIRouter(tags=["oauth"])
@@ -63,14 +64,18 @@ async def _get_public_base_url(db: AsyncSession, request: Request) -> str:
 
 def _parse_positive_int(value: str | None, field_name: str) -> int:
     if not value:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Missing {field_name} setting")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Missing {field_name} setting"
+        )
     try:
         parsed = int(value)
         if parsed > 0:
             return parsed
     except (TypeError, ValueError):
         pass
-    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid {field_name} setting")
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid {field_name} setting"
+    )
 
 
 class OAuthTokenResponse(BaseModel):
@@ -104,9 +109,13 @@ async def oauth_authorize_form(
     if mode != "oauth2":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="OAuth2 is disabled")
     if response_type != "code":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported response_type")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported response_type"
+        )
     if code_challenge_method not in {"S256"}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported code_challenge_method")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported code_challenge_method"
+        )
 
     hidden = {
         "response_type": response_type,
@@ -116,11 +125,8 @@ async def oauth_authorize_form(
         "code_challenge_method": code_challenge_method,
         "state": state or "",
     }
-    inputs = "\n".join(
-        f'<input type="hidden" name="{k}" value="{v}">' for k, v in hidden.items()
-    )
-    return HTMLResponse(
-        f"""
+    inputs = "\n".join(f'<input type="hidden" name="{k}" value="{v}">' for k, v in hidden.items())
+    return HTMLResponse(f"""
         <html>
           <head>
             <title>MCP Authorization</title>
@@ -138,8 +144,7 @@ async def oauth_authorize_form(
             </form>
           </body>
         </html>
-        """
-    )
+        """)
 
 
 @public_router.post("/authorize")
@@ -156,9 +161,13 @@ async def oauth_authorize(
     db: AsyncSession = Depends(get_db),
 ):
     if response_type != "code":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported response_type")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported response_type"
+        )
     if code_challenge_method not in {"S256"}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported code_challenge_method")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported code_challenge_method"
+        )
 
     mode = (await SystemSettingsManager.get_setting(db, "mcp_auth_mode") or "bearer").lower()
     if mode != "oauth2":
@@ -269,15 +278,23 @@ async def _handle_oauth_token(
 
     if grant_type == "password":
         if mode != "refresh":
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password grant disabled")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Password grant disabled"
+            )
         if not username or not password:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing credentials")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Missing credentials"
+            )
         result = await db.execute(select(AdminUser).where(AdminUser.username == username))
         admin = result.scalar_one_or_none()
         if not admin or not admin.is_active:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
+            )
         if not bcrypt.checkpw(password.encode("utf-8"), admin.password_hash.encode("utf-8")):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials"
+            )
 
         access_ttl = _parse_positive_int(
             await SystemSettingsManager.get_setting(db, "mcp_access_token_ttl_minutes"),
@@ -309,9 +326,14 @@ async def _handle_oauth_token(
 
     if grant_type == "authorization_code":
         if mode != "oauth2":
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Authorization code grant disabled")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Authorization code grant disabled"
+            )
         if not code or not code_verifier or not redirect_uri or not client_id:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing authorization_code parameters")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing authorization_code parameters",
+            )
 
         code_hash = _hash_code(code)
         result = await db.execute(select(MCPAuthCode).where(MCPAuthCode.code_hash == code_hash))
@@ -321,12 +343,18 @@ async def _handle_oauth_token(
         if record.used_at is not None or record.expires_at < datetime.utcnow():
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Expired code")
         if record.client_id != client_id or record.redirect_uri != redirect_uri:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid code parameters")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid code parameters"
+            )
 
         if record.code_challenge_method != "S256":
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported code challenge method")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported code challenge method"
+            )
         if _s256_challenge(code_verifier) != record.code_challenge:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid code verifier")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid code verifier"
+            )
 
         record.used_at = datetime.utcnow()
         await db.commit()
@@ -340,7 +368,9 @@ async def _handle_oauth_token(
             "mcp_refresh_token_ttl_days",
         )
         access_token, expires_in = create_mcp_access_token(record.admin_user_id, access_ttl)
-        refresh_token_value, jti, expires_at = create_mcp_refresh_token(record.admin_user_id, refresh_ttl)
+        refresh_token_value, jti, expires_at = create_mcp_refresh_token(
+            record.admin_user_id, refresh_ttl
+        )
         await store_mcp_refresh_token(db, record.admin_user_id, jti, expires_at)
 
         await record_mcp_oauth_event(
@@ -361,12 +391,18 @@ async def _handle_oauth_token(
 
     if grant_type == "refresh_token":
         if mode not in {"refresh", "oauth2"}:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Refresh token grant disabled")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Refresh token grant disabled"
+            )
         if not refresh_token:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing refresh token")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Missing refresh token"
+            )
         validated = await validate_mcp_refresh_token(db, refresh_token)
         if not validated:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
+            )
 
         admin_id, jti = validated
 

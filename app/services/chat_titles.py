@@ -1,13 +1,15 @@
 """Helpers for generating chat titles."""
+
 from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.llm_factory import create_llm_service
 from app.core.llm_base import Message
-from app.models.database import AppSettings as AppSettingsModel, KnowledgeBase as KnowledgeBaseModel
+from app.core.llm_factory import create_llm_service
+from app.models.database import AppSettings as AppSettingsModel
+from app.models.database import KnowledgeBase as KnowledgeBaseModel
 
 
 def clean_title(title: str) -> str:
@@ -27,12 +29,16 @@ def fallback_title(question: str) -> str:
 
 async def resolve_use_llm_titles(db: AsyncSession, kb_id: Optional[UUID]) -> bool:
     if kb_id:
-        kb_result = await db.execute(select(KnowledgeBaseModel).where(KnowledgeBaseModel.id == kb_id))
+        kb_result = await db.execute(
+            select(KnowledgeBaseModel).where(KnowledgeBaseModel.id == kb_id)
+        )
         kb = kb_result.scalar_one_or_none()
         if kb and kb.use_llm_chat_titles is not None:
             return bool(kb.use_llm_chat_titles)
 
-    settings_result = await db.execute(select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1))
+    settings_result = await db.execute(
+        select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1)
+    )
     settings_row = settings_result.scalar_one_or_none()
     if settings_row and settings_row.use_llm_chat_titles is not None:
         return bool(settings_row.use_llm_chat_titles)

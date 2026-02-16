@@ -3,14 +3,17 @@ Base classes for embedding providers.
 
 Provides abstract interface for different embedding services (OpenAI, Voyage AI, etc).
 """
+
 from abc import ABC, abstractmethod
-from typing import List, Optional
 from enum import Enum
-from pydantic import BaseModel, Field
+from typing import List
+
+from pydantic import BaseModel
 
 
 class EmbeddingProvider(str, Enum):
     """Supported embedding providers."""
+
     OPENAI = "openai"
     VOYAGE = "voyage"
     OLLAMA = "ollama"
@@ -18,6 +21,7 @@ class EmbeddingProvider(str, Enum):
 
 class EmbeddingModel(BaseModel):
     """Embedding model configuration."""
+
     provider: EmbeddingProvider
     model_name: str
     dimension: int
@@ -126,6 +130,7 @@ EMBEDDING_MODELS = {
 
 class EmbeddingResult(BaseModel):
     """Result of embedding generation."""
+
     text: str
     embedding: List[float]
     index: int

@@ -4,25 +4,24 @@ OpenAI Embeddings Service.
 Handles generation of text embeddings using OpenAI API with proper error handling,
 retries, and batch processing support.
 """
-import asyncio
+
 import logging
 from typing import List, Optional
+
+from openai import APITimeoutError, AsyncOpenAI, OpenAIError, RateLimitError
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
 )
-
-from openai import AsyncOpenAI, OpenAIError, RateLimitError, APITimeoutError
 
 from app.config import settings
 from app.core.embeddings_base import (
     BaseEmbeddingService,
-    EmbeddingResult,
     EmbeddingProvider,
+    EmbeddingResult,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +148,7 @@ class OpenAIEmbeddingService(BaseEmbeddingService):
 
         # Process in batches
         for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
+            batch = texts[i : i + batch_size]
             batch_num = i // batch_size + 1
             total_batches = (len(texts) + batch_size - 1) // batch_size
 
@@ -242,4 +241,4 @@ class OpenAIEmbeddingService(BaseEmbeddingService):
         logger.info("EmbeddingsService closed")
 
 
- # Singleton helpers removed; use app.core.embeddings_factory.get_embedding_service()
+# Singleton helpers removed; use app.core.embeddings_factory.get_embedding_service()

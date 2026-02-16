@@ -4,11 +4,11 @@ Revision ID: a9b2c3d4e5f7
 Revises: a8b1c2d3e4f6
 Create Date: 2026-02-05
 """
+
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "a9b2c3d4e5f7"
@@ -26,4 +26,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Revert migration."""
     op.add_column("prompt_versions", sa.Column("user_template", sa.Text(), nullable=True))
-    op.add_column("self_check_prompt_versions", sa.Column("user_template", sa.Text(), nullable=True))
+    op.add_column(
+        "self_check_prompt_versions", sa.Column("user_template", sa.Text(), nullable=True)
+    )

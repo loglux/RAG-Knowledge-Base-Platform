@@ -3,9 +3,10 @@ RAG (Retrieval-Augmented Generation) Service.
 
 Combines retrieval and generation for question answering over knowledge bases.
 """
+
 import logging
 import re
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -13,14 +14,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.core.retrieval import get_retrieval_engine, RetrievalEngine, RetrievedChunk
-from app.core.llm_factory import create_llm_service
 from app.core.llm_base import BaseLLMService, Message
-from app.services.query_intent import get_query_intent_extractor, QueryIntent
+from app.core.llm_factory import create_llm_service
+from app.core.retrieval import RetrievalEngine, RetrievedChunk, get_retrieval_engine
+from app.models.database import Document as DocumentModel
 from app.services.document_analyzer import get_document_analyzer
 from app.services.prompts import get_active_chat_prompt, get_active_self_check_prompt
-from app.models.database import Document as DocumentModel
-
+from app.services.query_intent import get_query_intent_extractor
 
 logger = logging.getLogger(__name__)
 
@@ -176,19 +176,23 @@ Retrieved Context:
 
             document_filter = None
             if document_ids:
-                document_filter = {"document_id": document_ids if len(document_ids) > 1 else document_ids[0]}
+                document_filter = {
+                    "document_id": document_ids if len(document_ids) > 1 else document_ids[0]
+                }
 
-            logger.debug(f"RAG query with use_structure={use_structure}, db={db is not None}, kb_id={kb_id}")
+            logger.debug(
+                f"RAG query with use_structure={use_structure}, db={db is not None}, kb_id={kb_id}"
+            )
 
             if use_structure:
                 if not db or not kb_id:
-                    logger.warning("use_structure=True but db or kb_id not provided, falling back to semantic search")
+                    logger.warning(
+                        "use_structure=True but db or kb_id not provided, falling back to semantic search"
+                    )
                 else:
                     logger.debug("Extracting structure filters...")
                     chunk_filters = await self._extract_structure_filters(
-                        question=question,
-                        kb_id=kb_id,
-                        db=db
+                        question=question, kb_id=kb_id, db=db
                     )
                     if chunk_filters:
                         logger.debug(f"Structure-based search: {chunk_filters}")
@@ -197,7 +201,9 @@ Retrieved Context:
 
             if document_filter and chunk_filters and "document_id" in chunk_filters:
                 if chunk_filters["document_id"] not in document_ids:
-                    logger.warning("Document filter excludes structured document. Returning empty result.")
+                    logger.warning(
+                        "Document filter excludes structured document. Returning empty result."
+                    )
                     return RAGResponse(
                         answer="I couldn't find any relevant information in the knowledge base to answer your question.",
                         sources=[],
@@ -221,7 +227,9 @@ Retrieved Context:
                     mode = "dense"
 
             if mode == "hybrid":
-                logger.debug(f"Hybrid retrieval (top_k={top_k}, lexical_top_k={lexical_top_k}, mmr={use_mmr})")
+                logger.debug(
+                    f"Hybrid retrieval (top_k={top_k}, lexical_top_k={lexical_top_k}, mmr={use_mmr})"
+                )
                 retrieval_result = await self.retrieval.retrieve_hybrid(
                     query=question,
                     collection_name=collection_name,
@@ -241,7 +249,9 @@ Retrieved Context:
                     mmr_diversity=mmr_diversity,
                 )
             else:
-                logger.debug(f"Retrieving top {top_k} chunks using {embedding_model} (mmr={use_mmr})")
+                logger.debug(
+                    f"Retrieving top {top_k} chunks using {embedding_model} (mmr={use_mmr})"
+                )
                 retrieval_result = await self.retrieval.retrieve(
                     query=question,
                     collection_name=collection_name,
@@ -337,6 +347,7 @@ Retrieved Context:
         embedding_model: str,
         document_id: UUID,
         top_k: int = 5,
+        db: Optional[AsyncSession] = None,
     ) -> RAGResponse:
         """
         Answer a question using only a specific document.
@@ -532,7 +543,7 @@ Retrieved Context:
 
             messages = [
                 Message(role="system", content=system_prompt),
-                Message(role="user", content=user_prompt)
+                Message(role="user", content=user_prompt),
             ]
 
             response = await service.generate(
@@ -561,10 +572,7 @@ Retrieved Context:
             return draft_answer
 
     async def _extract_structure_filters(
-        self,
-        question: str,
-        kb_id: UUID,
-        db: AsyncSession
+        self, question: str, kb_id: UUID, db: AsyncSession
     ) -> Optional[Dict[str, Any]]:
         """
         Extract structure-based filters from query using LLM.
@@ -584,8 +592,7 @@ Retrieved Context:
             # 1. Get list of documents in KB for context
             result = await db.execute(
                 select(DocumentModel).where(
-                    DocumentModel.knowledge_base_id == kb_id,
-                    DocumentModel.status == "completed"
+                    DocumentModel.knowledge_base_id == kb_id, DocumentModel.status == "completed"
                 )
             )
             documents = result.scalars().all()
@@ -600,12 +607,12 @@ Retrieved Context:
             # 2. Extract intent using LLM
             intent_extractor = get_query_intent_extractor()
             intent = await intent_extractor.extract_intent(
-                query=question,
-                kb_documents=doc_names,
-                use_cache=True  # Use fast pattern fallback
+                query=question, kb_documents=doc_names, use_cache=True  # Use fast pattern fallback
             )
 
-            logger.debug(f"Intent extracted: type={intent.intent_type}, confidence={intent.confidence}, doc={intent.document_name}, section={intent.section_type} {intent.section_number}")
+            logger.debug(
+                f"Intent extracted: type={intent.intent_type}, confidence={intent.confidence}, doc={intent.document_name}, section={intent.section_type} {intent.section_number}"
+            )
 
             logger.info(
                 f"Extracted intent: type={intent.intent_type}, "
@@ -639,7 +646,9 @@ Retrieved Context:
                     logger.debug(f"Using single document: {target_doc.filename}")
                 else:
                     # Multiple documents - match document type to query section type
-                    logger.debug(f"Multiple documents ({len(documents)}), finding best match for section_type={intent.section_type}")
+                    logger.debug(
+                        f"Multiple documents ({len(documents)}), finding best match for section_type={intent.section_type}"
+                    )
 
                     # Map section types to document types
                     section_to_doc_type = {
@@ -658,7 +667,9 @@ Retrieved Context:
                             structure = await analyzer.get_structure(doc.id, db)
                             if structure and structure.document_type == preferred_doc_type:
                                 target_doc = doc
-                                logger.debug(f"Found matching document: {doc.filename} (type={structure.document_type})")
+                                logger.debug(
+                                    f"Found matching document: {doc.filename} (type={structure.document_type})"
+                                )
                                 break
 
                     # Second pass: if no match, take any document with structure
@@ -675,10 +686,16 @@ Retrieved Context:
                     # Last resort: use first document
                     if not target_doc:
                         target_doc = documents[0]
-                        logger.debug(f"No document with structure, using first: {target_doc.filename}")
+                        logger.debug(
+                            f"No document with structure, using first: {target_doc.filename}"
+                        )
 
             # If we still don't have a document, try to locate one by section match
-            if not target_doc and intent.section_type and (intent.section_number is not None or intent.section_id):
+            if (
+                not target_doc
+                and intent.section_type
+                and (intent.section_number is not None or intent.section_id)
+            ):
                 logger.debug("No document selected, scanning for matching section across documents")
                 analyzer = get_document_analyzer()
                 for doc in documents:
@@ -686,12 +703,10 @@ Retrieved Context:
                     if not structure or not structure.toc_json:
                         continue
                     import json
+
                     toc_sections = json.loads(structure.toc_json)
                     candidate = self._find_matching_section(
-                        toc_sections,
-                        intent.section_type,
-                        intent.section_number,
-                        intent.section_id
+                        toc_sections, intent.section_type, intent.section_number, intent.section_id
                     )
                     if candidate:
                         target_doc = doc
@@ -713,12 +728,10 @@ Retrieved Context:
 
             # 6. Parse TOC and find matching section
             import json
+
             toc_sections = json.loads(structure.toc_json)
             matching_section = preselected_section or self._find_matching_section(
-                toc_sections,
-                intent.section_type,
-                intent.section_number,
-                intent.section_id
+                toc_sections, intent.section_type, intent.section_number, intent.section_id
             )
 
             if not matching_section:
@@ -744,7 +757,7 @@ Retrieved Context:
             # Return filter for chunk_index range + document_id
             return {
                 "chunk_index": {"gte": chunk_start, "lte": chunk_end},
-                "document_id": str(target_doc.id)
+                "document_id": str(target_doc.id),
             }
 
         except Exception as e:
@@ -756,7 +769,7 @@ Retrieved Context:
         sections: List[Dict[str, Any]],
         section_type: Optional[str],
         section_number: Optional[int],
-        section_id: Optional[str]
+        section_id: Optional[str],
     ) -> Optional[Dict[str, Any]]:
         """
         Find matching section in TOC.
@@ -789,10 +802,7 @@ Retrieved Context:
             subsections = section.get("subsections", [])
             if subsections:
                 match = self._find_matching_section(
-                    subsections,
-                    section_type,
-                    section_number,
-                    section_id
+                    subsections, section_type, section_number, section_id
                 )
                 if match:
                     return match

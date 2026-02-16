@@ -3,17 +3,20 @@ OpenAI LLM Service.
 
 Handles text generation using OpenAI GPT API.
 """
+
 import logging
 from typing import List, Optional
+
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
 )
 
 try:
-    from openai import AsyncOpenAI, OpenAIError, RateLimitError, APITimeoutError
+    from openai import APITimeoutError, AsyncOpenAI, OpenAIError, RateLimitError
+
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
@@ -26,10 +29,9 @@ from app.config import settings
 from app.core.llm_base import (
     BaseLLMService,
     LLMProvider,
-    Message,
     LLMResponse,
+    Message,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +67,7 @@ class OpenAILLMService(BaseLLMService):
         """
         if not OPENAI_AVAILABLE:
             raise ImportError(
-                "openai package is not installed. "
-                "Install it with: pip install openai"
+                "openai package is not installed. " "Install it with: pip install openai"
             )
 
         api_key = api_key or settings.OPENAI_API_KEY
@@ -76,7 +77,9 @@ class OpenAILLMService(BaseLLMService):
             raise ValueError("OpenAI API key is required")
 
         # Initialize base class
-        super().__init__(api_key=api_key, model=model, max_retries=max_retries, skip_validation=False)
+        super().__init__(
+            api_key=api_key, model=model, max_retries=max_retries, skip_validation=False
+        )
 
         # Validate provider
         if self.model_config and self.provider != LLMProvider.OPENAI:
@@ -114,10 +117,7 @@ class OpenAILLMService(BaseLLMService):
         """
         try:
             # Convert messages to OpenAI format
-            openai_messages = [
-                {"role": msg.role, "content": msg.content}
-                for msg in messages
-            ]
+            openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
 
             # Use Responses API for all OpenAI models.
             model_name = (self.model or "").lower()

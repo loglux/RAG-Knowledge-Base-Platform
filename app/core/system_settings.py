@@ -1,7 +1,8 @@
 """System settings manager - loads configuration from database."""
+
 import logging
-from typing import Optional, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,14 +32,12 @@ class SystemSettingsManager:
         "mcp_auth_mode": "MCP_AUTH_MODE",
         "mcp_access_token_ttl_minutes": "MCP_ACCESS_TOKEN_TTL_MINUTES",
         "mcp_refresh_token_ttl_days": "MCP_REFRESH_TOKEN_TTL_DAYS",
-
         # Database URLs
         "qdrant_url": "QDRANT_URL",
         "qdrant_api_key": "QDRANT_API_KEY",
         "opensearch_url": "OPENSEARCH_URL",
         "opensearch_username": "OPENSEARCH_USERNAME",
         "opensearch_password": "OPENSEARCH_PASSWORD",
-
         # System settings
         "system_name": "SYSTEM_NAME",
         "max_file_size_mb": "MAX_FILE_SIZE_MB",
@@ -58,9 +57,7 @@ class SystemSettingsManager:
             Dictionary of settings (DB key -> value)
         """
         try:
-            result = await db.execute(
-                select(SystemSettings)
-            )
+            result = await db.execute(select(SystemSettings))
             settings = result.scalars().all()
 
             settings_dict = {}
@@ -92,14 +89,16 @@ class SystemSettingsManager:
             # Check if at least one AI provider is configured
             result = await db.execute(
                 select(SystemSettings).where(
-                    SystemSettings.key.in_([
-                        "openai_api_key",
-                        "voyage_api_key",
-                        "anthropic_api_key",
-                        "deepseek_api_key",
-                        "ollama_base_url",
-                        "setup_completed"  # Explicit flag
-                    ])
+                    SystemSettings.key.in_(
+                        [
+                            "openai_api_key",
+                            "voyage_api_key",
+                            "anthropic_api_key",
+                            "deepseek_api_key",
+                            "ollama_base_url",
+                            "setup_completed",  # Explicit flag
+                        ]
+                    )
                 )
             )
             settings = result.scalars().all()
@@ -139,9 +138,7 @@ class SystemSettingsManager:
         if isinstance(value, str):
             value = value.strip()
         # Check if setting exists
-        result = await db.execute(
-            select(SystemSettings).where(SystemSettings.key == key)
-        )
+        result = await db.execute(select(SystemSettings).where(SystemSettings.key == key))
         setting = result.scalar_one_or_none()
 
         if setting:
@@ -185,9 +182,7 @@ class SystemSettingsManager:
             Setting value or None if not found
         """
         try:
-            result = await db.execute(
-                select(SystemSettings).where(SystemSettings.key == key)
-            )
+            result = await db.execute(select(SystemSettings).where(SystemSettings.key == key))
             setting = result.scalar_one_or_none()
 
             return setting.value if setting else None
@@ -197,7 +192,9 @@ class SystemSettingsManager:
             return None
 
     @staticmethod
-    async def ensure_defaults(db: AsyncSession, defaults: Dict[str, tuple[str, str, Optional[str]]]) -> None:
+    async def ensure_defaults(
+        db: AsyncSession, defaults: Dict[str, tuple[str, str, Optional[str]]]
+    ) -> None:
         """
         Ensure default settings exist in DB if missing.
 
@@ -236,9 +233,7 @@ class SystemSettingsManager:
             True if deleted, False if not found
         """
         try:
-            result = await db.execute(
-                select(SystemSettings).where(SystemSettings.key == key)
-            )
+            result = await db.execute(select(SystemSettings).where(SystemSettings.key == key))
             setting = result.scalar_one_or_none()
 
             if setting:

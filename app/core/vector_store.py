@@ -4,39 +4,39 @@ Qdrant Vector Store Service.
 Handles all interactions with Qdrant vector database including collection management,
 vector operations, and similarity search.
 """
+
 import logging
 import uuid
-from typing import List, Optional, Dict, Any
-from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from qdrant_client import AsyncQdrantClient
+from qdrant_client.http import models as rest
 from qdrant_client.models import (
     Distance,
-    VectorParams,
-    PointStruct,
-    Filter,
     FieldCondition,
+    Filter,
     MatchAny,
     MatchValue,
-    SearchRequest,
-    NearestQuery,
     Mmr,
+    NearestQuery,
+    PointStruct,
+    VectorParams,
 )
-from qdrant_client.http import models as rest
 
 from app.config import settings
-
 
 logger = logging.getLogger(__name__)
 
 
 class VectorStoreException(Exception):
     """Base exception for vector store operations."""
+
     pass
 
 
 class CollectionNotFoundError(VectorStoreException):
     """Raised when collection doesn't exist."""
+
     pass
 
 
@@ -157,8 +157,7 @@ class QdrantVectorStore:
             )
 
             logger.info(
-                f"Created collection '{collection_name}' "
-                f"(size={size}, distance={distance})"
+                f"Created collection '{collection_name}' " f"(size={size}, distance={distance})"
             )
             return True
 
@@ -203,7 +202,7 @@ class QdrantVectorStore:
 
             # Check aliases
             try:
-                aliases_response = await self.client.get_collection_aliases(collection_name)
+                await self.client.get_collection_aliases(collection_name)
                 # If we get here without exception, the alias exists
                 return True
             except Exception:
@@ -244,9 +243,7 @@ class QdrantVectorStore:
         try:
             # Check collection exists
             if not await self.collection_exists(collection_name):
-                raise CollectionNotFoundError(
-                    f"Collection '{collection_name}' does not exist"
-                )
+                raise CollectionNotFoundError(f"Collection '{collection_name}' does not exist")
 
             # Generate IDs if not provided
             if ids is None:
@@ -289,15 +286,13 @@ class QdrantVectorStore:
                 effective_batch_size = len(points)
 
             for start in range(0, len(points), effective_batch_size):
-                batch = points[start:start + effective_batch_size]
+                batch = points[start : start + effective_batch_size]
                 await self.client.upsert(
                     collection_name=collection_name,
                     points=batch,
                 )
 
-            logger.info(
-                f"Inserted {len(points)} vectors into collection '{collection_name}'"
-            )
+            logger.info(f"Inserted {len(points)} vectors into collection '{collection_name}'")
             return ids
 
         except CollectionNotFoundError:
@@ -346,9 +341,7 @@ class QdrantVectorStore:
         try:
             # Check collection exists
             if not await self.collection_exists(collection_name):
-                raise CollectionNotFoundError(
-                    f"Collection '{collection_name}' does not exist"
-                )
+                raise CollectionNotFoundError(f"Collection '{collection_name}' does not exist")
 
             # Build filter if provided
             query_filter = None
@@ -367,8 +360,7 @@ class QdrantVectorStore:
                     ),
                 )
                 logger.debug(
-                    f"Using MMR search (diversity={mmr_diversity}, "
-                    f"candidates={candidates})"
+                    f"Using MMR search (diversity={mmr_diversity}, " f"candidates={candidates})"
                 )
             else:
                 # Standard vector search
@@ -396,8 +388,7 @@ class QdrantVectorStore:
             ]
 
             logger.info(
-                f"Search in '{collection_name}' returned {len(results)} results "
-                f"(limit={limit})"
+                f"Search in '{collection_name}' returned {len(results)} results " f"(limit={limit})"
             )
             return results
 
@@ -426,9 +417,7 @@ class QdrantVectorStore:
         """
         try:
             if not await self.collection_exists(collection_name):
-                raise CollectionNotFoundError(
-                    f"Collection '{collection_name}' does not exist"
-                )
+                raise CollectionNotFoundError(f"Collection '{collection_name}' does not exist")
 
             query_filter = None
             if filter_conditions:
@@ -458,8 +447,7 @@ class QdrantVectorStore:
             ]
 
             logger.info(
-                f"Scroll in '{collection_name}' returned {len(results)} results "
-                f"(limit={limit})"
+                f"Scroll in '{collection_name}' returned {len(results)} results " f"(limit={limit})"
             )
             return results
 
@@ -542,9 +530,7 @@ class QdrantVectorStore:
             # due to version compatibility issues
             exists = await self.collection_exists(collection_name)
             if not exists:
-                raise CollectionNotFoundError(
-                    f"Collection '{collection_name}' not found"
-                )
+                raise CollectionNotFoundError(f"Collection '{collection_name}' not found")
 
             # Get basic info
             count = await self.client.count(
@@ -562,9 +548,7 @@ class QdrantVectorStore:
             raise
         except Exception as e:
             logger.error(f"Failed to get collection info: {e}")
-            raise CollectionNotFoundError(
-                f"Collection '{collection_name}' not found"
-            ) from e
+            raise CollectionNotFoundError(f"Collection '{collection_name}' not found") from e
 
     def _build_filter(self, conditions: Dict[str, Any]) -> Filter:
         """

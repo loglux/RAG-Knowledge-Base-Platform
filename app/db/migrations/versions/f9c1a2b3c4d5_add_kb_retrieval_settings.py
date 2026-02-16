@@ -4,10 +4,11 @@ Revision ID: f9c1a2b3c4d5
 Revises: f4a5b6c7d8e9
 Create Date: 2026-02-06
 """
-from typing import Union, Sequence
 
-from alembic import op
+from typing import Sequence, Union
+
 import sqlalchemy as sa
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "f9c1a2b3c4d5"

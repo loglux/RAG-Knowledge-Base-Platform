@@ -1,38 +1,37 @@
 """Knowledge Base CRUD endpoints."""
-import logging
+
 import json
+import logging
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks
-from sqlalchemy import select, func
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.embeddings_base import EMBEDDING_MODELS
+from app.core.lexical_store import get_lexical_store
+from app.core.vector_store import get_vector_store
 from app.db.session import get_db
-from app.models.database import (
-    KnowledgeBase as KnowledgeBaseModel,
-    AppSettings as AppSettingsModel,
-    Document as DocumentModel,
-    Conversation as ConversationModel,
-    ChatMessage as ChatMessageModel,
-)
+from app.dependencies import get_current_user_id
+from app.models.database import AppSettings as AppSettingsModel
+from app.models.database import ChatMessage as ChatMessageModel
+from app.models.database import Conversation as ConversationModel
+from app.models.database import Document as DocumentModel
+from app.models.database import KnowledgeBase as KnowledgeBaseModel
 from app.models.enums import DocumentStatus
 from app.models.schemas import (
+    EffectiveRetrievalSettings,
     KnowledgeBaseCreate,
-    KnowledgeBaseUpdate,
-    KnowledgeBaseResponse,
     KnowledgeBaseList,
+    KnowledgeBaseResponse,
+    KnowledgeBaseUpdate,
     RegenerateChatTitlesRequest,
     RegenerateChatTitlesResponse,
-    RetrievalSettingsUpdate,
     RetrievalSettingsEnvelope,
-    EffectiveRetrievalSettings,
+    RetrievalSettingsUpdate,
 )
-from app.dependencies import get_current_user_id
-from app.core.embeddings_base import EMBEDDING_MODELS
-from app.core.vector_store import get_vector_store
-from app.core.lexical_store import get_lexical_store
 from app.services.chat_titles import build_conversation_title
 from app.services.retrieval_settings import load_kb_retrieval_settings, resolve_retrieval_settings
 
@@ -73,7 +72,7 @@ async def create_knowledge_base(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unknown embedding model: {kb.embedding_model}. "
-                   f"Available models: {', '.join(EMBEDDING_MODELS.keys())}"
+            f"Available models: {', '.join(EMBEDDING_MODELS.keys())}",
         )
 
     # Get embedding model configuration
@@ -81,6 +80,7 @@ async def create_knowledge_base(
 
     # Generate KB ID and collection name (deterministic)
     import uuid
+
     kb_id = uuid.uuid4()
     collection_name = kb_id_to_collection_name(kb_id)
 
@@ -90,7 +90,9 @@ async def create_knowledge_base(
     default_upsert_batch_size = 256
     default_use_llm_chat_titles = True
 
-    settings_result = await db.execute(select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1))
+    settings_result = await db.execute(
+        select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1)
+    )
     settings_row = settings_result.scalar_one_or_none()
     if settings_row:
         if settings_row.kb_chunk_size is not None:
@@ -114,10 +116,14 @@ async def create_knowledge_base(
         chunk_size=kb.chunk_size if kb.chunk_size is not None else default_chunk_size,
         chunk_overlap=kb.chunk_overlap if kb.chunk_overlap is not None else default_chunk_overlap,
         chunking_strategy=kb.chunking_strategy,
-        upsert_batch_size=kb.upsert_batch_size if kb.upsert_batch_size is not None else default_upsert_batch_size,
-        use_llm_chat_titles=kb.use_llm_chat_titles
-        if kb.use_llm_chat_titles is not None
-        else default_use_llm_chat_titles,
+        upsert_batch_size=(
+            kb.upsert_batch_size if kb.upsert_batch_size is not None else default_upsert_batch_size
+        ),
+        use_llm_chat_titles=(
+            kb.use_llm_chat_titles
+            if kb.use_llm_chat_titles is not None
+            else default_use_llm_chat_titles
+        ),
         user_id=user_id,
     )
 
@@ -151,7 +157,7 @@ async def create_knowledge_base(
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create vector store collection: {str(e)}"
+            detail=f"Failed to create vector store collection: {str(e)}",
         )
 
     return kb_model
@@ -247,8 +253,7 @@ async def get_knowledge_base(
 
     if not kb:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Knowledge base {kb_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base {kb_id} not found"
         )
 
     # Future: Check user ownership when auth is implemented
@@ -260,7 +265,9 @@ async def _build_retrieval_settings_envelope(
     kb: KnowledgeBaseModel,
     db: AsyncSession,
 ) -> RetrievalSettingsEnvelope:
-    settings_result = await db.execute(select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1))
+    settings_result = await db.execute(
+        select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1)
+    )
     app_settings = settings_result.scalar_one_or_none()
 
     stored = load_kb_retrieval_settings(kb)
@@ -296,8 +303,7 @@ async def update_knowledge_base(
 
     if not kb:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Knowledge base {kb_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base {kb_id} not found"
         )
 
     # Future: Check user ownership
@@ -329,8 +335,7 @@ async def get_retrieval_settings(
 
     if not kb:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Knowledge base {kb_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base {kb_id} not found"
         )
 
     return await _build_retrieval_settings_envelope(kb, db)
@@ -353,8 +358,7 @@ async def update_retrieval_settings(
 
     if not kb:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Knowledge base {kb_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base {kb_id} not found"
         )
 
     data = payload.model_dump(exclude_none=True)
@@ -381,8 +385,7 @@ async def clear_retrieval_settings(
 
     if not kb:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Knowledge base {kb_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base {kb_id} not found"
         )
 
     kb.retrieval_settings_json = None
@@ -408,8 +411,7 @@ async def regenerate_chat_titles(
     kb = kb_result.scalar_one_or_none()
     if not kb:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Knowledge base {kb_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base {kb_id} not found"
         )
 
     convo_query = select(ConversationModel).where(
@@ -493,9 +495,9 @@ async def delete_knowledge_base(
     Marks knowledge base and all associated documents as deleted.
     Deletes Qdrant collection and all vectors.
     """
-    from app.models.database import Document as DocumentModel
-    from app.core.vector_store import get_vector_store
     from app.core.lexical_store import get_lexical_store
+    from app.core.vector_store import get_vector_store
+    from app.models.database import Document as DocumentModel
 
     # Get existing KB
     query = select(KnowledgeBaseModel).where(
@@ -507,8 +509,7 @@ async def delete_knowledge_base(
 
     if not kb:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Knowledge base {kb_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base {kb_id} not found"
         )
 
     # Future: Check user ownership
@@ -677,7 +678,9 @@ async def purge_knowledge_base(
 async def reprocess_knowledge_base(
     kb_id: UUID,
     background_tasks: BackgroundTasks,
-    detect_duplicates: bool = Query(False, description="Compute duplicate chunks after reprocessing"),
+    detect_duplicates: bool = Query(
+        False, description="Compute duplicate chunks after reprocessing"
+    ),
     db: AsyncSession = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_current_user_id),
 ):
@@ -772,7 +775,7 @@ async def cleanup_orphaned_chunks(
         return {
             "deleted_chunks": 0,
             "deleted_documents": 0,
-            "message": "No deleted documents found"
+            "message": "No deleted documents found",
         }
 
     # Delete chunks from Qdrant for each deleted document

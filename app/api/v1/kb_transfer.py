@@ -1,21 +1,30 @@
 """Knowledge Base export/import endpoints (MVP)."""
+
 import json
 import os
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, BackgroundTasks, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+    status,
+)
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.models.schemas import KBExportRequest, KBImportOptions, KBImportResponse
 from app.services.kb_export_import import (
-    export_kbs,
-    export_chats_markdown,
-    import_kbs,
     KBExportImportError,
+    export_chats_markdown,
+    export_kbs,
+    import_kbs,
 )
-
 
 router = APIRouter(prefix="/kb", tags=["kb-transfer"])
 
@@ -102,6 +111,7 @@ async def import_kb(
             options_payload = KBImportOptions()
 
         import tempfile
+
         fd, temp_path = tempfile.mkstemp(prefix="kb_import_", suffix=".tar.gz")
         try:
             with os.fdopen(fd, "wb") as f:
@@ -119,4 +129,6 @@ async def import_kb(
     except KBExportImportError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid options JSON") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid options JSON"
+        ) from exc

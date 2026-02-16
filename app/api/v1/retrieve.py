@@ -1,4 +1,5 @@
 """Retrieve-only endpoint (no LLM generation)."""
+
 import logging
 import time
 from typing import Optional
@@ -8,19 +9,19 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.retrieval import get_retrieval_engine
 from app.db.session import get_db
-from app.models.database import KnowledgeBase as KnowledgeBaseModel, AppSettings as AppSettingsModel
+from app.dependencies import get_current_user_id
+from app.models.database import AppSettings as AppSettingsModel
+from app.models.database import KnowledgeBase as KnowledgeBaseModel
 from app.models.schemas import (
+    EffectiveRetrievalSettings,
     RetrieveRequest,
     RetrieveResponse,
     SourceChunk,
-    EffectiveRetrievalSettings,
 )
-from app.dependencies import get_current_user_id
-from app.core.retrieval import get_retrieval_engine
-from app.services.rag import get_rag_service, RAGService
+from app.services.rag import RAGService, get_rag_service
 from app.services.retrieval_settings import resolve_retrieval_settings
-
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -47,16 +48,18 @@ async def retrieve_only(
     if not kb:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Knowledge base {request.knowledge_base_id} not found"
+            detail=f"Knowledge base {request.knowledge_base_id} not found",
         )
 
     if kb.document_count == 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Knowledge base is empty. Please add documents first."
+            detail="Knowledge base is empty. Please add documents first.",
         )
 
-    settings_result = await db.execute(select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1))
+    settings_result = await db.execute(
+        select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1)
+    )
     app_settings = settings_result.scalar_one_or_none()
 
     overrides = request.model_dump(exclude_none=True)
@@ -74,7 +77,9 @@ async def retrieve_only(
     document_filter = None
     if document_ids:
         document_ids = [str(doc_id) for doc_id in document_ids]
-        document_filter = {"document_id": document_ids if len(document_ids) > 1 else document_ids[0]}
+        document_filter = {
+            "document_id": document_ids if len(document_ids) > 1 else document_ids[0]
+        }
 
     chunk_filters = None
     if effective.get("use_structure"):

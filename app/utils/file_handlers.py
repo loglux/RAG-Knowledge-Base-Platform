@@ -1,8 +1,8 @@
 """File type handlers for document processing."""
-from typing import Dict, Any, Union
-from pathlib import Path
-from xml.etree import ElementTree
+
 import io
+from typing import Any, Dict, Union
+from xml.etree import ElementTree
 
 from docx import Document as DocxDocument
 
@@ -55,7 +55,7 @@ class TextFileHandler(FileHandler):
         """
         if isinstance(content, bytes):
             content = content.decode("utf-8", errors="replace")
-        lines = content.split('\n')
+        lines = content.split("\n")
         return {
             "file_type": "txt",
             "filename": filename,
@@ -92,13 +92,13 @@ class MarkdownFileHandler(FileHandler):
         """
         if isinstance(content, bytes):
             content = content.decode("utf-8", errors="replace")
-        lines = content.split('\n')
+        lines = content.split("\n")
 
         # Count headings
-        heading_count = sum(1 for line in lines if line.strip().startswith('#'))
+        heading_count = sum(1 for line in lines if line.strip().startswith("#"))
 
         # Check for frontmatter (YAML between --- markers)
-        has_frontmatter = content.strip().startswith('---')
+        has_frontmatter = content.strip().startswith("---")
 
         return {
             "file_type": "md",

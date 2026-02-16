@@ -4,18 +4,21 @@ Voyage AI Embeddings Service.
 Handles generation of text embeddings using Voyage AI API with proper error handling,
 retries, and batch processing support.
 """
+
 import logging
 from typing import List, Optional
+
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
 )
 
 try:
     import voyageai
     from voyageai.error import VoyageError
+
     VOYAGE_AVAILABLE = True
 except ImportError:
     VOYAGE_AVAILABLE = False
@@ -25,10 +28,9 @@ except ImportError:
 from app.config import settings
 from app.core.embeddings_base import (
     BaseEmbeddingService,
-    EmbeddingResult,
     EmbeddingProvider,
+    EmbeddingResult,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +67,7 @@ class VoyageEmbeddingService(BaseEmbeddingService):
         """
         if not VOYAGE_AVAILABLE:
             raise ImportError(
-                "voyageai package is not installed. "
-                "Install it with: pip install voyageai"
+                "voyageai package is not installed. " "Install it with: pip install voyageai"
             )
 
         api_key = api_key or getattr(settings, "VOYAGE_API_KEY", None)
@@ -169,7 +170,7 @@ class VoyageEmbeddingService(BaseEmbeddingService):
 
         # Process in batches
         for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
+            batch = texts[i : i + batch_size]
             batch_num = i // batch_size + 1
             total_batches = (len(texts) + batch_size - 1) // batch_size
 

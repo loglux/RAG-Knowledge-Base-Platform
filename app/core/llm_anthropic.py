@@ -3,17 +3,20 @@ Anthropic LLM Service.
 
 Handles text generation using Anthropic Claude API.
 """
+
 import logging
 from typing import List, Optional
+
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
 )
 
 try:
-    from anthropic import AsyncAnthropic, AnthropicError, RateLimitError, APITimeoutError
+    from anthropic import AnthropicError, APITimeoutError, AsyncAnthropic, RateLimitError
+
     ANTHROPIC_AVAILABLE = True
 except ImportError:
     ANTHROPIC_AVAILABLE = False
@@ -26,10 +29,9 @@ from app.config import settings
 from app.core.llm_base import (
     BaseLLMService,
     LLMProvider,
-    Message,
     LLMResponse,
+    Message,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +67,7 @@ class AnthropicLLMService(BaseLLMService):
         """
         if not ANTHROPIC_AVAILABLE:
             raise ImportError(
-                "anthropic package is not installed. "
-                "Install it with: pip install anthropic"
+                "anthropic package is not installed. " "Install it with: pip install anthropic"
             )
 
         api_key = api_key or settings.ANTHROPIC_API_KEY
@@ -76,7 +77,9 @@ class AnthropicLLMService(BaseLLMService):
             raise ValueError("Anthropic API key is required")
 
         # Initialize base class
-        super().__init__(api_key=api_key, model=model, max_retries=max_retries, skip_validation=False)
+        super().__init__(
+            api_key=api_key, model=model, max_retries=max_retries, skip_validation=False
+        )
 
         # Validate provider
         if self.model_config and self.provider != LLMProvider.ANTHROPIC:
@@ -121,10 +124,12 @@ class AnthropicLLMService(BaseLLMService):
                 if msg.role == "system":
                     system_message = msg.content
                 else:
-                    conversation_messages.append({
-                        "role": msg.role,
-                        "content": msg.content,
-                    })
+                    conversation_messages.append(
+                        {
+                            "role": msg.role,
+                            "content": msg.content,
+                        }
+                    )
 
             # Call Anthropic API
             response = await self.client.messages.create(

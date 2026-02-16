@@ -4,12 +4,12 @@ Revision ID: 016
 Revises: 013, 015
 Create Date: 2026-02-10
 """
+
 from typing import Sequence, Union
 
-
 # revision identifiers, used by Alembic.
-revision: str = '016'
-down_revision: Union[str, Sequence[str], None] = ('013', '015')
+revision: str = "016"
+down_revision: Union[str, Sequence[str], None] = ("013", "015")
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

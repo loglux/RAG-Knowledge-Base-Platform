@@ -4,9 +4,9 @@ Revision ID: 020
 Revises: 019
 Create Date: 2026-02-12 00:00:00.000000
 """
-from alembic import op
-import sqlalchemy as sa
 
+import sqlalchemy as sa
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "020"
@@ -19,7 +19,12 @@ def upgrade() -> None:
     op.create_table(
         "mcp_auth_codes",
         sa.Column("id", sa.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column("admin_user_id", sa.Integer, sa.ForeignKey("admin_users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "admin_user_id",
+            sa.Integer,
+            sa.ForeignKey("admin_users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("client_id", sa.String(length=255), nullable=False),
         sa.Column("redirect_uri", sa.String(length=2048), nullable=False),
         sa.Column("code_hash", sa.String(length=64), nullable=False),

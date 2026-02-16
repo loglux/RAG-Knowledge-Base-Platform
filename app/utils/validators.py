@@ -1,4 +1,5 @@
 """Input validation utilities."""
+
 import re
 from typing import Optional
 from uuid import UUID
@@ -24,13 +25,13 @@ def validate_file_size(content: str, max_size_bytes: Optional[int] = None) -> in
     Raises:
         HTTPException: If file size exceeds limit
     """
-    size = len(content.encode('utf-8'))
+    size = len(content.encode("utf-8"))
     max_size = max_size_bytes or settings.max_file_size_bytes
 
     if size > max_size:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File size {size} bytes exceeds limit of {max_size} bytes"
+            detail=f"File size {size} bytes exceeds limit of {max_size} bytes",
         )
 
     return size
@@ -51,8 +52,7 @@ def validate_file_type(filename: str) -> FileType:
     """
     if "." not in filename:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Filename must have an extension"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Filename must have an extension"
         )
 
     extension = filename.rsplit(".", 1)[-1].lower()
@@ -61,7 +61,7 @@ def validate_file_type(filename: str) -> FileType:
     if extension not in settings.allowed_file_types_list:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail=f"File type .{extension} not supported. Allowed: {settings.allowed_file_types_list}"
+            detail=f"File type .{extension} not supported. Allowed: {settings.allowed_file_types_list}",
         )
 
     # Map to FileType enum
@@ -70,7 +70,7 @@ def validate_file_type(filename: str) -> FileType:
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail=f"File type .{extension} not supported in current version"
+            detail=f"File type .{extension} not supported in current version",
         )
 
 
@@ -96,21 +96,20 @@ def validate_filename(filename: str) -> str:
     if ".." in filename or "/" in filename or "\\" in filename:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Filename contains invalid path characters"
+            detail="Filename contains invalid path characters",
         )
 
     # Check length
     if len(filename) < 1 or len(filename) > 255:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Filename must be between 1 and 255 characters"
+            detail="Filename must be between 1 and 255 characters",
         )
 
     # Check for invalid characters (basic check)
     if re.search(r'[<>:"|?*]', filename):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Filename contains invalid characters"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Filename contains invalid characters"
         )
 
     return filename.strip()
@@ -135,7 +134,7 @@ def validate_uuid(value: str, field_name: str = "ID") -> UUID:
     except (ValueError, AttributeError):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid {field_name} format. Must be a valid UUID"
+            detail=f"Invalid {field_name} format. Must be a valid UUID",
         )
 
 
@@ -155,14 +154,12 @@ def validate_pagination(page: int, page_size: int) -> tuple[int, int]:
     """
     if page < 1:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Page number must be >= 1"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Page number must be >= 1"
         )
 
     if page_size < 1 or page_size > 100:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Page size must be between 1 and 100"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Page size must be between 1 and 100"
         )
 
     return page, page_size
@@ -182,9 +179,9 @@ def sanitize_text_content(content: str) -> str:
         Sanitized content
     """
     # Remove null bytes
-    content = content.replace('\x00', '')
+    content = content.replace("\x00", "")
 
     # Remove other control characters except newlines and tabs
-    content = ''.join(char for char in content if char == '\n' or char == '\t' or ord(char) >= 32)
+    content = "".join(char for char in content if char == "\n" or char == "\t" or ord(char) >= 32)
 
     return content.strip()

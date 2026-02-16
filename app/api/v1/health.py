@@ -1,22 +1,23 @@
 """Health check endpoints."""
+
 import logging
 from datetime import datetime
 from typing import Optional
 
 import httpx
+from anthropic import AsyncAnthropic
 from fastapi import APIRouter, Depends, status
 from openai import AsyncOpenAI
-from anthropic import AsyncAnthropic
-from sqlalchemy import text, select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
-from app.models.schemas import HealthCheck, ReadinessCheck
-from app.models.database import AppSettings as AppSettingsModel
 from app.config import settings
-from app.core.vector_store import get_vector_store
-from app.core.lexical_store import get_lexical_store
 from app.core.embeddings_base import EMBEDDING_MODELS
+from app.core.lexical_store import get_lexical_store
+from app.core.vector_store import get_vector_store
+from app.db.session import get_db
+from app.models.database import AppSettings as AppSettingsModel
+from app.models.schemas import HealthCheck, ReadinessCheck
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ router = APIRouter()
 
 
 # Health check helper functions
+
 
 async def check_openai_health(api_key: Optional[str] = None) -> bool:
     """Check OpenAI API availability."""
@@ -54,7 +56,7 @@ async def check_anthropic_health(api_key: Optional[str] = None) -> bool:
         await client.messages.create(
             model="claude-3-haiku-20240307",
             max_tokens=1,
-            messages=[{"role": "user", "content": "test"}]
+            messages=[{"role": "user", "content": "test"}],
         )
         await client.close()
         return True
@@ -74,10 +76,7 @@ async def check_voyage_health(api_key: Optional[str] = None) -> bool:
             response = await client.post(
                 "https://api.voyageai.com/v1/embeddings",
                 headers={"Authorization": f"Bearer {key}"},
-                json={
-                    "input": ["test"],
-                    "model": "voyage-4-lite"
-                }
+                json={"input": ["test"], "model": "voyage-4-lite"},
             )
             return response.status_code == 200
     except Exception as e:
@@ -126,10 +125,7 @@ async def health_check():
 
     Returns OK if the service is running.
     """
-    return HealthCheck(
-        status="ok",
-        timestamp=datetime.utcnow()
-    )
+    return HealthCheck(status="ok", timestamp=datetime.utcnow())
 
 
 @router.get("/ready", response_model=ReadinessCheck)
@@ -178,7 +174,7 @@ async def readiness_check(db: AsyncSession = Depends(get_db)):
         result = await db.execute(select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1))
         row = result.scalar_one_or_none()
         if row:
-            requires_opensearch = (row.retrieval_mode == "hybrid")
+            requires_opensearch = row.retrieval_mode == "hybrid"
             if row.default_llm_model:
                 default_llm_model = row.default_llm_model
             # Use first KB's embedding model as proxy for default embedding
@@ -221,13 +217,7 @@ async def readiness_check(db: AsyncSession = Depends(get_db)):
 
     # System is ready if all checked services are healthy
     all_ready = all(checks.values())
-    status_code = status.HTTP_200_OK if all_ready else status.HTTP_503_SERVICE_UNAVAILABLE
-
-    return ReadinessCheck(
-        ready=all_ready,
-        checks=checks,
-        timestamp=datetime.utcnow()
-    )
+    return ReadinessCheck(ready=all_ready, checks=checks, timestamp=datetime.utcnow())
 
 
 @router.get("/info")

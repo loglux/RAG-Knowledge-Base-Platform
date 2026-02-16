@@ -1,4 +1,5 @@
 """Helpers for resolving retrieval settings."""
+
 from __future__ import annotations
 
 import json
@@ -6,10 +7,10 @@ import logging
 from typing import Any, Dict, Optional
 
 from app.config import settings
-from app.models.database import AppSettings as AppSettingsModel, KnowledgeBase as KnowledgeBaseModel
+from app.models.database import AppSettings as AppSettingsModel
+from app.models.database import KnowledgeBase as KnowledgeBaseModel
 from app.models.enums import RetrievalMode
 from app.models.schemas import RetrievalSettingsUpdate
-
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +58,9 @@ def _default_retrieval_settings() -> Dict[str, Any]:
     }
 
 
-def _apply_settings(target: Dict[str, Any], source: Dict[str, Any], fields: tuple[str, ...]) -> None:
+def _apply_settings(
+    target: Dict[str, Any], source: Dict[str, Any], fields: tuple[str, ...]
+) -> None:
     for field in fields:
         if field in source and source[field] is not None:
             target[field] = source[field]

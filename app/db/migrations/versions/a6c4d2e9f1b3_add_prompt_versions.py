@@ -4,12 +4,12 @@ Revision ID: a6c4d2e9f1b3
 Revises: f4a5b6c7d8e9
 Create Date: 2026-02-05
 """
+
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
-
 
 # revision identifiers, used by Alembic.
 revision: str = "a6c4d2e9f1b3"
@@ -83,7 +83,9 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     """Revert migration."""
-    op.drop_constraint("fk_app_settings_active_prompt_version_id", "app_settings", type_="foreignkey")
+    op.drop_constraint(
+        "fk_app_settings_active_prompt_version_id", "app_settings", type_="foreignkey"
+    )
     op.drop_column("app_settings", "show_prompt_versions")
     op.drop_column("app_settings", "active_prompt_version_id")
 

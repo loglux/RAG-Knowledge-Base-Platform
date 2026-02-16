@@ -1,25 +1,25 @@
 """Authentication endpoints (JWT + refresh tokens)."""
+
 from datetime import datetime
 
 import bcrypt
-from fastapi import APIRouter, Depends, HTTPException, Response, Cookie, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.auth import (
+    REFRESH_TOKEN_TYPE,
     create_access_token,
     create_refresh_token,
     decode_token,
-    is_token_type,
     get_admin_id,
-    REFRESH_TOKEN_TYPE,
+    is_token_type,
 )
 from app.db.session import get_db
-from app.models.database import AdminUser, AdminRefreshToken
-from app.models.schemas import LoginRequest, TokenResponse, MeResponse
 from app.dependencies import get_current_admin_id
-
+from app.models.database import AdminRefreshToken, AdminUser
+from app.models.schemas import LoginRequest, MeResponse, TokenResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -49,9 +49,7 @@ async def login(
     response: Response,
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(AdminUser).where(AdminUser.username == payload.username)
-    )
+    result = await db.execute(select(AdminUser).where(AdminUser.username == payload.username))
     admin = result.scalar_one_or_none()
     if not admin or not admin.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
@@ -62,12 +60,14 @@ async def login(
     access_token = create_access_token(admin.id, admin.username, admin.role)
     refresh_token, jti, expires_at = create_refresh_token(admin.id)
 
-    db.add(AdminRefreshToken(
-        admin_user_id=admin.id,
-        jti=jti,
-        expires_at=expires_at,
-        created_at=datetime.utcnow(),
-    ))
+    db.add(
+        AdminRefreshToken(
+            admin_user_id=admin.id,
+            jti=jti,
+            expires_at=expires_at,
+            created_at=datetime.utcnow(),
+        )
+    )
     admin.last_login = datetime.utcnow()
     await db.commit()
 
@@ -90,12 +90,16 @@ async def refresh(
     db: AsyncSession = Depends(get_db),
 ):
     if not refresh_token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing refresh token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing refresh token"
+        )
 
     try:
         payload = decode_token(refresh_token)
     except Exception:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
+        )
 
     if not is_token_type(payload, REFRESH_TOKEN_TYPE):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
@@ -103,29 +107,35 @@ async def refresh(
     admin_id = get_admin_id(payload)
     jti = payload.get("jti")
     if not admin_id or not jti:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
+        )
 
-    token_result = await db.execute(
-        select(AdminRefreshToken).where(AdminRefreshToken.jti == jti)
-    )
+    token_result = await db.execute(select(AdminRefreshToken).where(AdminRefreshToken.jti == jti))
     token_row = token_result.scalar_one_or_none()
     if not token_row or token_row.revoked_at is not None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token revoked")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token revoked"
+        )
 
     if token_row.expires_at < datetime.utcnow():
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token expired")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token expired"
+        )
 
     # Rotate refresh token
     token_row.revoked_at = datetime.utcnow()
     access_token = None
     refresh_token_new, new_jti, expires_at = create_refresh_token(admin_id)
 
-    db.add(AdminRefreshToken(
-        admin_user_id=admin_id,
-        jti=new_jti,
-        expires_at=expires_at,
-        created_at=datetime.utcnow(),
-    ))
+    db.add(
+        AdminRefreshToken(
+            admin_user_id=admin_id,
+            jti=new_jti,
+            expires_at=expires_at,
+            created_at=datetime.utcnow(),
+        )
+    )
 
     admin_result = await db.execute(select(AdminUser).where(AdminUser.id == admin_id))
     admin = admin_result.scalar_one_or_none()

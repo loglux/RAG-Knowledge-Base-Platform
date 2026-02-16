@@ -1,4 +1,5 @@
 """Text processing utilities."""
+
 import hashlib
 from typing import List
 
@@ -13,7 +14,7 @@ def calculate_content_hash(content: str) -> str:
     Returns:
         Hexadecimal hash string
     """
-    return hashlib.sha256(content.encode('utf-8')).hexdigest()
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
 def truncate_text(text: str, max_length: int, suffix: str = "...") -> str:
@@ -31,7 +32,7 @@ def truncate_text(text: str, max_length: int, suffix: str = "...") -> str:
     if len(text) <= max_length:
         return text
 
-    return text[:max_length - len(suffix)] + suffix
+    return text[: max_length - len(suffix)] + suffix
 
 
 def count_tokens_estimate(text: str) -> int:
@@ -71,15 +72,15 @@ def split_into_sentences(text: str) -> List[str]:
 
     for char in text:
         current.append(char)
-        if char in '.!?' and len(current) > 1:
-            sentence = ''.join(current).strip()
+        if char in ".!?" and len(current) > 1:
+            sentence = "".join(current).strip()
             if sentence:
                 sentences.append(sentence)
             current = []
 
     # Add remaining text
     if current:
-        sentence = ''.join(current).strip()
+        sentence = "".join(current).strip()
         if sentence:
             sentences.append(sentence)
 
@@ -103,10 +104,10 @@ def normalize_whitespace(text: str) -> str:
     import re
 
     # Replace multiple spaces with single space
-    text = re.sub(r' +', ' ', text)
+    text = re.sub(r" +", " ", text)
 
     # Replace multiple newlines with double newline
-    text = re.sub(r'\n\n+', '\n\n', text)
+    text = re.sub(r"\n\n+", "\n\n", text)
 
     # Strip leading/trailing whitespace
     text = text.strip()

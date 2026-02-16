@@ -3,19 +3,19 @@ Factory for creating embedding services.
 
 Provides unified interface for creating embedding services from different providers.
 """
+
 import logging
 from typing import Optional
 
 from app.config import settings
+from app.core.embeddings import OpenAIEmbeddingService
 from app.core.embeddings_base import (
+    EMBEDDING_MODELS,
     BaseEmbeddingService,
     EmbeddingProvider,
-    EMBEDDING_MODELS,
 )
-from app.core.embeddings import OpenAIEmbeddingService
-from app.core.embeddings_voyage import VoyageEmbeddingService
 from app.core.embeddings_ollama import OllamaEmbeddingService
-
+from app.core.embeddings_voyage import VoyageEmbeddingService
 
 logger = logging.getLogger(__name__)
 
@@ -211,8 +211,4 @@ def get_models_by_provider(provider: EmbeddingProvider) -> list:
     Returns:
         List of model names for the provider
     """
-    return [
-        model
-        for model, config in EMBEDDING_MODELS.items()
-        if config.provider == provider
-    ]
+    return [model for model, config in EMBEDDING_MODELS.items() if config.provider == provider]

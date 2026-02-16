@@ -1,34 +1,41 @@
 """Document management endpoints."""
-from typing import Optional
-from collections import deque
+
 import asyncio
-import time
-from uuid import UUID
 import hashlib
 import logging
+import time
+from collections import deque
+from typing import Optional
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, UploadFile, File, Form
-from sqlalchemy import select, func
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    UploadFile,
+    status,
+)
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.session import get_db
-from app.models.database import (
-    Document as DocumentModel,
-    KnowledgeBase as KnowledgeBaseModel,
-    AppSettings as AppSettingsModel,
-)
 from app.config import settings as app_settings
+from app.db.session import get_db
+from app.dependencies import get_current_user_id
+from app.models.database import AppSettings as AppSettingsModel
+from app.models.database import Document as DocumentModel
+from app.models.database import KnowledgeBase as KnowledgeBaseModel
+from app.models.enums import DocumentStatus, FileType
 from app.models.schemas import (
-    DocumentCreate,
-    DocumentResponse,
     DocumentList,
+    DocumentResponse,
     DocumentWithContent,
 )
-from app.models.enums import DocumentStatus, FileType
-from app.dependencies import get_current_user_id
-from app.services.document_processor import get_document_processor, DocumentProcessingError
+from app.services.document_processor import get_document_processor
 from app.services.duplicate_chunks import compute_duplicate_chunks_for_document, json_dumps
-
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +79,9 @@ async def _process_document_background(document_id: UUID, detect_duplicates: boo
             logger.info(f"[BACKGROUND] Getting document processor...")
             processor = get_document_processor()
             logger.info(f"[BACKGROUND] Calling process_document()...")
-            result = await processor.process_document(document_id, db, detect_duplicates=detect_duplicates)
+            result = await processor.process_document(
+                document_id, db, detect_duplicates=detect_duplicates
+            )
             logger.info(f"[BACKGROUND] Background processing completed: {result}")
 
     except Exception as e:
@@ -134,7 +143,7 @@ async def create_document(
     if not kb:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Knowledge base {knowledge_base_id} not found"
+            detail=f"Knowledge base {knowledge_base_id} not found",
         )
 
     # Detect file type
@@ -152,7 +161,7 @@ async def create_document(
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file type: {extension}. Supported: txt, md, fb2, docx"
+            detail=f"Unsupported file type: {extension}. Supported: txt, md, fb2, docx",
         )
 
     # Read file content
@@ -160,35 +169,37 @@ async def create_document(
     content: str
     if file_type == FileType.DOCX:
         from app.utils.file_handlers import process_file
+
         try:
             processed = process_file(content_bytes, filename, file_type)
             content = processed["text"]
         except Exception as exc:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Failed to parse DOCX: {exc}"
+                status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to parse DOCX: {exc}"
             ) from exc
     else:
         try:
-            content = content_bytes.decode('utf-8')
+            content = content_bytes.decode("utf-8")
         except UnicodeDecodeError:
             import chardet
+
             detected = chardet.detect(content_bytes)
             encoding = detected.get("encoding")
             if not encoding:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="File must be UTF-8 or a detectable text encoding"
+                    detail="File must be UTF-8 or a detectable text encoding",
                 )
             content = content_bytes.decode(encoding, errors="replace")
 
     # Validate file size
     from app.config import settings
+
     file_size = len(content_bytes)
     if file_size > settings.max_file_size_bytes:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"File size {file_size} bytes exceeds limit of {settings.MAX_FILE_SIZE_MB}MB"
+            detail=f"File size {file_size} bytes exceeds limit of {settings.MAX_FILE_SIZE_MB}MB",
         )
 
     # Calculate content hash for deduplication
@@ -204,7 +215,7 @@ async def create_document(
     if dup_result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Document with identical content already exists in this knowledge base"
+            detail="Document with identical content already exists in this knowledge base",
         )
 
     # Create document
@@ -225,8 +236,7 @@ async def create_document(
     # Recalculate KB document count (prevents desync from incremental updates)
     doc_count = await db.scalar(
         select(func.count(DocumentModel.id)).where(
-            DocumentModel.knowledge_base_id == kb.id,
-            DocumentModel.is_deleted == False
+            DocumentModel.knowledge_base_id == kb.id, DocumentModel.is_deleted == False
         )
     )
     kb.document_count = doc_count or 0
@@ -251,7 +261,9 @@ async def create_document(
 @router.get("/", response_model=DocumentList)
 async def list_documents(
     knowledge_base_id: Optional[UUID] = Query(None, description="Filter by knowledge base"),
-    status_filter: Optional[DocumentStatus] = Query(None, alias="status", description="Filter by status"),
+    status_filter: Optional[DocumentStatus] = Query(
+        None, alias="status", description="Filter by status"
+    ),
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(10, ge=1, le=100, description="Items per page"),
     db: AsyncSession = Depends(get_db),
@@ -315,8 +327,7 @@ async def get_document(
 
     if not doc:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Document {doc_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Document {doc_id} not found"
         )
 
     # Future: Check user ownership
@@ -346,16 +357,13 @@ async def delete_document(
 
     if not doc:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Document {doc_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Document {doc_id} not found"
         )
 
     # Future: Check user ownership
 
     # Get KB to update stats
-    kb_query = select(KnowledgeBaseModel).where(
-        KnowledgeBaseModel.id == doc.knowledge_base_id
-    )
+    kb_query = select(KnowledgeBaseModel).where(KnowledgeBaseModel.id == doc.knowledge_base_id)
     kb_result = await db.execute(kb_query)
     kb = kb_result.scalar_one_or_none()
 
@@ -366,14 +374,12 @@ async def delete_document(
     if kb:
         doc_count = await db.scalar(
             select(func.count(DocumentModel.id)).where(
-                DocumentModel.knowledge_base_id == kb.id,
-                DocumentModel.is_deleted == False
+                DocumentModel.knowledge_base_id == kb.id, DocumentModel.is_deleted == False
             )
         )
         total_chunks = await db.scalar(
             select(func.coalesce(func.sum(DocumentModel.chunk_count), 0)).where(
-                DocumentModel.knowledge_base_id == kb.id,
-                DocumentModel.is_deleted == False
+                DocumentModel.knowledge_base_id == kb.id, DocumentModel.is_deleted == False
             )
         )
         kb.document_count = doc_count or 0
@@ -400,7 +406,9 @@ async def delete_document(
 async def reprocess_document(
     doc_id: UUID,
     background_tasks: BackgroundTasks,
-    detect_duplicates: bool = Query(False, description="Compute duplicate chunks after reprocessing"),
+    detect_duplicates: bool = Query(
+        False, description="Compute duplicate chunks after reprocessing"
+    ),
     db: AsyncSession = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_current_user_id),
 ):
@@ -424,15 +432,13 @@ async def reprocess_document(
 
     if not doc:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Document {doc_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Document {doc_id} not found"
         )
 
     # Check if document is currently processing
     if doc.status == DocumentStatus.PROCESSING:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Document is currently being processed"
+            status_code=status.HTTP_409_CONFLICT, detail="Document is currently being processed"
         )
 
     # Update status to pending
@@ -467,7 +473,9 @@ async def _reprocess_document_background(document_id: UUID, detect_duplicates: b
 
         async with AsyncSessionLocal() as db:
             processor = get_document_processor()
-            result = await processor.reprocess_document(document_id, db, detect_duplicates=detect_duplicates)
+            result = await processor.reprocess_document(
+                document_id, db, detect_duplicates=detect_duplicates
+            )
             logger.info(f"Background reprocessing completed: {result}")
 
     except Exception as e:
@@ -521,15 +529,14 @@ async def get_document_status(
 
         if not doc:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Document {doc_id} not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Document {doc_id} not found"
             )
 
         # Safe status extraction
         doc_status = "unknown"
         if doc.status:
             try:
-                doc_status = doc.status.value if hasattr(doc.status, 'value') else str(doc.status)
+                doc_status = doc.status.value if hasattr(doc.status, "value") else str(doc.status)
             except Exception:
                 doc_status = "unknown"
 
@@ -537,8 +544,24 @@ async def get_document_status(
             "id": str(doc.id),
             "filename": doc.filename,
             "status": doc_status,
-            "embeddings_status": (doc.embeddings_status.value if hasattr(doc.embeddings_status, 'value') else str(doc.embeddings_status)) if doc.embeddings_status else None,
-            "bm25_status": (doc.bm25_status.value if hasattr(doc.bm25_status, 'value') else str(doc.bm25_status)) if doc.bm25_status else None,
+            "embeddings_status": (
+                (
+                    doc.embeddings_status.value
+                    if hasattr(doc.embeddings_status, "value")
+                    else str(doc.embeddings_status)
+                )
+                if doc.embeddings_status
+                else None
+            ),
+            "bm25_status": (
+                (
+                    doc.bm25_status.value
+                    if hasattr(doc.bm25_status, "value")
+                    else str(doc.bm25_status)
+                )
+                if doc.bm25_status
+                else None
+            ),
             "chunk_count": doc.chunk_count or 0,
             "error_message": doc.error_message,
             "processing_stage": doc.processing_stage,
@@ -570,19 +593,22 @@ async def recompute_document_duplicates(
     Recompute duplicate chunk analysis for a document (Qdrant payload scan only).
     Stores summary in document metadata.
     """
-    query = select(DocumentModel, KnowledgeBaseModel).join(
-        KnowledgeBaseModel,
-        DocumentModel.knowledge_base_id == KnowledgeBaseModel.id,
-    ).where(
-        DocumentModel.id == doc_id,
-        DocumentModel.is_deleted == False,
+    query = (
+        select(DocumentModel, KnowledgeBaseModel)
+        .join(
+            KnowledgeBaseModel,
+            DocumentModel.knowledge_base_id == KnowledgeBaseModel.id,
+        )
+        .where(
+            DocumentModel.id == doc_id,
+            DocumentModel.is_deleted == False,
+        )
     )
     result = await db.execute(query)
     row = result.first()
     if not row:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Document {doc_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Document {doc_id} not found"
         )
 
     doc, kb = row
@@ -606,8 +632,8 @@ async def analyze_document_structure(
 
     Returns analysis results with suggested metadata and TOC sections.
     """
-    from app.services.document_analyzer import get_document_analyzer
     from app.models.database import KnowledgeBase
+    from app.services.document_analyzer import get_document_analyzer
 
     # Get document
     doc_query = select(DocumentModel).where(
@@ -619,8 +645,7 @@ async def analyze_document_structure(
 
     if not doc:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Document {doc_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Document {doc_id} not found"
         )
 
     # Get KB collection name
@@ -630,12 +655,13 @@ async def analyze_document_structure(
 
     if not kb:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Knowledge base not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge base not found"
         )
 
     try:
-        settings_result = await db.execute(select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1))
+        settings_result = await db.execute(
+            select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1)
+        )
         settings_row = settings_result.scalar_one_or_none()
         rpm_limit = (
             settings_row.structure_requests_per_minute
@@ -646,7 +672,7 @@ async def analyze_document_structure(
         if retry_after is not None:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Rate limit exceeded. Retry in {retry_after} seconds."
+                detail=f"Rate limit exceeded. Retry in {retry_after} seconds.",
             )
 
         analyzer = get_document_analyzer()
@@ -663,7 +689,7 @@ async def analyze_document_structure(
             "document_type": analysis.document_type,
             "description": analysis.description,
             "total_sections": analysis.total_sections,
-            "sections": [section.model_dump() for section in analysis.sections]
+            "sections": [section.model_dump() for section in analysis.sections],
         }
 
     except Exception as e:
@@ -674,25 +700,22 @@ async def analyze_document_structure(
         if "rate_limit_error" in error_msg or "Error code: 429" in error_msg:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Analysis failed: Rate limit exceeded. Please wait a moment and try again. {error_msg}"
+                detail=f"Analysis failed: Rate limit exceeded. Please wait a moment and try again. {error_msg}",
             )
 
         # Check for other API errors that should be passed through
         if "Error code:" in error_msg:
             # Extract error code if possible
             import re
-            match = re.search(r'Error code: (\d+)', error_msg)
+
+            match = re.search(r"Error code: (\d+)", error_msg)
             if match:
                 error_code = int(match.group(1))
-                raise HTTPException(
-                    status_code=error_code,
-                    detail=f"Analysis failed: {error_msg}"
-                )
+                raise HTTPException(status_code=error_code, detail=f"Analysis failed: {error_msg}")
 
         # Generic server error for unexpected issues
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Analysis failed: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Analysis failed: {str(e)}"
         )
 
 
@@ -708,8 +731,8 @@ async def apply_document_structure(
 
     Saves the TOC to database and updates chunk metadata in Qdrant.
     """
-    from app.services.document_analyzer import get_document_analyzer
     from app.models.schemas import DocumentStructureAnalysis, TOCSection
+    from app.services.document_analyzer import get_document_analyzer
 
     try:
         # Parse analysis
@@ -718,29 +741,26 @@ async def apply_document_structure(
             document_type=analysis["document_type"],
             description=analysis["description"],
             sections=sections,
-            total_sections=len(sections)
+            total_sections=len(sections),
         )
 
         # Save to database
         analyzer = get_document_analyzer()
         structure = await analyzer.save_structure(
-            document_id=doc_id,
-            analysis=structure_analysis,
-            db=db,
-            approved=True
+            document_id=doc_id, analysis=structure_analysis, db=db, approved=True
         )
 
         return {
             "status": "success",
             "structure_id": str(structure.id),
-            "sections_saved": len(sections)
+            "sections_saved": len(sections),
         }
 
     except Exception as e:
         logger.error(f"Failed to apply structure for document {doc_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to apply structure: {str(e)}"
+            detail=f"Failed to apply structure: {str(e)}",
         )
 
 
@@ -751,8 +771,9 @@ async def get_document_structure(
     user_id: Optional[UUID] = Depends(get_current_user_id),
 ):
     """Get document structure (TOC) if it exists."""
-    from app.services.document_analyzer import get_document_analyzer
     import json
+
+    from app.services.document_analyzer import get_document_analyzer
 
     analyzer = get_document_analyzer()
     structure = await analyzer.get_structure(doc_id, db)

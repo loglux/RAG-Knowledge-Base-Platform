@@ -3,18 +3,20 @@ DeepSeek LLM Service.
 
 Uses OpenAI-compatible API with DeepSeek base_url.
 """
+
 import logging
 from typing import List, Optional
 
 from tenacity import (
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
 )
 
 try:
-    from openai import AsyncOpenAI, OpenAIError, RateLimitError, APITimeoutError
+    from openai import APITimeoutError, AsyncOpenAI, OpenAIError, RateLimitError
+
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
@@ -24,8 +26,7 @@ except ImportError:
     APITimeoutError = Exception
 
 from app.config import settings
-from app.core.llm_base import BaseLLMService, Message, LLMResponse
-
+from app.core.llm_base import BaseLLMService, LLMResponse, Message
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,9 @@ class DeepSeekLLMService(BaseLLMService):
 
         self.base_url = base_url or settings.DEEPSEEK_BASE_URL
 
-        super().__init__(api_key=api_key, model=model or settings.DEEPSEEK_CHAT_MODEL, max_retries=max_retries)
+        super().__init__(
+            api_key=api_key, model=model or settings.DEEPSEEK_CHAT_MODEL, max_retries=max_retries
+        )
 
         self.client = AsyncOpenAI(
             api_key=api_key,

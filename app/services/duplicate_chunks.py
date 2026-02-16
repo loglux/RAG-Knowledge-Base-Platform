@@ -1,23 +1,23 @@
 """Duplicate chunk analysis utilities."""
+
 import hashlib
 import re
 from collections import defaultdict
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from qdrant_client.models import Filter, FieldCondition, MatchValue
-from sqlalchemy.ext.asyncio import AsyncSession
+from qdrant_client.models import FieldCondition, Filter, MatchValue
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.vector_store import get_vector_store
 from app.models.database import Document as DocumentModel
-
 
 _normalize_re = re.compile(r"\s+")
 
 
 def _normalize_text(text: str) -> str:
-    return _normalize_re.sub(' ', text.strip())
+    return _normalize_re.sub(" ", text.strip())
 
 
 def _build_duplicate_summary(groups: Dict[str, List[int]]) -> Dict[str, Any]:
@@ -27,18 +27,20 @@ def _build_duplicate_summary(groups: Dict[str, List[int]]) -> Dict[str, Any]:
         uniq = sorted(set(indices))
         if len(uniq) < 2:
             continue
-        group_list.append({
-            'hash': h,
-            'chunks': uniq,
-            'count': len(uniq),
-        })
+        group_list.append(
+            {
+                "hash": h,
+                "chunks": uniq,
+                "count": len(uniq),
+            }
+        )
         total_chunks += len(uniq)
 
-    group_list.sort(key=lambda g: (-g['count'], g['chunks'][0] if g['chunks'] else 0))
+    group_list.sort(key=lambda g: (-g["count"], g["chunks"][0] if g["chunks"] else 0))
     return {
-        'total_groups': len(group_list),
-        'total_chunks': total_chunks,
-        'groups': group_list,
+        "total_groups": len(group_list),
+        "total_chunks": total_chunks,
+        "groups": group_list,
     }
 
 
@@ -69,16 +71,16 @@ async def compute_duplicate_chunks_for_document(
             break
         for p in points:
             payload = p.payload or {}
-            text = payload.get('text') or ''
+            text = payload.get("text") or ""
             if not text:
                 continue
-            chunk_index = payload.get('chunk_index')
+            chunk_index = payload.get("chunk_index")
             if chunk_index is None:
                 continue
             norm = _normalize_text(text)
             if not norm:
                 continue
-            h = hashlib.sha1(norm.encode('utf-8')).hexdigest()
+            h = hashlib.sha1(norm.encode("utf-8")).hexdigest()
             groups[h].append(int(chunk_index))
         if next_offset is None:
             break
@@ -104,4 +106,5 @@ async def store_duplicate_chunks(
 
 def json_dumps(data: Dict[str, Any]) -> str:
     import json
+
     return json.dumps(data, ensure_ascii=False)

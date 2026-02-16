@@ -1,20 +1,25 @@
 """QA-based evaluation utilities for RAG auto-tuning."""
+
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
 import re
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.database import KnowledgeBase as KnowledgeBaseModel, QASample, QAEvalRun, QAEvalResult
+from app.models.database import KnowledgeBase as KnowledgeBaseModel
+from app.models.database import (
+    QAEvalResult,
+    QAEvalRun,
+    QASample,
+)
 from app.services.rag import RAGService
-
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+", re.IGNORECASE)
 NO_ANSWER_SENTINEL = "__NO_ANSWER__"
@@ -146,10 +151,14 @@ async def _load_gold_samples(
     kb_id,
     sample_limit: Optional[int],
 ) -> List[QASample]:
-    query = select(QASample).where(
-        QASample.knowledge_base_id == kb_id,
-        QASample.sample_type == "gold",
-    ).order_by(QASample.created_at.asc())
+    query = (
+        select(QASample)
+        .where(
+            QASample.knowledge_base_id == kb_id,
+            QASample.sample_type == "gold",
+        )
+        .order_by(QASample.created_at.asc())
+    )
     if sample_limit:
         query = query.limit(sample_limit)
     result = await db.execute(query)
@@ -183,7 +192,13 @@ async def run_gold_evaluation_on_run(
 
     for idx, sample in enumerate(samples, 1):
         try:
-            logger.info("Gold eval run %s: processing sample %s/%s (id=%s)", run.id, idx, len(samples), sample.id)
+            logger.info(
+                "Gold eval run %s: processing sample %s/%s (id=%s)",
+                run.id,
+                idx,
+                len(samples),
+                sample.id,
+            )
             response = await asyncio.wait_for(
                 rag.query(
                     question=sample.question,
@@ -291,7 +306,9 @@ async def run_gold_evaluation_on_run(
         "f1_avg": sum(f1_scores) / len(f1_scores) if f1_scores else 0.0,
         "concise_f1_avg": sum(concise_scores) / len(concise_scores) if concise_scores else 0.0,
         "recall_avg": sum(recall_scores) / len(recall_scores) if recall_scores else None,
-        "no_answer_accuracy": sum(no_answer_scores) / len(no_answer_scores) if no_answer_scores else None,
+        "no_answer_accuracy": (
+            sum(no_answer_scores) / len(no_answer_scores) if no_answer_scores else None
+        ),
         "errors": errors,
     }
 

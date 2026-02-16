@@ -1,14 +1,15 @@
 """Embeddings configuration endpoints."""
-from typing import List, Dict, Any
+
+from typing import Any, Dict, List
+
 from fastapi import APIRouter, HTTPException, status
 
-from app.core.embeddings_base import EMBEDDING_MODELS, EmbeddingProvider
+from app.core.embeddings_base import EmbeddingProvider
 from app.core.embeddings_factory import (
     get_model_info,
-    list_available_models,
     get_models_by_provider,
+    list_available_models,
 )
-
 
 router = APIRouter()
 
@@ -45,10 +46,7 @@ async def get_embedding_model(model_name: str):
     try:
         return get_model_info(model_name)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @router.get("/providers/{provider}/models", response_model=List[str])
@@ -72,7 +70,7 @@ async def list_provider_models(provider: str):
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid provider: {provider}. Valid providers: openai, voyage"
+            detail=f"Invalid provider: {provider}. Valid providers: openai, voyage",
         )
 
 

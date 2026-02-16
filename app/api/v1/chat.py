@@ -1,39 +1,37 @@
 """Chat/Query endpoints for RAG."""
+
 import json
 import logging
 from datetime import datetime
-from uuid import UUID
 from typing import Optional
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func, desc, delete
-from sqlalchemy.ext.asyncio import AsyncSession
 import httpx
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import delete, desc, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings as app_settings
 from app.db.session import get_db
-from app.models.database import (
-    KnowledgeBase as KnowledgeBaseModel,
-    AppSettings as AppSettingsModel,
-    Conversation as ConversationModel,
-    ChatMessage as ChatMessageModel,
-)
+from app.dependencies import get_current_user_id
+from app.models.database import AppSettings as AppSettingsModel
+from app.models.database import ChatMessage as ChatMessageModel
+from app.models.database import Conversation as ConversationModel
+from app.models.database import KnowledgeBase as KnowledgeBaseModel
 from app.models.schemas import (
+    ChatDeleteResponse,
+    ChatMessageResponse,
     ChatRequest,
     ChatResponse,
-    ChatDeleteResponse,
-    SourceChunk,
-    ConversationSummary,
-    ChatMessageResponse,
     ConversationDetail,
     ConversationSettings,
+    ConversationSummary,
     ConversationTitleUpdate,
+    SourceChunk,
 )
-from app.services.rag import get_rag_service, RAGService
 from app.services.chat_titles import build_conversation_title
 from app.services.prompts import get_active_chat_prompt
-from app.dependencies import get_current_user_id
-
+from app.services.rag import RAGService, get_rag_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -53,25 +51,20 @@ def _format_chat_error(exc: Exception) -> tuple[int, str]:
     if isinstance(exc, httpx.ReadTimeout):
         return (
             status.HTTP_504_GATEWAY_TIMEOUT,
-            "Ollama timed out while generating a response. Try a smaller model or reduce context."
+            "Ollama timed out while generating a response. Try a smaller model or reduce context.",
         )
     if isinstance(exc, httpx.HTTPStatusError):
         code = exc.response.status_code if exc.response else status.HTTP_502_BAD_GATEWAY
         if code == status.HTTP_400_BAD_REQUEST:
             return (
                 status.HTTP_400_BAD_REQUEST,
-                "Ollama rejected the request (400). Try reducing context or checking model availability."
+                "Ollama rejected the request (400). Try reducing context or checking model availability.",
             )
         return (
             status.HTTP_502_BAD_GATEWAY,
-            "Ollama returned an upstream error. Try again or switch models."
+            "Ollama returned an upstream error. Try again or switch models.",
         )
-    return (
-        status.HTTP_500_INTERNAL_SERVER_ERROR,
-        "Query failed. Please try again."
-    )
-
-
+    return (status.HTTP_500_INTERNAL_SERVER_ERROR, "Query failed. Please try again.")
 
 
 @router.post("/", response_model=ChatResponse)
@@ -115,14 +108,14 @@ async def chat_query(
         if not kb:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Knowledge base {request.knowledge_base_id} not found"
+                detail=f"Knowledge base {request.knowledge_base_id} not found",
             )
 
         # 2. Check if KB has any documents
         if kb.document_count == 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Knowledge base is empty. Please add documents first."
+                detail="Knowledge base is empty. Please add documents first.",
             )
 
         # 3. Load conversation (optional)
@@ -137,12 +130,12 @@ async def chat_query(
             if not conversation:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Conversation {request.conversation_id} not found"
+                    detail=f"Conversation {request.conversation_id} not found",
                 )
             if conversation.knowledge_base_id != request.knowledge_base_id:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Conversation does not belong to this knowledge base"
+                    detail="Conversation does not belong to this knowledge base",
                 )
 
         # 4. Perform RAG query
@@ -180,8 +173,7 @@ async def chat_query(
 
         if request.conversation_history:
             history_dicts = [
-                {"role": msg.role, "content": msg.content}
-                for msg in request.conversation_history
+                {"role": msg.role, "content": msg.content} for msg in request.conversation_history
             ]
         elif conversation and use_history and history_limit > 0:
             history_query = (
@@ -194,12 +186,13 @@ async def chat_query(
             history_messages = list(reversed(history_result.scalars().all()))
             if history_messages:
                 history_dicts = [
-                    {"role": msg.role, "content": msg.content}
-                    for msg in history_messages
+                    {"role": msg.role, "content": msg.content} for msg in history_messages
                 ]
 
         # Resolve BM25 settings (request > KB override > global defaults > hard defaults)
-        settings_result = await db.execute(select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1))
+        settings_result = await db.execute(
+            select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1)
+        )
         app_settings_row = settings_result.scalar_one_or_none()
         bm25_defaults = _bm25_defaults()
 
@@ -220,7 +213,9 @@ async def chat_query(
         bm25_min_should_match = _resolve_bm25("bm25_min_should_match")
         bm25_use_phrase = _resolve_bm25("bm25_use_phrase")
         bm25_analyzer = _resolve_bm25("bm25_analyzer")
-        llm_provider = request.llm_provider or (app_settings_row.llm_provider if app_settings_row else None)
+        llm_provider = request.llm_provider or (
+            app_settings_row.llm_provider if app_settings_row else None
+        )
         llm_model = request.llm_model or (app_settings_row.llm_model if app_settings_row else None)
 
         rag_response = await rag_service.query(
@@ -247,8 +242,9 @@ async def chat_query(
             use_mmr=request.use_mmr,
             mmr_diversity=request.mmr_diversity,
             use_self_check=request.use_self_check,
-            document_ids=[str(doc_id) for doc_id in request.document_ids]
-            if request.document_ids else None,
+            document_ids=(
+                [str(doc_id) for doc_id in request.document_ids] if request.document_ids else None
+            ),
             context_expansion=request.context_expansion,
             context_window=request.context_window,
             db=db,
@@ -294,33 +290,38 @@ async def chat_query(
                     existing_settings = json.loads(conversation.settings_json)
                 except Exception:
                     existing_settings = {}
-            existing_settings.update({
-                "top_k": request.top_k,
-                "temperature": request.temperature,
-                "max_context_chars": request.max_context_chars,
-                "score_threshold": request.score_threshold,
-                "llm_model": request.llm_model,
-                "llm_provider": request.llm_provider,
-                "use_structure": request.use_structure,
-                "retrieval_mode": request.retrieval_mode,
-                "lexical_top_k": request.lexical_top_k,
-                "hybrid_dense_weight": request.hybrid_dense_weight,
-                "hybrid_lexical_weight": request.hybrid_lexical_weight,
-                "bm25_match_mode": bm25_match_mode,
-                "bm25_min_should_match": bm25_min_should_match,
-                "bm25_use_phrase": bm25_use_phrase,
-                "bm25_analyzer": bm25_analyzer,
-                "use_mmr": request.use_mmr,
-                "mmr_diversity": request.mmr_diversity,
-                "use_self_check": request.use_self_check,
-                "use_conversation_history": request.use_conversation_history,
-                "conversation_history_limit": request.conversation_history_limit,
-                "use_document_filter": request.use_document_filter,
-                "document_ids": [str(doc_id) for doc_id in request.document_ids]
-                if request.document_ids else None,
-                "context_expansion": request.context_expansion,
-                "context_window": request.context_window,
-            })
+            existing_settings.update(
+                {
+                    "top_k": request.top_k,
+                    "temperature": request.temperature,
+                    "max_context_chars": request.max_context_chars,
+                    "score_threshold": request.score_threshold,
+                    "llm_model": request.llm_model,
+                    "llm_provider": request.llm_provider,
+                    "use_structure": request.use_structure,
+                    "retrieval_mode": request.retrieval_mode,
+                    "lexical_top_k": request.lexical_top_k,
+                    "hybrid_dense_weight": request.hybrid_dense_weight,
+                    "hybrid_lexical_weight": request.hybrid_lexical_weight,
+                    "bm25_match_mode": bm25_match_mode,
+                    "bm25_min_should_match": bm25_min_should_match,
+                    "bm25_use_phrase": bm25_use_phrase,
+                    "bm25_analyzer": bm25_analyzer,
+                    "use_mmr": request.use_mmr,
+                    "mmr_diversity": request.mmr_diversity,
+                    "use_self_check": request.use_self_check,
+                    "use_conversation_history": request.use_conversation_history,
+                    "conversation_history_limit": request.conversation_history_limit,
+                    "use_document_filter": request.use_document_filter,
+                    "document_ids": (
+                        [str(doc_id) for doc_id in request.document_ids]
+                        if request.document_ids
+                        else None
+                    ),
+                    "context_expansion": request.context_expansion,
+                    "context_window": request.context_window,
+                }
+            )
             conversation.settings_json = json.dumps(existing_settings)
 
         # 6. Persist messages
@@ -446,8 +447,7 @@ async def get_knowledge_base_stats(
 
     if not kb:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Knowledge base {kb_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base {kb_id} not found"
         )
 
     return {
@@ -513,7 +513,7 @@ async def get_conversation(
     if not conversation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Conversation {conversation_id} not found"
+            detail=f"Conversation {conversation_id} not found",
         )
 
     settings = None
@@ -550,7 +550,7 @@ async def update_conversation_settings(
     if not conversation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Conversation {conversation_id} not found"
+            detail=f"Conversation {conversation_id} not found",
         )
 
     conversation.settings_json = payload.model_dump_json(exclude_none=True)
@@ -583,7 +583,7 @@ async def update_conversation(
     if not conversation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Conversation {conversation_id} not found"
+            detail=f"Conversation {conversation_id} not found",
         )
 
     title = payload.title.strip() if payload.title else None
@@ -623,7 +623,7 @@ async def get_conversation_messages(
     if not conversation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Conversation {conversation_id} not found"
+            detail=f"Conversation {conversation_id} not found",
         )
 
     msg_query = (
@@ -643,17 +643,19 @@ async def get_conversation_messages(
                 sources = [SourceChunk(**source) for source in raw_sources]
             except Exception:
                 sources = None
-        response_messages.append(ChatMessageResponse(
-            id=msg.id,
-            role=msg.role,
-            content=msg.content,
-            sources=sources,
-            model=msg.model,
-            use_self_check=msg.use_self_check,
-            prompt_version_id=msg.prompt_version_id,
-            timestamp=msg.created_at,
-            message_index=msg.message_index,
-        ))
+        response_messages.append(
+            ChatMessageResponse(
+                id=msg.id,
+                role=msg.role,
+                content=msg.content,
+                sources=sources,
+                model=msg.model,
+                use_self_check=msg.use_self_check,
+                prompt_version_id=msg.prompt_version_id,
+                timestamp=msg.created_at,
+                message_index=msg.message_index,
+            )
+        )
 
     return response_messages
 
@@ -679,7 +681,7 @@ async def delete_conversation_message(
     if not conversation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Conversation {conversation_id} not found"
+            detail=f"Conversation {conversation_id} not found",
         )
 
     msg_query = select(ChatMessageModel).where(
@@ -690,8 +692,7 @@ async def delete_conversation_message(
     target_message = msg_result.scalar_one_or_none()
     if not target_message:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Message {message_id} not found"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Message {message_id} not found"
         )
 
     deleted_ids = {target_message.id}
@@ -711,9 +712,7 @@ async def delete_conversation_message(
             if adjacent_message:
                 deleted_ids.add(adjacent_message.id)
 
-    await db.execute(
-        delete(ChatMessageModel).where(ChatMessageModel.id.in_(deleted_ids))
-    )
+    await db.execute(delete(ChatMessageModel).where(ChatMessageModel.id.in_(deleted_ids)))
     conversation.updated_at = datetime.utcnow()
 
     return ChatDeleteResponse(
@@ -738,7 +737,7 @@ async def delete_conversation(
     if not conversation:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Conversation {conversation_id} not found"
+            detail=f"Conversation {conversation_id} not found",
         )
 
     conversation.is_deleted = True

@@ -4,27 +4,27 @@ Revision ID: 011
 Revises: 010
 Create Date: 2026-01-28
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 
 # revision identifiers
-revision = '011'
-down_revision = '010'
+revision = "011"
+down_revision = "010"
 branch_labels = None
 depends_on = None
 
 
 def upgrade() -> None:
     """Add embeddings_status and bm25_status columns."""
-    status_enum = sa.Enum('pending', 'processing', 'completed', 'failed', name='documentstatus')
+    status_enum = sa.Enum("pending", "processing", "completed", "failed", name="documentstatus")
 
     op.add_column(
-        'documents',
-        sa.Column('embeddings_status', status_enum, nullable=False, server_default='pending')
+        "documents",
+        sa.Column("embeddings_status", status_enum, nullable=False, server_default="pending"),
     )
     op.add_column(
-        'documents',
-        sa.Column('bm25_status', status_enum, nullable=False, server_default='pending')
+        "documents", sa.Column("bm25_status", status_enum, nullable=False, server_default="pending")
     )
 
     # Backfill embeddings_status from existing document status
@@ -36,11 +36,11 @@ def upgrade() -> None:
         "WHERE status IS NOT NULL"
     )
 
-    op.alter_column('documents', 'embeddings_status', server_default=None)
-    op.alter_column('documents', 'bm25_status', server_default=None)
+    op.alter_column("documents", "embeddings_status", server_default=None)
+    op.alter_column("documents", "bm25_status", server_default=None)
 
 
 def downgrade() -> None:
     """Remove embeddings_status and bm25_status columns."""
-    op.drop_column('documents', 'bm25_status')
-    op.drop_column('documents', 'embeddings_status')
+    op.drop_column("documents", "bm25_status")
+    op.drop_column("documents", "embeddings_status")

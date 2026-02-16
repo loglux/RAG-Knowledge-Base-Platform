@@ -1,4 +1,5 @@
 """MCP refresh token management endpoints."""
+
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -33,7 +34,9 @@ async def list_refresh_tokens(
         return []
 
     admin_ids = {t.admin_user_id for t in tokens}
-    result = await db.execute(select(AdminUser.id, AdminUser.username).where(AdminUser.id.in_(admin_ids)))
+    result = await db.execute(
+        select(AdminUser.id, AdminUser.username).where(AdminUser.id.in_(admin_ids))
+    )
     admin_map = {row[0]: row[1] for row in result.all()}
 
     return [

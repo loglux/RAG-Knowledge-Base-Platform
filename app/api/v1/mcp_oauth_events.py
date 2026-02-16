@@ -1,4 +1,5 @@
 """MCP OAuth event listing endpoints."""
+
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query
@@ -38,7 +39,9 @@ async def list_oauth_events(
     admin_ids = {e.admin_user_id for e in events if e.admin_user_id is not None}
     admin_map = {}
     if admin_ids:
-        result = await db.execute(select(AdminUser.id, AdminUser.username).where(AdminUser.id.in_(admin_ids)))
+        result = await db.execute(
+            select(AdminUser.id, AdminUser.username).where(AdminUser.id.in_(admin_ids))
+        )
         admin_map = {row[0]: row[1] for row in result.all()}
 
     return [

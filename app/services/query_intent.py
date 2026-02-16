@@ -3,15 +3,17 @@ Query Intent Extraction Service.
 
 Uses LLM to understand user query intent for structured search.
 """
-import logging
+
 import json
+import logging
 import re
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
 from pydantic import BaseModel
 
-from app.core.llm_factory import create_llm_service
-from app.core.llm_base import Message
 from app.config import settings
+from app.core.llm_base import Message
+from app.core.llm_factory import create_llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +54,7 @@ Return JSON with:
 Return ONLY valid JSON, no other text."""
 
     async def extract_intent(
-        self,
-        query: str,
-        kb_documents: list[str] = None,
-        use_cache: bool = True
+        self, query: str, kb_documents: list[str] = None, use_cache: bool = True
     ) -> QueryIntent:
         """
         Extract structured intent from user query using LLM.
@@ -75,14 +74,16 @@ Return ONLY valid JSON, no other text."""
             llm_service = create_llm_service(model="claude-haiku-4-5-20251001")  # Fast, cheap
 
             prompt = self.EXTRACTION_PROMPT.format(
-                query=query,
-                document_list=doc_list or "- (no document list provided)"
+                query=query, document_list=doc_list or "- (no document list provided)"
             )
 
             response = await llm_service.generate(
                 messages=[
-                    Message(role="system", content="You are a query intent analyzer. Return only valid JSON."),
-                    Message(role="user", content=prompt)
+                    Message(
+                        role="system",
+                        content="You are a query intent analyzer. Return only valid JSON.",
+                    ),
+                    Message(role="user", content=prompt),
                 ],
                 temperature=settings.QUERY_INTENT_LLM_TEMPERATURE,
             )
@@ -97,7 +98,7 @@ Return ONLY valid JSON, no other text."""
                 section_number=intent_data.get("section_number"),
                 section_id=intent_data.get("section_id"),
                 confidence=intent_data.get("confidence", 0.5),
-                original_query=query
+                original_query=query,
             )
 
             logger.info(f"LLM extracted intent: {intent.model_dump()}")
@@ -108,20 +109,16 @@ Return ONLY valid JSON, no other text."""
         except Exception as e:
             logger.error(f"Intent extraction failed: {e}")
             # Fallback to semantic search
-            return QueryIntent(
-                intent_type="semantic_search",
-                confidence=1.0,
-                original_query=query
-            )
+            return QueryIntent(intent_type="semantic_search", confidence=1.0, original_query=query)
 
     def _parse_llm_response(self, response: str) -> Dict[str, Any]:
         """Parse LLM JSON response."""
         # Try to extract JSON from response
-        json_match = re.search(r'```json\s*(\{.*?\})\s*```', response, re.DOTALL)
+        json_match = re.search(r"```json\s*(\{.*?\})\s*```", response, re.DOTALL)
         if json_match:
             json_str = json_match.group(1)
         else:
-            json_match = re.search(r'\{.*\}', response, re.DOTALL)
+            json_match = re.search(r"\{.*\}", response, re.DOTALL)
             if json_match:
                 json_str = json_match.group(0)
             else:

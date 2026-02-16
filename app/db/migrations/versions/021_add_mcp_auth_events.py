@@ -4,9 +4,9 @@ Revision ID: 021
 Revises: 020
 Create Date: 2026-02-12 00:00:00.000000
 """
-from alembic import op
-import sqlalchemy as sa
 
+import sqlalchemy as sa
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "021"
@@ -19,7 +19,12 @@ def upgrade() -> None:
     op.create_table(
         "mcp_auth_events",
         sa.Column("id", sa.UUID(as_uuid=True), primary_key=True, nullable=False),
-        sa.Column("admin_user_id", sa.Integer, sa.ForeignKey("admin_users.id", ondelete="SET NULL"), nullable=True),
+        sa.Column(
+            "admin_user_id",
+            sa.Integer,
+            sa.ForeignKey("admin_users.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
         sa.Column("event_type", sa.String(length=32), nullable=False),
         sa.Column("client_id", sa.String(length=255), nullable=True),
         sa.Column("ip_address", sa.String(length=64), nullable=True),

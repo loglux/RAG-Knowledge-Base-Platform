@@ -1,12 +1,13 @@
 """Ollama models endpoints."""
+
 import logging
-from typing import List, Dict, Any
-from fastapi import APIRouter, HTTPException, status, Query
-from pydantic import BaseModel
+from typing import Any, Dict, List
+
 import httpx
+from fastapi import APIRouter, HTTPException, status
+from pydantic import BaseModel
 
 from app.config import settings
-
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -14,6 +15,7 @@ router = APIRouter()
 
 class OllamaConnectionTest(BaseModel):
     """Request to test Ollama connection."""
+
     base_url: str
 
 
@@ -96,14 +98,13 @@ async def list_ollama_models():
 
     except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Ollama not configured: {e}"
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=f"Ollama not configured: {e}"
         )
     except Exception as e:
         logger.error(f"Failed to list Ollama models: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch Ollama models: {e}"
+            detail=f"Failed to fetch Ollama models: {e}",
         )
 
 
@@ -129,10 +130,7 @@ async def list_ollama_embedding_models():
 
     except Exception as e:
         logger.error(f"Failed to list embedding models: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.get("/models/llm")
@@ -158,20 +156,14 @@ async def list_ollama_llm_models():
 
     except Exception as e:
         logger.error(f"Failed to list LLM models: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
 
 @router.get("/status")
 async def ollama_status():
     """Check Ollama server status."""
     if not settings.OLLAMA_BASE_URL:
-        return {
-            "available": False,
-            "error": "OLLAMA_BASE_URL not configured"
-        }
+        return {"available": False, "error": "OLLAMA_BASE_URL not configured"}
 
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -184,11 +176,7 @@ async def ollama_status():
                 "models_count": len(response.json().get("models", [])),
             }
     except Exception as e:
-        return {
-            "available": False,
-            "url": settings.OLLAMA_BASE_URL,
-            "error": str(e)
-        }
+        return {"available": False, "url": settings.OLLAMA_BASE_URL, "error": str(e)}
 
 
 @router.post("/test-connection")
@@ -204,7 +192,7 @@ async def test_ollama_connection(payload: OllamaConnectionTest):
     Returns:
         Connection status with available models count
     """
-    base_url = payload.base_url.rstrip('/')
+    base_url = payload.base_url.rstrip("/")
 
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -219,7 +207,7 @@ async def test_ollama_connection(payload: OllamaConnectionTest):
                 "available": True,
                 "url": base_url,
                 "models_count": len(models),
-                "message": f"✅ Connected successfully! Found {len(models)} model(s)"
+                "message": f"✅ Connected successfully! Found {len(models)} model(s)",
             }
 
     except httpx.TimeoutException:
@@ -228,15 +216,15 @@ async def test_ollama_connection(payload: OllamaConnectionTest):
             "available": False,
             "url": base_url,
             "error": "Connection timeout (5s). Check if Ollama is running and accessible.",
-            "message": "❌ Connection timeout"
+            "message": "❌ Connection timeout",
         }
-    except httpx.ConnectError as e:
+    except httpx.ConnectError:
         return {
             "success": False,
             "available": False,
             "url": base_url,
             "error": f"Cannot connect to {base_url}. Check URL and network.",
-            "message": "❌ Connection failed"
+            "message": "❌ Connection failed",
         }
     except httpx.HTTPStatusError as e:
         return {
@@ -244,7 +232,7 @@ async def test_ollama_connection(payload: OllamaConnectionTest):
             "available": False,
             "url": base_url,
             "error": f"HTTP {e.response.status_code}: {e.response.text}",
-            "message": f"❌ HTTP {e.response.status_code}"
+            "message": f"❌ HTTP {e.response.status_code}",
         }
     except Exception as e:
         logger.error(f"Ollama connection test failed for {base_url}: {e}")
@@ -253,5 +241,5 @@ async def test_ollama_connection(payload: OllamaConnectionTest):
             "available": False,
             "url": base_url,
             "error": str(e),
-            "message": "❌ Connection failed"
+            "message": "❌ Connection failed",
         }

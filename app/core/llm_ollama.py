@@ -3,18 +3,18 @@ Ollama LLM Service.
 
 Handles text generation using Ollama API (local models).
 """
+
 import logging
 from typing import List, Optional
+
 import httpx
 
 from app.config import settings
 from app.core.llm_base import (
     BaseLLMService,
-    LLMProvider,
-    Message,
     LLMResponse,
+    Message,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,9 @@ class OllamaLLMService(BaseLLMService):
         model = model or settings.OLLAMA_CHAT_MODEL
 
         # Initialize base class with skip_validation for dynamic models
-        super().__init__(api_key=api_key, model=model, max_retries=max_retries, skip_validation=True)
+        super().__init__(
+            api_key=api_key, model=model, max_retries=max_retries, skip_validation=True
+        )
 
         self.base_url = base_url or settings.OLLAMA_BASE_URL
         if not self.base_url:
@@ -104,7 +106,7 @@ class OllamaLLMService(BaseLLMService):
                 "stream": False,
                 "options": {
                     "temperature": temperature,
-                }
+                },
             }
 
             if max_tokens:
@@ -143,7 +145,11 @@ class OllamaLLMService(BaseLLMService):
                 model=self.model,
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
-                total_tokens=(input_tokens or 0) + (output_tokens or 0) if input_tokens and output_tokens else None,
+                total_tokens=(
+                    (input_tokens or 0) + (output_tokens or 0)
+                    if input_tokens and output_tokens
+                    else None
+                ),
             )
 
         except httpx.HTTPStatusError as e:

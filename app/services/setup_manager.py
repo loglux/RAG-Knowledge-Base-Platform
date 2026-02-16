@@ -1,27 +1,30 @@
 """Setup wizard business logic."""
+
 import logging
 import secrets
 import string
-from typing import Optional, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, Optional
 
 import bcrypt
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.database import AdminUser, SystemSettings
 from app.core.system_settings import SystemSettingsManager
+from app.models.database import AdminUser, SystemSettings
 
 logger = logging.getLogger(__name__)
 
 
 class SetupError(Exception):
     """Base exception for setup errors."""
+
     pass
 
 
 class SetupAlreadyCompleteError(SetupError):
     """Raised when trying to run setup but it's already complete."""
+
     pass
 
 
@@ -40,8 +43,8 @@ class SetupManager:
             Bcrypt password hash
         """
         salt = bcrypt.gensalt()
-        hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
-        return hashed.decode('utf-8')
+        hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+        return hashed.decode("utf-8")
 
     @staticmethod
     def verify_password(password: str, password_hash: str) -> bool:
@@ -55,7 +58,7 @@ class SetupManager:
         Returns:
             True if password matches
         """
-        return bcrypt.checkpw(password.encode('utf-8'), password_hash.encode('utf-8'))
+        return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
 
     @staticmethod
     async def create_admin_user(
@@ -81,9 +84,7 @@ class SetupManager:
         """
         try:
             # Check if admin already exists
-            result = await db.execute(
-                select(AdminUser).where(AdminUser.username == username)
-            )
+            result = await db.execute(select(AdminUser).where(AdminUser.username == username))
             existing = result.scalar_one_or_none()
 
             if existing:
@@ -206,7 +207,9 @@ class SetupManager:
             logger.info("Saved API keys to system settings")
 
         except Exception as e:
-            logger.exception(f"Failed to save API keys: {e}")  # Changed to .exception to include traceback
+            logger.exception(
+                f"Failed to save API keys: {e}"
+            )  # Changed to .exception to include traceback
             raise SetupError(f"Failed to save API keys: {e}") from e
 
     @staticmethod
@@ -484,7 +487,7 @@ class SetupManager:
         # Shuffle to avoid predictable pattern
         secrets.SystemRandom().shuffle(password)
 
-        return ''.join(password)
+        return "".join(password)
 
     @staticmethod
     async def change_postgres_password(
@@ -518,6 +521,7 @@ class SetupManager:
 
             # Get current DATABASE_URL from config
             from app.config import settings
+
             current_url = settings.DATABASE_URL
 
             # Parse current URL to replace password
@@ -542,6 +546,7 @@ class SetupManager:
             # Without this, all new connections will fail with authentication error
             # because the pool still uses old password from environment variable
             from app.db.session import recreate_engine
+
             logger.info("Recreating database connection pool with new credentials...")
             await recreate_engine(new_url)
 

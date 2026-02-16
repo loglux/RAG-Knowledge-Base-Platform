@@ -5,9 +5,8 @@ Revises: 012
 Create Date: 2026-01-28
 """
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "013"
@@ -17,8 +16,12 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("knowledge_bases", sa.Column("structure_llm_model", sa.String(length=100), nullable=True))
-    op.add_column("app_settings", sa.Column("structure_requests_per_minute", sa.Integer(), nullable=True))
+    op.add_column(
+        "knowledge_bases", sa.Column("structure_llm_model", sa.String(length=100), nullable=True)
+    )
+    op.add_column(
+        "app_settings", sa.Column("structure_requests_per_minute", sa.Integer(), nullable=True)
+    )
 
 
 def downgrade() -> None:

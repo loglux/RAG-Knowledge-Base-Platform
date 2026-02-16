@@ -1,18 +1,19 @@
 """FastAPI dependencies for dependency injection."""
-from typing import Optional, AsyncGenerator
+
+from typing import AsyncGenerator, Optional
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import ACCESS_TOKEN_TYPE, decode_token, get_admin_id, is_token_type
 from app.db.session import get_db
-from app.core.auth import decode_token, is_token_type, get_admin_id, ACCESS_TOKEN_TYPE
-
 
 # ============================================================================
 # Database Dependencies
 # ============================================================================
+
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     """
@@ -59,7 +60,9 @@ async def get_current_user(
 
     admin_id = get_admin_id(payload)
     if admin_id is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token subject")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token subject"
+        )
 
     return admin_id
 

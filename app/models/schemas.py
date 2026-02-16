@@ -1,16 +1,17 @@
 """Pydantic schemas for API request/response validation."""
+
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.models.enums import DocumentStatus, ChunkingStrategy, FileType, RetrievalMode
-
+from app.models.enums import ChunkingStrategy, DocumentStatus, FileType, RetrievalMode
 
 # ============================================================================
 # Knowledge Base Schemas
 # ============================================================================
+
 
 class KnowledgeBaseBase(BaseModel):
     """Base schema for Knowledge Base."""
@@ -21,49 +22,39 @@ class KnowledgeBaseBase(BaseModel):
     # Embedding configuration
     embedding_model: str = Field(
         default="text-embedding-3-large",
-        description="Embedding model name (e.g., text-embedding-3-large, voyage-4)"
+        description="Embedding model name (e.g., text-embedding-3-large, voyage-4)",
     )
 
     # Chunking configuration
     chunk_size: int = Field(default=1000, ge=100, le=4000, description="Chunk size in characters")
-    chunk_overlap: int = Field(default=200, ge=0, le=1000, description="Chunk overlap in characters")
+    chunk_overlap: int = Field(
+        default=200, ge=0, le=1000, description="Chunk overlap in characters"
+    )
     chunking_strategy: ChunkingStrategy = Field(
-        default=ChunkingStrategy.FIXED_SIZE,
-        description="Chunking strategy"
+        default=ChunkingStrategy.FIXED_SIZE, description="Chunking strategy"
     )
     upsert_batch_size: int = Field(
-        default=256,
-        ge=64,
-        le=1024,
-        description="Max vectors per upsert request"
+        default=256, ge=64, le=1024, description="Max vectors per upsert request"
     )
 
     # BM25 configuration (optional overrides)
     bm25_match_mode: Optional[str] = Field(
-        default=None,
-        description="BM25 match mode: strict, balanced, loose"
+        default=None, description="BM25 match mode: strict, balanced, loose"
     )
     bm25_min_should_match: Optional[int] = Field(
-        default=None,
-        ge=0,
-        le=100,
-        description="BM25 minimum_should_match percentage (0-100)"
+        default=None, ge=0, le=100, description="BM25 minimum_should_match percentage (0-100)"
     )
     bm25_use_phrase: Optional[bool] = Field(
-        default=None,
-        description="Include match_phrase clause in BM25 query"
+        default=None, description="Include match_phrase clause in BM25 query"
     )
     bm25_analyzer: Optional[str] = Field(
-        default=None,
-        description="BM25 analyzer profile: auto, mixed, ru, en"
+        default=None, description="BM25 analyzer profile: auto, mixed, ru, en"
     )
     structure_llm_model: Optional[str] = Field(
-        default=None,
-        description="LLM model for document structure (TOC) analysis"
+        default=None, description="LLM model for document structure (TOC) analysis"
     )
     use_llm_chat_titles: Optional[bool] = Field(
-        default=None,
-        description="Override for LLM-generated chat titles (None = use app default)"
+        default=None, description="Override for LLM-generated chat titles (None = use app default)"
     )
 
     @field_validator("chunk_overlap")
@@ -78,11 +69,12 @@ class KnowledgeBaseBase(BaseModel):
 
 class KnowledgeBaseCreate(KnowledgeBaseBase):
     """Schema for creating a new Knowledge Base."""
+
     chunk_size: Optional[int] = Field(None, ge=100, le=4000)
     chunk_overlap: Optional[int] = Field(None, ge=0, le=1000)
     chunking_strategy: Optional[ChunkingStrategy] = Field(
         default=ChunkingStrategy.SMART,
-        description="Chunking strategy: simple (fixed-size), smart (recursive), semantic (future)"
+        description="Chunking strategy: simple (fixed-size), smart (recursive), semantic (future)",
     )
     upsert_batch_size: Optional[int] = Field(None, ge=64, le=1024)
     bm25_match_mode: Optional[str] = None
@@ -141,6 +133,7 @@ class KnowledgeBaseList(BaseModel):
 # Document Schemas
 # ============================================================================
 
+
 class DocumentBase(BaseModel):
     """Base schema for Document."""
 
@@ -152,7 +145,9 @@ class DocumentCreate(DocumentBase):
 
     knowledge_base_id: UUID = Field(..., description="Knowledge base ID")
     content: str = Field(..., min_length=1, description="Document content")
-    file_type: Optional[FileType] = Field(None, description="File type (auto-detected if not provided)")
+    file_type: Optional[FileType] = Field(
+        None, description="File type (auto-detected if not provided)"
+    )
 
     @field_validator("file_type", mode="before")
     @classmethod
@@ -228,6 +223,7 @@ class DocumentWithContent(DocumentResponse):
 # Search Schemas
 # ============================================================================
 
+
 class SearchRequest(BaseModel):
     """Schema for semantic search request."""
 
@@ -258,6 +254,7 @@ class SearchResponse(BaseModel):
 # Health Check Schema
 # ============================================================================
 
+
 class HealthCheck(BaseModel):
     """Schema for health check response."""
 
@@ -277,6 +274,7 @@ class ReadinessCheck(BaseModel):
 # Chat / RAG Schemas
 # ============================================================================
 
+
 class SourceChunk(BaseModel):
     """Schema for a source chunk in chat response."""
 
@@ -286,14 +284,14 @@ class SourceChunk(BaseModel):
     filename: str = Field(..., description="Source filename")
     chunk_index: int = Field(..., description="Chunk index in document")
     metadata: Optional[Dict[str, Any]] = Field(
-        default=None,
-        description="Additional retrieval metadata (source type, scores, etc.)"
+        default=None, description="Additional retrieval metadata (source type, scores, etc.)"
     )
 
 
 # ============================================================================
 # Retrieval Settings Schemas
 # ============================================================================
+
 
 class RetrievalSettingsUpdate(BaseModel):
     """Schema for retrieval settings overrides."""
@@ -350,12 +348,10 @@ class RetrieveRequest(RetrievalSettingsUpdate):
     query: str = Field(..., min_length=1, max_length=2000, description="Search query")
     knowledge_base_id: UUID = Field(..., description="Knowledge base ID")
     document_ids: Optional[List[UUID]] = Field(
-        default=None,
-        description="Optional document ID allow-list for retrieval"
+        default=None, description="Optional document ID allow-list for retrieval"
     )
     debug: Optional[bool] = Field(
-        default=False,
-        description="Include debug info in response (timings, filters, mode)"
+        default=False, description="Include debug info in response (timings, filters, mode)"
     )
 
 
@@ -373,18 +369,24 @@ class RetrieveResponse(BaseModel):
 
 class ConversationMessage(BaseModel):
     """Single message in conversation history."""
+
     role: str = Field(..., description="Message role: user or assistant")
     content: str = Field(..., description="Message content")
 
 
 class ChatMessageResponse(BaseModel):
     """Chat message response (stored conversation history)."""
+
     id: UUID
     role: str = Field(..., description="Message role: user or assistant")
     content: str = Field(..., description="Message content")
-    sources: Optional[List[SourceChunk]] = Field(default=None, description="Source chunks for assistant messages")
+    sources: Optional[List[SourceChunk]] = Field(
+        default=None, description="Source chunks for assistant messages"
+    )
     model: Optional[str] = Field(default=None, description="LLM model used for assistant messages")
-    use_self_check: Optional[bool] = Field(default=None, description="Whether self-check was applied")
+    use_self_check: Optional[bool] = Field(
+        default=None, description="Whether self-check was applied"
+    )
     prompt_version_id: Optional[UUID] = Field(default=None, description="Prompt version used")
     timestamp: datetime
     message_index: int
@@ -392,6 +394,7 @@ class ChatMessageResponse(BaseModel):
 
 class ConversationSummary(BaseModel):
     """Conversation list item."""
+
     id: UUID
     knowledge_base_id: UUID
     title: Optional[str] = None
@@ -401,6 +404,7 @@ class ConversationSummary(BaseModel):
 
 class ConversationSettings(BaseModel):
     """Chat settings stored per conversation."""
+
     top_k: Optional[int] = Field(default=None, ge=1, le=100)
     temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
     max_context_chars: Optional[int] = Field(default=None, ge=0)
@@ -429,17 +433,24 @@ class ConversationSettings(BaseModel):
 
 class ConversationTitleUpdate(BaseModel):
     """Conversation title update payload."""
+
     title: Optional[str] = Field(default=None, max_length=255)
 
 
 class RegenerateChatTitlesRequest(BaseModel):
     """Request to regenerate chat titles for a KB."""
-    include_existing: bool = Field(default=False, description="Regenerate titles even if they already exist")
-    limit: Optional[int] = Field(default=None, ge=1, description="Max number of conversations to process")
+
+    include_existing: bool = Field(
+        default=False, description="Regenerate titles even if they already exist"
+    )
+    limit: Optional[int] = Field(
+        default=None, ge=1, description="Max number of conversations to process"
+    )
 
 
 class RegenerateChatTitlesResponse(BaseModel):
     """Response for chat title regeneration."""
+
     updated: int
     skipped: int
     total: int
@@ -447,6 +458,7 @@ class RegenerateChatTitlesResponse(BaseModel):
 
 class AppSettingsBase(BaseModel):
     """Global app defaults for chat settings."""
+
     llm_model: Optional[str] = Field(default=None)
     llm_provider: Optional[str] = Field(default=None)
     temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
@@ -484,6 +496,7 @@ class AppSettingsUpdate(AppSettingsBase):
 
 class ConversationDetail(BaseModel):
     """Conversation detail with settings."""
+
     id: UUID
     knowledge_base_id: UUID
     title: Optional[str] = None
@@ -494,6 +507,7 @@ class ConversationDetail(BaseModel):
 
 class PromptVersionSummary(BaseModel):
     """Prompt version list item."""
+
     id: UUID
     name: Optional[str] = None
     created_at: datetime
@@ -501,6 +515,7 @@ class PromptVersionSummary(BaseModel):
 
 class PromptVersionDetail(BaseModel):
     """Prompt version detail."""
+
     id: UUID
     name: Optional[str] = None
     system_content: str
@@ -509,6 +524,7 @@ class PromptVersionDetail(BaseModel):
 
 class PromptVersionCreate(BaseModel):
     """Create a new prompt version."""
+
     name: Optional[str] = Field(default=None, max_length=255)
     system_content: str = Field(..., min_length=1)
     activate: bool = Field(default=False)
@@ -516,6 +532,7 @@ class PromptVersionCreate(BaseModel):
 
 class SelfCheckPromptVersionSummary(BaseModel):
     """Self-check prompt version list item."""
+
     id: UUID
     name: Optional[str] = None
     created_at: datetime
@@ -523,6 +540,7 @@ class SelfCheckPromptVersionSummary(BaseModel):
 
 class SelfCheckPromptVersionDetail(BaseModel):
     """Self-check prompt version detail."""
+
     id: UUID
     name: Optional[str] = None
     system_content: str
@@ -531,6 +549,7 @@ class SelfCheckPromptVersionDetail(BaseModel):
 
 class SelfCheckPromptVersionCreate(BaseModel):
     """Create a new self-check prompt version."""
+
     name: Optional[str] = Field(default=None, max_length=255)
     system_content: str = Field(..., min_length=1)
     activate: bool = Field(default=False)
@@ -539,145 +558,93 @@ class SelfCheckPromptVersionCreate(BaseModel):
 class ChatRequest(BaseModel):
     """Schema for chat/query request."""
 
-    question: str = Field(
-        ...,
-        min_length=1,
-        max_length=2000,
-        description="User's question"
-    )
-    knowledge_base_id: UUID = Field(
-        ...,
-        description="Knowledge base to query"
-    )
+    question: str = Field(..., min_length=1, max_length=2000, description="User's question")
+    knowledge_base_id: UUID = Field(..., description="Knowledge base to query")
     conversation_id: Optional[UUID] = Field(
-        default=None,
-        description="Conversation ID for persistent chat (optional)"
+        default=None, description="Conversation ID for persistent chat (optional)"
     )
     conversation_history: Optional[List["ConversationMessage"]] = Field(
-        default=None,
-        description="Previous messages in conversation (for follow-up questions)"
+        default=None, description="Previous messages in conversation (for follow-up questions)"
     )
-    top_k: int = Field(
-        default=5,
-        ge=1,
-        le=100,
-        description="Number of chunks to retrieve"
-    )
+    top_k: int = Field(default=5, ge=1, le=100, description="Number of chunks to retrieve")
     temperature: float = Field(
-        default=0.7,
-        ge=0.0,
-        le=2.0,
-        description="LLM temperature for response generation"
+        default=0.7, ge=0.0, le=2.0, description="LLM temperature for response generation"
     )
     retrieval_mode: RetrievalMode = Field(
-        default=RetrievalMode.DENSE,
-        description="Retrieval mode (dense or hybrid)"
+        default=RetrievalMode.DENSE, description="Retrieval mode (dense or hybrid)"
     )
     lexical_top_k: Optional[int] = Field(
-        default=None,
-        ge=1,
-        le=200,
-        description="Lexical top K for hybrid (optional)"
+        default=None, ge=1, le=200, description="Lexical top K for hybrid (optional)"
     )
     hybrid_dense_weight: float = Field(
-        default=0.6,
-        ge=0.0,
-        le=1.0,
-        description="Dense weight for hybrid retrieval"
+        default=0.6, ge=0.0, le=1.0, description="Dense weight for hybrid retrieval"
     )
     hybrid_lexical_weight: float = Field(
-        default=0.4,
-        ge=0.0,
-        le=1.0,
-        description="Lexical weight for hybrid retrieval"
+        default=0.4, ge=0.0, le=1.0, description="Lexical weight for hybrid retrieval"
     )
     bm25_match_mode: Optional[str] = Field(
-        default=None,
-        description="BM25 match mode: strict, balanced, loose"
+        default=None, description="BM25 match mode: strict, balanced, loose"
     )
     bm25_min_should_match: Optional[int] = Field(
-        default=None,
-        ge=0,
-        le=100,
-        description="BM25 minimum_should_match percentage (0-100)"
+        default=None, ge=0, le=100, description="BM25 minimum_should_match percentage (0-100)"
     )
     bm25_use_phrase: Optional[bool] = Field(
-        default=None,
-        description="Include match_phrase clause in BM25 query"
+        default=None, description="Include match_phrase clause in BM25 query"
     )
     bm25_analyzer: Optional[str] = Field(
-        default=None,
-        description="BM25 analyzer profile: auto, mixed, ru, en"
+        default=None, description="BM25 analyzer profile: auto, mixed, ru, en"
     )
     max_context_chars: Optional[int] = Field(
-        default=None,
-        ge=0,
-        description="Max context length in characters (0 = unlimited)"
+        default=None, ge=0, description="Max context length in characters (0 = unlimited)"
     )
     score_threshold: Optional[float] = Field(
-        default=None,
-        ge=0.0,
-        le=1.0,
-        description="Minimum similarity score for retrieved chunks"
+        default=None, ge=0.0, le=1.0, description="Minimum similarity score for retrieved chunks"
     )
     max_tokens: Optional[int] = Field(
-        default=None,
-        ge=1,
-        description="Max tokens for the generated response"
+        default=None, ge=1, description="Max tokens for the generated response"
     )
     llm_model: Optional[str] = Field(
-        default=None,
-        description="LLM model to use (e.g., gpt-4o, claude-3-5-sonnet-20241022)"
+        default=None, description="LLM model to use (e.g., gpt-4o, claude-3-5-sonnet-20241022)"
     )
     llm_provider: Optional[str] = Field(
-        default=None,
-        description="LLM provider (openai, anthropic, ollama)"
+        default=None, description="LLM provider (openai, anthropic, ollama)"
     )
     use_structure: bool = Field(
-        default=False,
-        description="Use document structure for search (experimental, default: OFF)"
+        default=False, description="Use document structure for search (experimental, default: OFF)"
     )
     use_mmr: Optional[bool] = Field(
         default=False,
-        description="Enable MMR (Maximal Marginal Relevance) for diversity-aware search"
+        description="Enable MMR (Maximal Marginal Relevance) for diversity-aware search",
     )
     mmr_diversity: Optional[float] = Field(
         default=0.5,
         ge=0.0,
         le=1.0,
-        description="MMR diversity parameter (0.0=pure relevance, 1.0=pure diversity)"
+        description="MMR diversity parameter (0.0=pure relevance, 1.0=pure diversity)",
     )
     use_self_check: Optional[bool] = Field(
-        default=False,
-        description="Enable self-check validation of generated answers"
+        default=False, description="Enable self-check validation of generated answers"
     )
     use_conversation_history: Optional[bool] = Field(
-        default=None,
-        description="Whether to include conversation history in the prompt"
+        default=None, description="Whether to include conversation history in the prompt"
     )
     conversation_history_limit: Optional[int] = Field(
-        default=None,
-        ge=0,
-        le=100,
-        description="Number of recent messages to include from history"
+        default=None, ge=0, le=100, description="Number of recent messages to include from history"
     )
     use_document_filter: Optional[bool] = Field(
-        default=None,
-        description="Whether to limit retrieval to selected documents"
+        default=None, description="Whether to limit retrieval to selected documents"
     )
     document_ids: Optional[List[UUID]] = Field(
-        default=None,
-        description="Optional document ID allow-list for retrieval"
+        default=None, description="Optional document ID allow-list for retrieval"
     )
     context_expansion: Optional[List[str]] = Field(
-        default=None,
-        description="Context expansion strategies (e.g., ['window'])"
+        default=None, description="Context expansion strategies (e.g., ['window'])"
     )
     context_window: Optional[int] = Field(
         default=None,
         ge=0,
         le=5,
-        description="Window size (chunks on each side) for windowed retrieval"
+        description="Window size (chunks on each side) for windowed retrieval",
     )
 
 
@@ -690,13 +657,21 @@ class ChatResponse(BaseModel):
     confidence_score: float = Field(..., description="Average relevance score")
     model: str = Field(..., description="Model used for generation")
     knowledge_base_id: UUID = Field(..., description="Knowledge base queried")
-    conversation_id: Optional[UUID] = Field(default=None, description="Conversation ID for persistent chat")
+    conversation_id: Optional[UUID] = Field(
+        default=None, description="Conversation ID for persistent chat"
+    )
     user_message_id: Optional[UUID] = Field(default=None, description="Stored user message ID")
-    assistant_message_id: Optional[UUID] = Field(default=None, description="Stored assistant message ID")
+    assistant_message_id: Optional[UUID] = Field(
+        default=None, description="Stored assistant message ID"
+    )
     prompt_version_id: Optional[UUID] = Field(default=None, description="Prompt version used")
     use_mmr: Optional[bool] = Field(default=None, description="Whether MMR was used")
-    mmr_diversity: Optional[float] = Field(default=None, description="MMR diversity parameter (0.0-1.0)")
-    use_self_check: Optional[bool] = Field(default=None, description="Whether self-check was applied")
+    mmr_diversity: Optional[float] = Field(
+        default=None, description="MMR diversity parameter (0.0-1.0)"
+    )
+    use_self_check: Optional[bool] = Field(
+        default=None, description="Whether self-check was applied"
+    )
 
 
 class ChatDeleteResponse(BaseModel):
@@ -709,6 +684,7 @@ class ChatDeleteResponse(BaseModel):
 # ============================================================================
 # Document Structure Schemas
 # ============================================================================
+
 
 class TOCSection(BaseModel):
     """Section in table of contents."""
@@ -749,6 +725,7 @@ class DocumentStructureResponse(BaseModel):
 # Auth Schemas
 # ============================================================================
 
+
 class LoginRequest(BaseModel):
     username: str
     password: str
@@ -772,6 +749,7 @@ class MeResponse(BaseModel):
 # ============================================================================
 # KB Export/Import Schemas
 # ============================================================================
+
 
 class KBExportInclude(BaseModel):
     """Toggle export/import components for KB transfer."""
@@ -811,9 +789,11 @@ class KBImportResponse(BaseModel):
     kb_updated: int
     warnings: List[str] = Field(default_factory=list)
 
+
 # ============================================================================
 # QA Auto-Tuning Schemas
 # ============================================================================
+
 
 class QASampleResponse(BaseModel):
     id: UUID

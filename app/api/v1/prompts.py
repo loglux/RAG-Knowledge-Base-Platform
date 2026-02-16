@@ -1,28 +1,27 @@
 """Prompt version management endpoints."""
+
+from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, desc
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.models.database import (
-    PromptVersion as PromptVersionModel,
-    SelfCheckPromptVersion as SelfCheckPromptVersionModel,
-    AppSettings as AppSettingsModel,
-)
-from app.models.schemas import (
-    PromptVersionSummary,
-    PromptVersionDetail,
-    PromptVersionCreate,
-    SelfCheckPromptVersionSummary,
-    SelfCheckPromptVersionDetail,
-    SelfCheckPromptVersionCreate,
-)
 from app.dependencies import get_current_user_id
+from app.models.database import AppSettings as AppSettingsModel
+from app.models.database import PromptVersion as PromptVersionModel
+from app.models.database import SelfCheckPromptVersion as SelfCheckPromptVersionModel
+from app.models.schemas import (
+    PromptVersionCreate,
+    PromptVersionDetail,
+    PromptVersionSummary,
+    SelfCheckPromptVersionCreate,
+    SelfCheckPromptVersionDetail,
+    SelfCheckPromptVersionSummary,
+)
 from app.services.prompts import validate_system_prompt
-from datetime import datetime
 
 router = APIRouter()
 
@@ -42,7 +41,9 @@ async def list_prompt_versions(
     db: AsyncSession = Depends(get_db),
 ):
     """List prompt versions (most recent first)."""
-    result = await db.execute(select(PromptVersionModel).order_by(desc(PromptVersionModel.created_at)))
+    result = await db.execute(
+        select(PromptVersionModel).order_by(desc(PromptVersionModel.created_at))
+    )
     prompts = result.scalars().all()
     return [
         PromptVersionSummary(
@@ -74,8 +75,6 @@ async def get_active_prompt(
         system_content=prompt.system_content,
         created_at=prompt.created_at,
     )
-
-
 
 
 @router.post("/", response_model=PromptVersionDetail)
@@ -115,14 +114,14 @@ async def create_prompt_version(
     )
 
 
-
-
 @router.get("/self-check", response_model=list[SelfCheckPromptVersionSummary])
 async def list_self_check_prompt_versions(
     db: AsyncSession = Depends(get_db),
 ):
     """List self-check prompt versions (most recent first)."""
-    result = await db.execute(select(SelfCheckPromptVersionModel).order_by(desc(SelfCheckPromptVersionModel.created_at)))
+    result = await db.execute(
+        select(SelfCheckPromptVersionModel).order_by(desc(SelfCheckPromptVersionModel.created_at))
+    )
     prompts = result.scalars().all()
     return [
         SelfCheckPromptVersionSummary(
@@ -164,10 +163,14 @@ async def get_self_check_prompt_version(
     db: AsyncSession = Depends(get_db),
 ):
     """Get self-check prompt version detail."""
-    result = await db.execute(select(SelfCheckPromptVersionModel).where(SelfCheckPromptVersionModel.id == prompt_id))
+    result = await db.execute(
+        select(SelfCheckPromptVersionModel).where(SelfCheckPromptVersionModel.id == prompt_id)
+    )
     prompt = result.scalar_one_or_none()
     if not prompt:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Self-check prompt version not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Self-check prompt version not found"
+        )
     return SelfCheckPromptVersionDetail(
         id=prompt.id,
         name=prompt.name,
@@ -219,10 +222,14 @@ async def activate_self_check_prompt_version(
     db: AsyncSession = Depends(get_db),
 ):
     """Activate an existing self-check prompt version."""
-    result = await db.execute(select(SelfCheckPromptVersionModel).where(SelfCheckPromptVersionModel.id == prompt_id))
+    result = await db.execute(
+        select(SelfCheckPromptVersionModel).where(SelfCheckPromptVersionModel.id == prompt_id)
+    )
     prompt = result.scalar_one_or_none()
     if not prompt:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Self-check prompt version not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Self-check prompt version not found"
+        )
 
     errors = validate_system_prompt(prompt.system_content)
     if errors:
@@ -252,7 +259,9 @@ async def get_prompt_version(
     result = await db.execute(select(PromptVersionModel).where(PromptVersionModel.id == prompt_id))
     prompt = result.scalar_one_or_none()
     if not prompt:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prompt version not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Prompt version not found"
+        )
     return PromptVersionDetail(
         id=prompt.id,
         name=prompt.name,
@@ -270,7 +279,9 @@ async def activate_prompt_version(
     result = await db.execute(select(PromptVersionModel).where(PromptVersionModel.id == prompt_id))
     prompt = result.scalar_one_or_none()
     if not prompt:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prompt version not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Prompt version not found"
+        )
 
     errors = validate_system_prompt(prompt.system_content)
     if errors:

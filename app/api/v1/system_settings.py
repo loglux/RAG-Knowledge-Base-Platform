@@ -1,14 +1,15 @@
 """System settings endpoints (API keys, database URLs, etc.)."""
+
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-import httpx
 
-from app.db.session import get_db
 from app.core.system_settings import SystemSettingsManager
+from app.db.session import get_db
 from app.services.setup_manager import SetupManager
 
 logger = logging.getLogger(__name__)
@@ -35,6 +36,7 @@ def _coerce_list(value: Optional[str]) -> Optional[list[str]]:
             return []
         if value.startswith("["):
             import json
+
             try:
                 return json.loads(value)
             except Exception:
@@ -45,6 +47,7 @@ def _coerce_list(value: Optional[str]) -> Optional[list[str]]:
 
 class SystemSettingsResponse(BaseModel):
     """Response with system settings (sensitive values masked)."""
+
     # API Keys (masked)
     openai_api_key: Optional[str] = Field(None, description="OpenAI API key (masked)")
     voyage_api_key: Optional[str] = Field(None, description="VoyageAI API key (masked)")
@@ -56,9 +59,15 @@ class SystemSettingsResponse(BaseModel):
     mcp_public_base_url: Optional[str] = Field(None, description="Public base URL for MCP")
     mcp_default_kb_id: Optional[str] = Field(None, description="Default KB for MCP tools")
     mcp_tools_enabled: Optional[list[str]] = Field(None, description="Enabled MCP tools")
-    mcp_auth_mode: Optional[str] = Field(None, description="MCP auth mode (bearer | refresh | oauth2)")
-    mcp_access_token_ttl_minutes: Optional[int] = Field(None, description="MCP OAuth access token TTL (minutes)")
-    mcp_refresh_token_ttl_days: Optional[int] = Field(None, description="MCP OAuth refresh token TTL (days)")
+    mcp_auth_mode: Optional[str] = Field(
+        None, description="MCP auth mode (bearer | refresh | oauth2)"
+    )
+    mcp_access_token_ttl_minutes: Optional[int] = Field(
+        None, description="MCP OAuth access token TTL (minutes)"
+    )
+    mcp_refresh_token_ttl_days: Optional[int] = Field(
+        None, description="MCP OAuth refresh token TTL (days)"
+    )
 
     # Database URLs
     qdrant_url: Optional[str] = Field(None, description="Qdrant URL")
@@ -74,6 +83,7 @@ class SystemSettingsResponse(BaseModel):
 
 class SystemSettingsUpdate(BaseModel):
     """Update system settings."""
+
     # API Keys
     openai_api_key: Optional[str] = Field(None, description="OpenAI API key")
     voyage_api_key: Optional[str] = Field(None, description="VoyageAI API key")
@@ -85,9 +95,15 @@ class SystemSettingsUpdate(BaseModel):
     mcp_public_base_url: Optional[str] = Field(None, description="Public base URL for MCP")
     mcp_default_kb_id: Optional[str] = Field(None, description="Default KB for MCP tools")
     mcp_tools_enabled: Optional[list[str]] = Field(None, description="Enabled MCP tools")
-    mcp_auth_mode: Optional[str] = Field(None, description="MCP auth mode (bearer | refresh | oauth2)")
-    mcp_access_token_ttl_minutes: Optional[int] = Field(None, description="MCP OAuth access token TTL (minutes)")
-    mcp_refresh_token_ttl_days: Optional[int] = Field(None, description="MCP OAuth refresh token TTL (days)")
+    mcp_auth_mode: Optional[str] = Field(
+        None, description="MCP auth mode (bearer | refresh | oauth2)"
+    )
+    mcp_access_token_ttl_minutes: Optional[int] = Field(
+        None, description="MCP OAuth access token TTL (minutes)"
+    )
+    mcp_refresh_token_ttl_days: Optional[int] = Field(
+        None, description="MCP OAuth refresh token TTL (days)"
+    )
 
     # Database URLs
     qdrant_url: Optional[str] = Field(None, description="Qdrant URL")
@@ -103,19 +119,26 @@ class SystemSettingsUpdate(BaseModel):
 
 class PostgresPasswordUpdate(BaseModel):
     """Update PostgreSQL password."""
+
     username: str = Field(..., description="PostgreSQL username")
     new_password: str = Field(..., min_length=8, description="New password (min 8 characters)")
 
 
 class ProviderTestRequest(BaseModel):
     """Test connectivity for a provider API key/base URL."""
+
     provider: str = Field(..., description="Provider name: openai|anthropic|deepseek|voyage|ollama")
-    api_key: Optional[str] = Field(None, description="API key to test (optional, uses stored key if omitted)")
-    base_url: Optional[str] = Field(None, description="Base URL override for providers that support it")
+    api_key: Optional[str] = Field(
+        None, description="API key to test (optional, uses stored key if omitted)"
+    )
+    base_url: Optional[str] = Field(
+        None, description="Base URL override for providers that support it"
+    )
 
 
 class ProviderTestResponse(BaseModel):
     """Result of provider connectivity test."""
+
     provider: str
     success: bool
     status_code: int
@@ -137,7 +160,9 @@ def _is_masked(value: Optional[str]) -> bool:
     return "*" in value
 
 
-async def _resolve_provider_key(db: AsyncSession, provider: str, api_key: Optional[str]) -> Optional[str]:
+async def _resolve_provider_key(
+    db: AsyncSession, provider: str, api_key: Optional[str]
+) -> Optional[str]:
     if api_key and not _is_masked(api_key):
         return api_key.strip()
 
@@ -193,14 +218,18 @@ async def get_system_settings(db: AsyncSession = Depends(get_db)):
             opensearch_username=settings_dict.get("opensearch_username"),
             opensearch_password=_mask_sensitive(settings_dict.get("opensearch_password")),
             system_name=settings_dict.get("system_name"),
-            max_file_size_mb=int(settings_dict.get("max_file_size_mb", 50)) if settings_dict.get("max_file_size_mb") else None,
+            max_file_size_mb=(
+                int(settings_dict.get("max_file_size_mb", 50))
+                if settings_dict.get("max_file_size_mb")
+                else None
+            ),
         )
 
     except Exception as e:
         logger.error(f"Failed to get system settings: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get system settings: {str(e)}"
+            detail=f"Failed to get system settings: {str(e)}",
         )
 
 
@@ -325,6 +354,7 @@ async def update_system_settings(
 
         if payload.mcp_tools_enabled is not None:
             import json
+
             await SystemSettingsManager.save_setting(
                 db=db,
                 key="mcp_tools_enabled",
@@ -371,7 +401,6 @@ async def update_system_settings(
             )
             updated_count += 1
             mcp_updated = True
-
 
         # Update database URLs
         if payload.qdrant_url is not None:
@@ -456,11 +485,13 @@ async def update_system_settings(
 
         # Reload settings from database to apply changes
         from app.config import load_settings_from_db
+
         await load_settings_from_db()
 
         # Ensure cached LLM services pick up new settings (e.g., API keys)
         try:
             from app.services.rag import close_rag_service
+
             await close_rag_service()
         except Exception:
             pass
@@ -468,8 +499,11 @@ async def update_system_settings(
         if mcp_updated:
             try:
                 from app.mcp.manager import reload_mcp_routes
+
                 if request is None:
-                    logger.warning("MCP settings updated but request is unavailable; skipping reload.")
+                    logger.warning(
+                        "MCP settings updated but request is unavailable; skipping reload."
+                    )
                 else:
                     await reload_mcp_routes(request.app)
             except Exception as exc:
@@ -480,7 +514,7 @@ async def update_system_settings(
         return {
             "success": True,
             "message": f"Updated {updated_count} settings successfully",
-            "updated_count": updated_count
+            "updated_count": updated_count,
         }
 
     except Exception as e:
@@ -488,14 +522,13 @@ async def update_system_settings(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update system settings: {str(e)}"
+            detail=f"Failed to update system settings: {str(e)}",
         )
 
 
 @router.post("/postgres-password", response_model=dict)
 async def change_postgres_password(
-    payload: PostgresPasswordUpdate,
-    db: AsyncSession = Depends(get_db)
+    payload: PostgresPasswordUpdate, db: AsyncSession = Depends(get_db)
 ):
     """
     Change PostgreSQL password.
@@ -514,14 +547,14 @@ async def change_postgres_password(
         return {
             "success": True,
             "message": "PostgreSQL password changed successfully",
-            "username": result["username"]
+            "username": result["username"],
         }
 
     except Exception as e:
         logger.error(f"Failed to change PostgreSQL password: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to change PostgreSQL password: {str(e)}"
+            detail=f"Failed to change PostgreSQL password: {str(e)}",
         )
 
 
@@ -532,10 +565,7 @@ async def test_provider_key(
 ):
     provider = (payload.provider or "").strip().lower()
     if provider not in {"openai", "anthropic", "deepseek", "voyage", "ollama"}:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unsupported provider"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported provider")
 
     api_key = await _resolve_provider_key(db, provider, payload.api_key)
     base_url = (payload.base_url or "").strip()
@@ -584,6 +614,7 @@ async def test_provider_key(
         async with httpx.AsyncClient(timeout=10.0) as client:
             if provider == "voyage":
                 from app.config import settings
+
                 response = await client.post(
                     url,
                     headers=headers,
