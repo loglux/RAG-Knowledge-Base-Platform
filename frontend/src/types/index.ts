@@ -269,6 +269,12 @@ export interface ChatRequest {
   bm25_min_should_match?: number | null
   bm25_use_phrase?: boolean | null
   bm25_analyzer?: string | null
+  rerank_enabled?: boolean
+  rerank_provider?: string | null
+  rerank_model?: string | null
+  rerank_candidate_pool?: number | null
+  rerank_top_n?: number | null
+  rerank_min_score?: number | null
   max_context_chars?: number
   score_threshold?: number
   llm_model?: string
@@ -323,6 +329,12 @@ export interface ConversationSettings {
   bm25_min_should_match?: number | null
   bm25_use_phrase?: boolean | null
   bm25_analyzer?: string | null
+  rerank_enabled?: boolean
+  rerank_provider?: string | null
+  rerank_model?: string | null
+  rerank_candidate_pool?: number | null
+  rerank_top_n?: number | null
+  rerank_min_score?: number | null
   use_mmr?: boolean
   mmr_diversity?: number
   use_self_check?: boolean
@@ -376,6 +388,12 @@ export interface AppSettings {
   bm25_min_should_match: number | null
   bm25_use_phrase: boolean | null
   bm25_analyzer: string | null
+  rerank_enabled: boolean | null
+  rerank_provider: string | null
+  rerank_model: string | null
+  rerank_candidate_pool: number | null
+  rerank_top_n: number | null
+  rerank_min_score: number | null
   structure_requests_per_minute: number | null
   kb_chunk_size: number | null
   kb_chunk_overlap: number | null
@@ -404,6 +422,12 @@ export interface AppSettingsUpdate {
   bm25_min_should_match?: number | null
   bm25_use_phrase?: boolean | null
   bm25_analyzer?: string | null
+  rerank_enabled?: boolean | null
+  rerank_provider?: string | null
+  rerank_model?: string | null
+  rerank_candidate_pool?: number | null
+  rerank_top_n?: number | null
+  rerank_min_score?: number | null
   structure_requests_per_minute?: number | null
   kb_chunk_size?: number | null
   kb_chunk_overlap?: number | null
@@ -474,6 +498,18 @@ export interface ApiInfo {
 export interface SettingsMetadata {
   bm25_match_modes: string[]
   bm25_analyzers: string[]
+  rerank_providers?: Array<{ id: string; label: string }>
+  rerank_models_by_provider?: Record<
+    string,
+    Array<{
+      id: string
+      label: string
+      pricing_unit?: string
+      price_per_million_tokens_usd?: number
+      notes?: string
+    }>
+  >
+  rerank_pricing_formula?: string
 }
 
 export interface MCPToken {

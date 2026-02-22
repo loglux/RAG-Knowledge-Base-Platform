@@ -15,6 +15,24 @@ interface ChatSettingsProps {
   bm25MinShouldMatch: number
   bm25UsePhrase: boolean
   bm25Analyzer: string
+  rerankEnabled: boolean
+  rerankProvider: string
+  rerankModel: string
+  rerankCandidatePool: number
+  rerankTopN: number
+  rerankMinScore: number
+  rerankProviders?: Array<{ id: string; label: string }>
+  rerankModelsByProvider?: Record<
+    string,
+    Array<{
+      id: string
+      label: string
+      pricing_unit?: string
+      price_per_million_tokens_usd?: number
+      notes?: string
+    }>
+  >
+  rerankPricingFormula?: string
   bm25MatchModes?: string[]
   bm25Analyzers?: string[]
   opensearchAvailable?: boolean
@@ -44,6 +62,12 @@ interface ChatSettingsProps {
   onBm25MinShouldMatchChange: (value: number) => void
   onBm25UsePhraseChange: (value: boolean) => void
   onBm25AnalyzerChange: (value: string) => void
+  onRerankEnabledChange: (value: boolean) => void
+  onRerankProviderChange: (value: string) => void
+  onRerankModelChange: (value: string) => void
+  onRerankCandidatePoolChange: (value: number) => void
+  onRerankTopNChange: (value: number) => void
+  onRerankMinScoreChange: (value: number) => void
   onLLMChange: (model: string, provider: string) => void
   onUseStructureChange: (value: boolean) => void
   onUseMmrChange: (value: boolean) => void
@@ -72,6 +96,15 @@ export function ChatSettings({
   bm25MinShouldMatch,
   bm25UsePhrase,
   bm25Analyzer,
+  rerankEnabled,
+  rerankProvider,
+  rerankModel,
+  rerankCandidatePool,
+  rerankTopN,
+  rerankMinScore,
+  rerankProviders,
+  rerankModelsByProvider,
+  rerankPricingFormula,
   bm25MatchModes,
   bm25Analyzers,
   opensearchAvailable,
@@ -101,6 +134,12 @@ export function ChatSettings({
   onBm25MinShouldMatchChange,
   onBm25UsePhraseChange,
   onBm25AnalyzerChange,
+  onRerankEnabledChange,
+  onRerankProviderChange,
+  onRerankModelChange,
+  onRerankCandidatePoolChange,
+  onRerankTopNChange,
+  onRerankMinScoreChange,
   onLLMChange,
   onUseStructureChange,
   onUseMmrChange,
@@ -124,6 +163,17 @@ export function ChatSettings({
   const safeHybridLexicalWeight = Number.isFinite(hybridLexicalWeight) ? hybridLexicalWeight : 0.4
   const safeBm25MinShouldMatch = Number.isFinite(bm25MinShouldMatch) ? bm25MinShouldMatch : 0
   const safeBm25UsePhrase = typeof bm25UsePhrase === 'boolean' ? bm25UsePhrase : true
+  const safeRerankCandidatePool = Number.isFinite(rerankCandidatePool) ? rerankCandidatePool : 20
+  const safeRerankTopN = Number.isFinite(rerankTopN) ? rerankTopN : safeTopK
+  const safeRerankMinScore = Number.isFinite(rerankMinScore) ? rerankMinScore : 0
+  const rerankProviderOptions = rerankProviders && rerankProviders.length > 0
+    ? rerankProviders
+    : [{ id: 'auto', label: 'Auto (recommended)' }, { id: 'voyage', label: 'Voyage' }]
+  const rerankProviderValue = rerankProvider || 'auto'
+  const rerankModelOptions =
+    (rerankModelsByProvider && rerankModelsByProvider[rerankProviderValue === 'auto' ? 'voyage' : rerankProviderValue]) || []
+  const rerankModelValue = rerankModel || (rerankModelOptions[0]?.id ?? 'rerank-2.5-lite')
+  const selectedRerankModelMeta = rerankModelOptions.find((m) => m.id === rerankModelValue)
   const safeContextWindow = Number.isFinite(contextWindow) && contextWindow > 0 ? contextWindow : 1
   const windowEnabled = Array.isArray(contextExpansion) && contextExpansion.includes('window')
   const [showAdvancedBm25, setShowAdvancedBm25] = useState(false)
@@ -763,6 +813,133 @@ export function ChatSettings({
             )}
           </div>
         )}
+
+        <div className="mt-6 rounded-lg border border-gray-700 bg-gray-900/60 p-4">
+          <h4 className="text-sm font-semibold text-white">Reranking</h4>
+          <p className="mt-2 text-xs text-gray-500">
+            Optional second pass that reorders retrieved chunks before answer generation.
+          </p>
+
+          <div className="mt-3">
+            <label className="flex items-center gap-2 text-sm text-gray-300">
+              <input
+                type="checkbox"
+                checked={rerankEnabled}
+                onChange={(e) => onRerankEnabledChange(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
+              />
+              Enable reranking
+            </label>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Provider
+              </label>
+              <select
+                value={rerankProviderValue}
+                onChange={(e) => onRerankProviderChange(e.target.value)}
+                disabled={!rerankEnabled}
+                className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100 disabled:opacity-50"
+              >
+                {rerankProviderOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Model
+              </label>
+              <select
+                value={rerankModelValue}
+                onChange={(e) => onRerankModelChange(e.target.value)}
+                disabled={!rerankEnabled}
+                className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100 disabled:opacity-50"
+              >
+                {rerankModelOptions.map((opt) => (
+                  <option key={opt.id} value={opt.id}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Candidate pool: {safeRerankCandidatePool}
+              </label>
+              <input
+                type="range"
+                min="1"
+                max="100"
+                step="1"
+                value={safeRerankCandidatePool}
+                onChange={(e) => onRerankCandidatePoolChange(Number(e.target.value))}
+                disabled={!rerankEnabled}
+                className="slider w-full disabled:opacity-50"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Chunks passed into reranking stage.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Keep top N after rerank: {safeRerankTopN}
+              </label>
+              <input
+                type="range"
+                min="1"
+                max="100"
+                step="1"
+                value={safeRerankTopN}
+                onChange={(e) => onRerankTopNChange(Number(e.target.value))}
+                disabled={!rerankEnabled}
+                className="slider w-full disabled:opacity-50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Min rerank score: {safeRerankMinScore.toFixed(2)}
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={safeRerankMinScore}
+                onChange={(e) => onRerankMinScoreChange(Number(e.target.value))}
+                disabled={!rerankEnabled}
+                className="slider w-full disabled:opacity-50"
+              />
+            </div>
+          </div>
+
+          {selectedRerankModelMeta && (
+            <div className="mt-4 rounded border border-gray-700 bg-gray-900 px-3 py-2 text-xs text-gray-300">
+              <div>
+                Cost: ${selectedRerankModelMeta.price_per_million_tokens_usd?.toFixed(2) ?? 'n/a'} / 1M{' '}
+                {selectedRerankModelMeta.pricing_unit ?? 'tokens'}
+              </div>
+              {rerankPricingFormula && (
+                <div className="mt-1 text-gray-500">
+                  Token formula: {rerankPricingFormula}
+                </div>
+              )}
+              {selectedRerankModelMeta.notes && (
+                <div className="mt-1 text-gray-500">{selectedRerankModelMeta.notes}</div>
+              )}
+            </div>
+          )}
+        </div>
 
         <div className="mt-4 p-3 bg-gray-900 rounded-lg border border-gray-700">
           <p className="text-xs text-gray-400">

@@ -67,6 +67,24 @@ export function ChatPage() {
   const [bm25Analyzer, setBm25Analyzer] = useState(() => {
     return 'mixed'
   })
+  const [rerankEnabled, setRerankEnabled] = useState(() => {
+    return false
+  })
+  const [rerankProvider, setRerankProvider] = useState(() => {
+    return 'auto'
+  })
+  const [rerankModel, setRerankModel] = useState(() => {
+    return 'rerank-2.5-lite'
+  })
+  const [rerankCandidatePool, setRerankCandidatePool] = useState(() => {
+    return 20
+  })
+  const [rerankTopN, setRerankTopN] = useState(() => {
+    return 5
+  })
+  const [rerankMinScore, setRerankMinScore] = useState(() => {
+    return 0
+  })
   const [llmModel, setLlmModel] = useState(() => {
     return 'gpt-4o'
   })
@@ -106,6 +124,9 @@ export function ChatPage() {
   const [kbDefaultsApplied, setKbDefaultsApplied] = useState(false)
   const [bm25MatchModes, setBm25MatchModes] = useState<string[] | null>(null)
   const [bm25Analyzers, setBm25Analyzers] = useState<string[] | null>(null)
+  const [rerankProviders, setRerankProviders] = useState<Array<{ id: string; label: string }> | null>(null)
+  const [rerankModelsByProvider, setRerankModelsByProvider] = useState<Record<string, Array<{ id: string; label: string; pricing_unit?: string; price_per_million_tokens_usd?: number; notes?: string }>> | null>(null)
+  const [rerankPricingFormula, setRerankPricingFormula] = useState<string | null>(null)
   const [showPromptVersions, setShowPromptVersions] = useState(false)
 
   const messagesScrollRef = useRef<HTMLDivElement>(null)
@@ -199,6 +220,22 @@ export function ChatPage() {
           setBm25UsePhrase(settings.bm25_use_phrase)
         }
         if (settings.bm25_analyzer) setBm25Analyzer(settings.bm25_analyzer)
+        if (settings.rerank_enabled !== undefined) setRerankEnabled(Boolean(settings.rerank_enabled))
+        if (settings.rerank_provider !== undefined && settings.rerank_provider !== null) {
+          setRerankProvider(settings.rerank_provider)
+        }
+        if (settings.rerank_model !== undefined && settings.rerank_model !== null) {
+          setRerankModel(settings.rerank_model)
+        }
+        if (settings.rerank_candidate_pool !== undefined && settings.rerank_candidate_pool !== null) {
+          setRerankCandidatePool(settings.rerank_candidate_pool)
+        }
+        if (settings.rerank_top_n !== undefined && settings.rerank_top_n !== null) {
+          setRerankTopN(settings.rerank_top_n)
+        }
+        if (settings.rerank_min_score !== undefined && settings.rerank_min_score !== null) {
+          setRerankMinScore(settings.rerank_min_score)
+        }
         if (settings.llm_model) setLlmModel(settings.llm_model)
         if (settings.llm_provider) setLlmProvider(settings.llm_provider)
         if (settings.use_structure !== undefined) setUseStructure(settings.use_structure)
@@ -260,6 +297,12 @@ export function ChatPage() {
         if (data.bm25_min_should_match !== null) setBm25MinShouldMatch(data.bm25_min_should_match)
         if (data.bm25_use_phrase !== null) setBm25UsePhrase(data.bm25_use_phrase)
         if (data.bm25_analyzer) setBm25Analyzer(data.bm25_analyzer)
+        if (data.rerank_enabled !== null) setRerankEnabled(data.rerank_enabled)
+        if (data.rerank_provider !== null) setRerankProvider(data.rerank_provider)
+        if (data.rerank_model !== null) setRerankModel(data.rerank_model)
+        if (data.rerank_candidate_pool !== null) setRerankCandidatePool(data.rerank_candidate_pool)
+        if (data.rerank_top_n !== null) setRerankTopN(data.rerank_top_n)
+        if (data.rerank_min_score !== null) setRerankMinScore(data.rerank_min_score)
         if (data.llm_model) setLlmModel(data.llm_model)
         if (data.llm_provider) setLlmProvider(data.llm_provider)
         if (data.use_structure !== null) setUseStructure(data.use_structure)
@@ -316,6 +359,22 @@ export function ChatPage() {
         setBm25UsePhrase(draft.bm25_use_phrase)
       }
       if (draft.bm25_analyzer) setBm25Analyzer(draft.bm25_analyzer)
+      if (draft.rerank_enabled !== undefined) setRerankEnabled(Boolean(draft.rerank_enabled))
+      if (draft.rerank_provider !== undefined && draft.rerank_provider !== null) {
+        setRerankProvider(draft.rerank_provider)
+      }
+      if (draft.rerank_model !== undefined && draft.rerank_model !== null) {
+        setRerankModel(draft.rerank_model)
+      }
+      if (draft.rerank_candidate_pool !== undefined && draft.rerank_candidate_pool !== null) {
+        setRerankCandidatePool(draft.rerank_candidate_pool)
+      }
+      if (draft.rerank_top_n !== undefined && draft.rerank_top_n !== null) {
+        setRerankTopN(draft.rerank_top_n)
+      }
+      if (draft.rerank_min_score !== undefined && draft.rerank_min_score !== null) {
+        setRerankMinScore(draft.rerank_min_score)
+      }
       if (draft.llm_model) setLlmModel(draft.llm_model)
       if (draft.llm_provider) setLlmProvider(draft.llm_provider)
       if (draft.use_structure !== undefined) setUseStructure(draft.use_structure)
@@ -351,9 +410,15 @@ export function ChatPage() {
         const metadata = await apiClient.getSettingsMetadata()
         setBm25MatchModes(metadata.bm25_match_modes || null)
         setBm25Analyzers(metadata.bm25_analyzers || null)
+        setRerankProviders(metadata.rerank_providers || null)
+        setRerankModelsByProvider(metadata.rerank_models_by_provider || null)
+        setRerankPricingFormula(metadata.rerank_pricing_formula || null)
       } catch {
         setBm25MatchModes(null)
         setBm25Analyzers(null)
+        setRerankProviders(null)
+        setRerankModelsByProvider(null)
+        setRerankPricingFormula(null)
       }
     }
 
@@ -411,6 +476,12 @@ export function ChatPage() {
       bm25_min_should_match: bm25MinShouldMatch,
       bm25_use_phrase: bm25UsePhrase,
       bm25_analyzer: bm25Analyzer,
+      rerank_enabled: rerankEnabled,
+      rerank_provider: rerankProvider || null,
+      rerank_model: rerankModel || null,
+      rerank_candidate_pool: rerankCandidatePool,
+      rerank_top_n: rerankTopN,
+      rerank_min_score: rerankMinScore,
       llm_model: llmModel,
       llm_provider: llmProvider,
       use_structure: useStructure,
@@ -428,7 +499,7 @@ export function ChatPage() {
     apiClient.updateConversationSettings(conversationId, payload).catch((err) => {
       console.error('Failed to update conversation settings:', err)
     })
-  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, llmModel, llmProvider, useStructure, useMmr, mmrDiversity, useSelfCheck, useConversationHistory, conversationHistoryLimit, useDocumentFilter, selectedDocumentIds, contextExpansion, contextWindow])
+  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, rerankEnabled, rerankProvider, rerankModel, rerankCandidatePool, rerankTopN, rerankMinScore, llmModel, llmProvider, useStructure, useMmr, mmrDiversity, useSelfCheck, useConversationHistory, conversationHistoryLimit, useDocumentFilter, selectedDocumentIds, contextExpansion, contextWindow])
 
   useEffect(() => {
     if (conversationId || !settingsLoaded) return
@@ -448,6 +519,12 @@ export function ChatPage() {
       bm25_min_should_match: bm25MinShouldMatch,
       bm25_use_phrase: bm25UsePhrase,
       bm25_analyzer: bm25Analyzer,
+      rerank_enabled: rerankEnabled,
+      rerank_provider: rerankProvider || null,
+      rerank_model: rerankModel || null,
+      rerank_candidate_pool: rerankCandidatePool,
+      rerank_top_n: rerankTopN,
+      rerank_min_score: rerankMinScore,
       llm_model: llmModel,
       llm_provider: llmProvider,
       use_structure: useStructure,
@@ -466,7 +543,7 @@ export function ChatPage() {
     } catch (err) {
       console.error('Failed to persist draft chat settings:', err)
     }
-  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, llmModel, llmProvider, useStructure, useMmr, mmrDiversity, useSelfCheck, useConversationHistory, conversationHistoryLimit, useDocumentFilter, selectedDocumentIds, contextExpansion, contextWindow, settingsDraftKey])
+  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, rerankEnabled, rerankProvider, rerankModel, rerankCandidatePool, rerankTopN, rerankMinScore, llmModel, llmProvider, useStructure, useMmr, mmrDiversity, useSelfCheck, useConversationHistory, conversationHistoryLimit, useDocumentFilter, selectedDocumentIds, contextExpansion, contextWindow, settingsDraftKey])
 
   useEffect(() => {
     const fetchKB = async () => {
@@ -622,6 +699,12 @@ export function ChatPage() {
       bm25MinShouldMatch,
       bm25UsePhrase,
       bm25Analyzer,
+      rerankEnabled,
+      rerankProvider,
+      rerankModel,
+      rerankCandidatePool,
+      rerankTopN,
+      rerankMinScore,
       maxContextChars,
       scoreThreshold,
       llmModel,
@@ -668,6 +751,12 @@ export function ChatPage() {
       if (data.bm25_min_should_match !== null) setBm25MinShouldMatch(data.bm25_min_should_match)
       if (data.bm25_use_phrase !== null) setBm25UsePhrase(data.bm25_use_phrase)
       if (data.bm25_analyzer) setBm25Analyzer(data.bm25_analyzer)
+      if (data.rerank_enabled !== null) setRerankEnabled(data.rerank_enabled)
+      if (data.rerank_provider !== null) setRerankProvider(data.rerank_provider)
+      if (data.rerank_model !== null) setRerankModel(data.rerank_model)
+      if (data.rerank_candidate_pool !== null) setRerankCandidatePool(data.rerank_candidate_pool)
+      if (data.rerank_top_n !== null) setRerankTopN(data.rerank_top_n)
+      if (data.rerank_min_score !== null) setRerankMinScore(data.rerank_min_score)
       if (data.llm_model) setLlmModel(data.llm_model)
       if (data.llm_provider) setLlmProvider(data.llm_provider)
       if (data.use_structure !== null) setUseStructure(data.use_structure)
@@ -682,6 +771,12 @@ export function ChatPage() {
       setSelectedDocumentIds([])
       setContextExpansion([])
       setContextWindow(1)
+      setRerankEnabled(false)
+      setRerankProvider('auto')
+      setRerankModel('rerank-2.5-lite')
+      setRerankCandidatePool(20)
+      setRerankTopN(data.top_k ?? 5)
+      setRerankMinScore(0)
 
       if (kb) {
         if (kb.bm25_match_mode !== null && kb.bm25_match_mode !== undefined) setBm25MatchMode(kb.bm25_match_mode)
@@ -798,6 +893,15 @@ export function ChatPage() {
               bm25MinShouldMatch={bm25MinShouldMatch}
               bm25UsePhrase={bm25UsePhrase}
               bm25Analyzer={bm25Analyzer}
+              rerankEnabled={rerankEnabled}
+              rerankProvider={rerankProvider}
+              rerankModel={rerankModel}
+              rerankCandidatePool={rerankCandidatePool}
+              rerankTopN={rerankTopN}
+              rerankMinScore={rerankMinScore}
+              rerankProviders={rerankProviders ?? undefined}
+              rerankModelsByProvider={rerankModelsByProvider ?? undefined}
+              rerankPricingFormula={rerankPricingFormula ?? undefined}
               bm25MatchModes={bm25MatchModes ?? undefined}
               bm25Analyzers={bm25Analyzers ?? undefined}
               opensearchAvailable={opensearchAvailable ?? undefined}
@@ -827,6 +931,12 @@ export function ChatPage() {
               onBm25MinShouldMatchChange={setBm25MinShouldMatch}
               onBm25UsePhraseChange={setBm25UsePhrase}
               onBm25AnalyzerChange={setBm25Analyzer}
+              onRerankEnabledChange={setRerankEnabled}
+              onRerankProviderChange={setRerankProvider}
+              onRerankModelChange={setRerankModel}
+              onRerankCandidatePoolChange={setRerankCandidatePool}
+              onRerankTopNChange={setRerankTopN}
+              onRerankMinScoreChange={setRerankMinScore}
               onLLMChange={handleLLMChange}
               onUseStructureChange={setUseStructure}
               onUseMmrChange={setUseMmr}

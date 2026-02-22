@@ -151,6 +151,20 @@ async def retrieve_only(
         )
 
     chunks = retrieval_result.chunks
+    if effective.get("rerank_enabled") and chunks:
+        candidate_pool = effective.get("rerank_candidate_pool") or len(chunks)
+        candidate_pool = max(1, min(candidate_pool, len(chunks)))
+        reranked = await retrieval_engine.rerank_results(
+            query=request.query,
+            chunks=chunks[:candidate_pool],
+            provider=effective.get("rerank_provider"),
+            model=effective.get("rerank_model"),
+            min_score=effective.get("rerank_min_score"),
+        )
+        keep_n = effective.get("rerank_top_n") or effective.get("top_k", len(reranked))
+        keep_n = max(1, min(keep_n, len(reranked)))
+        chunks = reranked[:keep_n]
+
     expansion_modes = effective.get("context_expansion") or []
     window_size = effective.get("context_window") or 0
     if "window" in expansion_modes and window_size > 0:

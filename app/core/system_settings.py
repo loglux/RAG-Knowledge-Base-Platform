@@ -22,6 +22,7 @@ class SystemSettingsManager:
     SENSITIVE_KEYS = {
         "openai_api_key",
         "voyage_api_key",
+        "cohere_api_key",
         "anthropic_api_key",
         "deepseek_api_key",
         "qdrant_api_key",
@@ -34,6 +35,7 @@ class SystemSettingsManager:
         # API Keys
         "openai_api_key": "OPENAI_API_KEY",
         "voyage_api_key": "VOYAGE_API_KEY",
+        "cohere_api_key": "COHERE_API_KEY",
         "anthropic_api_key": "ANTHROPIC_API_KEY",
         "deepseek_api_key": "DEEPSEEK_API_KEY",
         "ollama_base_url": "OLLAMA_BASE_URL",
@@ -110,6 +112,7 @@ class SystemSettingsManager:
                         [
                             "openai_api_key",
                             "voyage_api_key",
+                            "cohere_api_key",
                             "anthropic_api_key",
                             "deepseek_api_key",
                             "ollama_base_url",

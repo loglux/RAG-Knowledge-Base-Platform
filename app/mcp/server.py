@@ -137,6 +137,12 @@ def build_mcp_app() -> FastMCP:
                 llm_model=effective.get("llm_model"),
                 llm_provider=effective.get("llm_provider"),
                 use_structure=effective.get("use_structure", False),
+                rerank_enabled=effective.get("rerank_enabled", False),
+                rerank_provider=effective.get("rerank_provider"),
+                rerank_model=effective.get("rerank_model"),
+                rerank_candidate_pool=effective.get("rerank_candidate_pool"),
+                rerank_top_n=effective.get("rerank_top_n"),
+                rerank_min_score=effective.get("rerank_min_score"),
                 use_mmr=effective.get("use_mmr", False),
                 mmr_diversity=effective.get("mmr_diversity", 0.5),
                 document_ids=effective.get("document_ids"),
@@ -271,6 +277,20 @@ def build_mcp_app() -> FastMCP:
                 )
 
             chunks = retrieval_result.chunks
+            if effective.get("rerank_enabled") and chunks:
+                candidate_pool = effective.get("rerank_candidate_pool") or len(chunks)
+                candidate_pool = max(1, min(candidate_pool, len(chunks)))
+                reranked = await retrieval_engine.rerank_results(
+                    query=query,
+                    chunks=chunks[:candidate_pool],
+                    provider=effective.get("rerank_provider"),
+                    model=effective.get("rerank_model"),
+                    min_score=effective.get("rerank_min_score"),
+                )
+                keep_n = effective.get("rerank_top_n") or effective.get("top_k", len(reranked))
+                keep_n = max(1, min(keep_n, len(reranked)))
+                chunks = reranked[:keep_n]
+
             context = retrieval_engine._assemble_context(
                 chunks, max_length=effective.get("max_context_chars")
             )
@@ -410,6 +430,12 @@ def build_mcp_app() -> FastMCP:
                         "max_context_chars": app_settings.max_context_chars,
                         "score_threshold": app_settings.score_threshold,
                         "use_structure": app_settings.use_structure,
+                        "rerank_enabled": app_settings.rerank_enabled,
+                        "rerank_provider": app_settings.rerank_provider,
+                        "rerank_model": app_settings.rerank_model,
+                        "rerank_candidate_pool": app_settings.rerank_candidate_pool,
+                        "rerank_top_n": app_settings.rerank_top_n,
+                        "rerank_min_score": app_settings.rerank_min_score,
                         "retrieval_mode": app_settings.retrieval_mode,
                         "lexical_top_k": app_settings.lexical_top_k,
                         "hybrid_dense_weight": app_settings.hybrid_dense_weight,

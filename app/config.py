@@ -90,6 +90,9 @@ class Settings(BaseSettings):
     VOYAGE_API_KEY: Optional[str] = Field(default=None, description="Voyage AI API key (optional)")
     VOYAGE_EMBEDDING_MODEL: str = Field(default="voyage-4", description="Voyage AI embedding model")
 
+    # Cohere (optional)
+    COHERE_API_KEY: Optional[str] = Field(default=None, description="Cohere API key (optional)")
+
     # Anthropic (optional)
     ANTHROPIC_API_KEY: Optional[str] = Field(
         default=None, description="Anthropic API key (optional)"

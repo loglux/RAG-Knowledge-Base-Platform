@@ -46,6 +46,7 @@ const Setup: React.FC = () => {
   const [apiKeysData, setAPIKeysData] = useState<APIKeysRequest>({
     openai_api_key: '',
     voyage_api_key: '',
+    cohere_api_key: '',
     anthropic_api_key: '',
     deepseek_api_key: '',
     ollama_base_url: '',
@@ -211,6 +212,7 @@ const Setup: React.FC = () => {
       // Validate at least one key
       const hasKey = apiKeysData.openai_api_key ||
                      apiKeysData.voyage_api_key ||
+                     apiKeysData.cohere_api_key ||
                      apiKeysData.anthropic_api_key ||
                      apiKeysData.deepseek_api_key;
 
@@ -302,7 +304,7 @@ const Setup: React.FC = () => {
               <ul>
                 <li>✓ Admin account for system management</li>
                 <li>✓ Database security (optional)</li>
-                <li>✓ AI providers (OpenAI, Voyage, Anthropic, DeepSeek, Ollama)</li>
+                <li>✓ AI providers (OpenAI, Voyage, Cohere, Anthropic, DeepSeek, Ollama)</li>
                 <li>✓ Database connections (optional)</li>
                 <li>✓ System settings (optional)</li>
               </ul>
@@ -529,6 +531,18 @@ const Setup: React.FC = () => {
                 onChange={(e) => setAPIKeysData({ ...apiKeysData, anthropic_api_key: e.target.value })}
               />
               <small className="form-text">Used for Claude models</small>
+            </div>
+
+            <div className="form-group">
+              <label>Cohere API Key (Optional)</label>
+              <input
+                type="password"
+                className="form-control"
+                placeholder="co-..."
+                value={apiKeysData.cohere_api_key}
+                onChange={(e) => setAPIKeysData({ ...apiKeysData, cohere_api_key: e.target.value })}
+              />
+              <small className="form-text">Used for reranking models</small>
             </div>
 
             <div className="form-group">

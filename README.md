@@ -8,6 +8,7 @@
 ![Anthropic](https://img.shields.io/badge/Anthropic-191919?logo=anthropic&logoColor=white)
 ![DeepSeek](https://img.shields.io/badge/DeepSeek-0E0E0E?logoColor=white)
 ![Voyage](https://img.shields.io/badge/Voyage-1B1F23?logo=voyage&logoColor=white)
+![Cohere](https://img.shields.io/badge/Cohere-191919?logo=cohere&logoColor=white)
 ![Ollama](https://img.shields.io/badge/Ollama-000000?logo=ollama&logoColor=white)
 ![LangChain](https://img.shields.io/badge/🦜_LangChain-1C3C3C?logoColor=white)
 ![React](https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=111111)
@@ -23,7 +24,7 @@ It can be used as a standalone service or integrated into other products via its
 - **High-signal retrieval**: Vector search with Qdrant and configurable chunking.
 - **Structured navigation**: LLM-based TOC extraction enables section-aware search.
 - **API-first**: Use the backend independently from the UI.
-- **Provider-flexible**: OpenAI by default, with optional Anthropic, DeepSeek, Voyage, or Ollama.
+- **Provider-flexible**: OpenAI by default, with optional Anthropic, DeepSeek, Voyage, Cohere, or Ollama.
 - **Grounded answers**: Responses are built from your documents, not guesses.
 - **Retrieve-only access**: Get chunks + context without creating chat history.
 
@@ -37,6 +38,7 @@ It can be used as a standalone service or integrated into other products via its
 - Qdrant-backed vector index for fast similarity search
 - **MMR (Maximal Marginal Relevance)** for diversity-aware search
 - Optional BM25 lexical index (OpenSearch) for hybrid retrieval
+- **Optional reranking** (Voyage/Cohere) after retrieval for better relevance ordering
 - **Self-Check Validation** (optional): Two-stage answer generation with validation for improved accuracy
 - **Retrieve-only API** for MCP/search tools (no chat side-effects)
 - **KB export/import**: portable archives for backup, migration, and QA
@@ -320,6 +322,31 @@ The chat UI exposes retrieval controls to tune answer quality:
 - **Windowed retrieval**: expands context by adding neighboring chunks (prevents truncated citations; useful for multi-part questions).
 - **Retrieval mode**: dense (vectors) or hybrid (BM25 + vectors).
 - **BM25 controls** (hybrid only): lexical top‑K and weight blending.
+- **Reranking controls**:
+  - `rerank_enabled`
+  - `rerank_provider` (`auto`, `voyage`, `cohere`)
+  - `rerank_model`
+  - `rerank_candidate_pool` (how many retrieved chunks are sent to reranker)
+  - `rerank_top_n` (how many chunks are kept after rerank)
+  - `rerank_min_score` (drop low relevance rerank results)
+
+### Reranking behavior
+
+- Reranking is applied **after retrieval** (dense or hybrid) and **before** context assembly.
+- In `auto` mode provider selection is:
+  1. `voyage` (if `VOYAGE_API_KEY` exists)
+  2. `cohere` (if `COHERE_API_KEY` exists)
+  3. no rerank (fallback to original order)
+- If provider/API call fails, the system safely falls back to original retrieval ordering.
+
+### How to verify reranking is active
+
+- In UI source cards (`SOURCES`) you should see:
+  - `reranked: <provider> (<model>)`
+  - `rerank: <score>`
+  - `pre: <pre_rerank_score>`
+- In API logs you should see:
+  - `Rerank applied: provider=... model=... input=... output=...`
 
 ### MMR Diversity Parameter Guide
 

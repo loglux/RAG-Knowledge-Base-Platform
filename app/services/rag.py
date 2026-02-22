@@ -113,6 +113,12 @@ Retrieved Context:
         llm_provider: Optional[str] = None,
         conversation_history: Optional[List[Dict[str, str]]] = None,
         use_structure: bool = False,
+        rerank_enabled: bool = False,
+        rerank_provider: Optional[str] = None,
+        rerank_model: Optional[str] = None,
+        rerank_candidate_pool: Optional[int] = None,
+        rerank_top_n: Optional[int] = None,
+        rerank_min_score: Optional[float] = None,
         use_mmr: bool = False,
         mmr_diversity: float = 0.5,
         use_self_check: bool = False,
@@ -144,6 +150,12 @@ Retrieved Context:
             llm_provider: Override LLM provider for this query
             conversation_history: Previous messages for follow-up questions
             use_structure: Use document structure for structured search (default: False)
+            rerank_enabled: Enable reranking stage after retrieval
+            rerank_provider: Reranking provider hint
+            rerank_model: Reranking model hint
+            rerank_candidate_pool: Candidate pool size before reranking
+            rerank_top_n: Number of chunks to keep after reranking
+            rerank_min_score: Optional minimum rerank score threshold
             document_ids: Optional list of document IDs to filter retrieval
             db: Database session for structure lookups (required if use_structure=True)
             kb_id: Knowledge base ID for document lookup (required if use_structure=True)
@@ -274,6 +286,40 @@ Retrieved Context:
                 )
 
             chunks = retrieval_result.chunks
+            if rerank_enabled and chunks:
+                provider_normalized = (rerank_provider or "auto").strip().lower()
+                if provider_normalized not in {"auto", "voyage", "cohere"}:
+                    logger.warning(
+                        "Unsupported rerank provider '%s'. Falling back to auto.", rerank_provider
+                    )
+                    provider_normalized = "auto"
+                if provider_normalized == "auto":
+                    if settings.VOYAGE_API_KEY:
+                        provider_normalized = "voyage"
+                    elif settings.COHERE_API_KEY:
+                        provider_normalized = "cohere"
+                    else:
+                        provider_normalized = None
+                if provider_normalized == "voyage" and not settings.VOYAGE_API_KEY:
+                    logger.warning("Rerank provider 'voyage' selected but VOYAGE_API_KEY is missing")
+                    provider_normalized = None
+                if provider_normalized == "cohere" and not settings.COHERE_API_KEY:
+                    logger.warning("Rerank provider 'cohere' selected but COHERE_API_KEY is missing")
+                    provider_normalized = None
+
+                candidate_pool = rerank_candidate_pool or len(chunks)
+                candidate_pool = max(1, min(candidate_pool, len(chunks)))
+                reranked = await self.retrieval.rerank_results(
+                    query=question,
+                    chunks=chunks[:candidate_pool],
+                    provider=provider_normalized,
+                    model=rerank_model,
+                    min_score=rerank_min_score,
+                )
+                keep_n = rerank_top_n or top_k
+                keep_n = max(1, keep_n)
+                chunks = reranked[:keep_n]
+
             expansion_modes = context_expansion or []
             window_size = context_window or 0
             if "window" in expansion_modes and window_size > 0:

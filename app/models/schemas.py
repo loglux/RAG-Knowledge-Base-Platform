@@ -308,6 +308,12 @@ class RetrievalSettingsUpdate(BaseModel):
     mmr_diversity: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     context_expansion: Optional[List[str]] = Field(default=None)
     context_window: Optional[int] = Field(default=None, ge=0, le=5)
+    rerank_enabled: Optional[bool] = Field(default=None)
+    rerank_provider: Optional[str] = Field(default=None)
+    rerank_model: Optional[str] = Field(default=None)
+    rerank_candidate_pool: Optional[int] = Field(default=None, ge=1, le=100)
+    rerank_top_n: Optional[int] = Field(default=None, ge=1, le=100)
+    rerank_min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     bm25_match_mode: Optional[str] = Field(default=None)
     bm25_min_should_match: Optional[int] = Field(default=None, ge=0, le=100)
     bm25_use_phrase: Optional[bool] = Field(default=None)
@@ -329,6 +335,12 @@ class EffectiveRetrievalSettings(BaseModel):
     mmr_diversity: float = Field(..., ge=0.0, le=1.0)
     context_expansion: Optional[List[str]] = Field(default=None)
     context_window: Optional[int] = Field(default=None, ge=0, le=5)
+    rerank_enabled: bool = Field(...)
+    rerank_provider: Optional[str] = Field(default=None)
+    rerank_model: Optional[str] = Field(default=None)
+    rerank_candidate_pool: int = Field(..., ge=1, le=100)
+    rerank_top_n: Optional[int] = Field(default=None, ge=1, le=100)
+    rerank_min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     bm25_match_mode: Optional[str] = Field(default=None)
     bm25_min_should_match: Optional[int] = Field(default=None, ge=0, le=100)
     bm25_use_phrase: Optional[bool] = Field(default=None)
@@ -425,6 +437,12 @@ class ConversationSettings(BaseModel):
     bm25_analyzer: Optional[str] = Field(default=None)
     use_mmr: Optional[bool] = Field(default=None)
     mmr_diversity: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    rerank_enabled: Optional[bool] = Field(default=None)
+    rerank_provider: Optional[str] = Field(default=None)
+    rerank_model: Optional[str] = Field(default=None)
+    rerank_candidate_pool: Optional[int] = Field(default=None, ge=1, le=100)
+    rerank_top_n: Optional[int] = Field(default=None, ge=1, le=100)
+    rerank_min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     use_self_check: Optional[bool] = Field(default=None)
     use_conversation_history: Optional[bool] = Field(default=None)
     conversation_history_limit: Optional[int] = Field(default=None, ge=0, le=100)
@@ -469,6 +487,12 @@ class AppSettingsBase(BaseModel):
     max_context_chars: Optional[int] = Field(default=None, ge=0)
     score_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     use_structure: Optional[bool] = Field(default=None)
+    rerank_enabled: Optional[bool] = Field(default=None)
+    rerank_provider: Optional[str] = Field(default=None)
+    rerank_model: Optional[str] = Field(default=None)
+    rerank_candidate_pool: Optional[int] = Field(default=None, ge=1, le=100)
+    rerank_top_n: Optional[int] = Field(default=None, ge=1, le=100)
+    rerank_min_score: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     retrieval_mode: Optional[RetrievalMode] = Field(default=None)
     lexical_top_k: Optional[int] = Field(default=None, ge=1, le=200)
     hybrid_dense_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
@@ -614,6 +638,29 @@ class ChatRequest(BaseModel):
     )
     use_structure: bool = Field(
         default=False, description="Use document structure for search (experimental, default: OFF)"
+    )
+    rerank_enabled: Optional[bool] = Field(default=None, description="Enable retrieval reranking")
+    rerank_provider: Optional[str] = Field(
+        default=None, description="Reranking provider (e.g., openai, voyage)"
+    )
+    rerank_model: Optional[str] = Field(default=None, description="Reranking model name")
+    rerank_candidate_pool: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=100,
+        description="Candidate pool size before reranking",
+    )
+    rerank_top_n: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=100,
+        description="Number of chunks to keep after reranking (default: top_k)",
+    )
+    rerank_min_score: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Optional minimum rerank score threshold",
     )
     use_mmr: Optional[bool] = Field(
         default=False,

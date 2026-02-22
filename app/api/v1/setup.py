@@ -53,6 +53,7 @@ class APIKeysRequest(BaseModel):
 
     openai_api_key: Optional[str] = Field(None, description="OpenAI API key")
     voyage_api_key: Optional[str] = Field(None, description="VoyageAI API key")
+    cohere_api_key: Optional[str] = Field(None, description="Cohere API key")
     anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key")
     deepseek_api_key: Optional[str] = Field(None, description="DeepSeek API key")
     ollama_base_url: Optional[str] = Field(
@@ -268,6 +269,7 @@ async def save_api_keys(
             [
                 request.openai_api_key,
                 request.voyage_api_key,
+                request.cohere_api_key,
                 request.anthropic_api_key,
                 request.deepseek_api_key,
                 request.ollama_base_url,
@@ -283,6 +285,7 @@ async def save_api_keys(
             db=db,
             openai_api_key=request.openai_api_key,
             voyage_api_key=request.voyage_api_key,
+            cohere_api_key=request.cohere_api_key,
             anthropic_api_key=request.anthropic_api_key,
             deepseek_api_key=request.deepseek_api_key,
             ollama_base_url=request.ollama_base_url,
@@ -385,7 +388,7 @@ async def complete_setup(
     try:
         # Verify at least one API key is configured
         api_keys_configured = False
-        for key in ["openai_api_key", "voyage_api_key", "anthropic_api_key"]:
+        for key in ["openai_api_key", "voyage_api_key", "cohere_api_key", "anthropic_api_key"]:
             value = await SystemSettingsManager.get_setting(db, key)
             if value:
                 api_keys_configured = True

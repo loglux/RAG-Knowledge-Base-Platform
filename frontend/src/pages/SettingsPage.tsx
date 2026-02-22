@@ -57,6 +57,15 @@ export function SettingsPage() {
   const [bm25MinShouldMatch, setBm25MinShouldMatch] = useState(50)
   const [bm25UsePhrase, setBm25UsePhrase] = useState(true)
   const [bm25Analyzer, setBm25Analyzer] = useState('mixed')
+  const [rerankProviders, setRerankProviders] = useState<Array<{ id: string; label: string }> | null>(null)
+  const [rerankModelsByProvider, setRerankModelsByProvider] = useState<Record<string, Array<{ id: string; label: string; pricing_unit?: string; price_per_million_tokens_usd?: number; notes?: string }>> | null>(null)
+  const [rerankPricingFormula, setRerankPricingFormula] = useState<string | null>(null)
+  const [rerankEnabled, setRerankEnabled] = useState(false)
+  const [rerankProvider, setRerankProvider] = useState('auto')
+  const [rerankModel, setRerankModel] = useState('rerank-2.5-lite')
+  const [rerankCandidatePool, setRerankCandidatePool] = useState(20)
+  const [rerankTopN, setRerankTopN] = useState(5)
+  const [rerankMinScore, setRerankMinScore] = useState(0)
   const [useStructure, setUseStructure] = useState(false)
   const [structureRequestsPerMinute, setStructureRequestsPerMinute] = useState(10)
   const [useLlmChatTitles, setUseLlmChatTitles] = useState(true)
@@ -103,11 +112,13 @@ export function SettingsPage() {
   // System Settings (AI Providers)
   const [openaiApiKey, setOpenaiApiKey] = useState('')
   const [voyageApiKey, setVoyageApiKey] = useState('')
+  const [cohereApiKey, setCohereApiKey] = useState('')
   const [anthropicApiKey, setAnthropicApiKey] = useState('')
   const [deepseekApiKey, setDeepseekApiKey] = useState('')
   const [ollamaBaseUrl, setOllamaBaseUrl] = useState('')
   const [showOpenaiKey, setShowOpenaiKey] = useState(false)
   const [showVoyageKey, setShowVoyageKey] = useState(false)
+  const [showCohereKey, setShowCohereKey] = useState(false)
   const [showAnthropicKey, setShowAnthropicKey] = useState(false)
   const [showDeepseekKey, setShowDeepseekKey] = useState(false)
   const [providerTests, setProviderTests] = useState<Record<string, { status: 'idle' | 'loading' | 'ok' | 'error'; message?: string }>>({})
@@ -215,6 +226,10 @@ export function SettingsPage() {
 
       // Load app settings (query defaults, KB defaults)
       const appSettings: AppSettings = await apiClient.getAppSettings()
+      const metadata = await apiClient.getSettingsMetadata()
+      setRerankProviders(metadata.rerank_providers || null)
+      setRerankModelsByProvider(metadata.rerank_models_by_provider || null)
+      setRerankPricingFormula(metadata.rerank_pricing_formula || null)
       if (appSettings.llm_model) setLlmModel(appSettings.llm_model)
       if (appSettings.llm_provider) setLlmProvider(appSettings.llm_provider)
       if (appSettings.temperature !== null) setTemperature(appSettings.temperature)
@@ -230,6 +245,12 @@ export function SettingsPage() {
       if (appSettings.bm25_min_should_match !== null) setBm25MinShouldMatch(appSettings.bm25_min_should_match)
       if (appSettings.bm25_use_phrase !== null) setBm25UsePhrase(appSettings.bm25_use_phrase)
       if (appSettings.bm25_analyzer) setBm25Analyzer(appSettings.bm25_analyzer)
+      if (appSettings.rerank_enabled !== null) setRerankEnabled(appSettings.rerank_enabled)
+      if (appSettings.rerank_provider !== null) setRerankProvider(appSettings.rerank_provider)
+      if (appSettings.rerank_model !== null) setRerankModel(appSettings.rerank_model)
+      if (appSettings.rerank_candidate_pool !== null) setRerankCandidatePool(appSettings.rerank_candidate_pool)
+      if (appSettings.rerank_top_n !== null) setRerankTopN(appSettings.rerank_top_n)
+      if (appSettings.rerank_min_score !== null) setRerankMinScore(appSettings.rerank_min_score)
       if (appSettings.structure_requests_per_minute !== null) {
         setStructureRequestsPerMinute(appSettings.structure_requests_per_minute)
       }
@@ -253,6 +274,7 @@ export function SettingsPage() {
       const systemSettings = await apiClient.getSystemSettings()
       if (systemSettings.openai_api_key) setOpenaiApiKey(systemSettings.openai_api_key)
       if (systemSettings.voyage_api_key) setVoyageApiKey(systemSettings.voyage_api_key)
+      if (systemSettings.cohere_api_key) setCohereApiKey(systemSettings.cohere_api_key)
       if (systemSettings.anthropic_api_key) setAnthropicApiKey(systemSettings.anthropic_api_key)
       if (systemSettings.deepseek_api_key) setDeepseekApiKey(systemSettings.deepseek_api_key)
       if (systemSettings.ollama_base_url) setOllamaBaseUrl(systemSettings.ollama_base_url)
@@ -620,6 +642,12 @@ export function SettingsPage() {
         bm25_min_should_match: bm25MinShouldMatch,
         bm25_use_phrase: bm25UsePhrase,
         bm25_analyzer: bm25Analyzer,
+        rerank_enabled: rerankEnabled,
+        rerank_provider: rerankProvider || null,
+        rerank_model: rerankModel || null,
+        rerank_candidate_pool: rerankCandidatePool,
+        rerank_top_n: rerankTopN,
+        rerank_min_score: rerankMinScore,
         structure_requests_per_minute: structureRequestsPerMinute,
         use_llm_chat_titles: useLlmChatTitles,
       })
@@ -844,6 +872,7 @@ export function SettingsPage() {
       // Only send values that were changed (not masked)
       if (openaiApiKey && !openaiApiKey.startsWith('*')) payload.openai_api_key = openaiApiKey
       if (voyageApiKey && !voyageApiKey.startsWith('*')) payload.voyage_api_key = voyageApiKey
+      if (cohereApiKey && !cohereApiKey.startsWith('*')) payload.cohere_api_key = cohereApiKey
       if (anthropicApiKey && !anthropicApiKey.startsWith('*')) payload.anthropic_api_key = anthropicApiKey
       if (deepseekApiKey && !deepseekApiKey.startsWith('*')) payload.deepseek_api_key = deepseekApiKey
       if (ollamaBaseUrl) payload.ollama_base_url = ollamaBaseUrl
@@ -1120,6 +1149,21 @@ export function SettingsPage() {
             setBm25UsePhrase={setBm25UsePhrase}
             bm25Analyzer={bm25Analyzer}
             setBm25Analyzer={setBm25Analyzer}
+            rerankEnabled={rerankEnabled}
+            setRerankEnabled={setRerankEnabled}
+            rerankProvider={rerankProvider}
+            setRerankProvider={setRerankProvider}
+            rerankModel={rerankModel}
+            setRerankModel={setRerankModel}
+            rerankCandidatePool={rerankCandidatePool}
+            setRerankCandidatePool={setRerankCandidatePool}
+            rerankTopN={rerankTopN}
+            setRerankTopN={setRerankTopN}
+            rerankMinScore={rerankMinScore}
+            setRerankMinScore={setRerankMinScore}
+            rerankProviders={rerankProviders ?? undefined}
+            rerankModelsByProvider={rerankModelsByProvider ?? undefined}
+            rerankPricingFormula={rerankPricingFormula ?? undefined}
             useStructure={useStructure}
             setUseStructure={setUseStructure}
             structureRequestsPerMinute={structureRequestsPerMinute}
@@ -1155,6 +1199,10 @@ export function SettingsPage() {
             setVoyageApiKey={setVoyageApiKey}
             showVoyageKey={showVoyageKey}
             setShowVoyageKey={setShowVoyageKey}
+            cohereApiKey={cohereApiKey}
+            setCohereApiKey={setCohereApiKey}
+            showCohereKey={showCohereKey}
+            setShowCohereKey={setShowCohereKey}
             anthropicApiKey={anthropicApiKey}
             setAnthropicApiKey={setAnthropicApiKey}
             showAnthropicKey={showAnthropicKey}
@@ -2189,6 +2237,30 @@ type QueryDefaultsTabProps = {
   setBm25UsePhrase: (value: boolean) => void
   bm25Analyzer: string
   setBm25Analyzer: (value: string) => void
+  rerankEnabled: boolean
+  setRerankEnabled: (value: boolean) => void
+  rerankProvider: string
+  setRerankProvider: (value: string) => void
+  rerankModel: string
+  setRerankModel: (value: string) => void
+  rerankCandidatePool: number
+  setRerankCandidatePool: (value: number) => void
+  rerankTopN: number
+  setRerankTopN: (value: number) => void
+  rerankMinScore: number
+  setRerankMinScore: (value: number) => void
+  rerankProviders?: Array<{ id: string; label: string }>
+  rerankModelsByProvider?: Record<
+    string,
+    Array<{
+      id: string
+      label: string
+      pricing_unit?: string
+      price_per_million_tokens_usd?: number
+      notes?: string
+    }>
+  >
+  rerankPricingFormula?: string
   useStructure: boolean
   setUseStructure: (value: boolean) => void
   structureRequestsPerMinute: number
@@ -2217,12 +2289,29 @@ function QueryDefaultsTab({
   bm25MinShouldMatch, setBm25MinShouldMatch,
   bm25UsePhrase, setBm25UsePhrase,
   bm25Analyzer, setBm25Analyzer,
+  rerankEnabled, setRerankEnabled,
+  rerankProvider, setRerankProvider,
+  rerankModel, setRerankModel,
+  rerankCandidatePool, setRerankCandidatePool,
+  rerankTopN, setRerankTopN,
+  rerankMinScore, setRerankMinScore,
+  rerankProviders,
+  rerankModelsByProvider,
+  rerankPricingFormula,
   useStructure, setUseStructure,
   structureRequestsPerMinute, setStructureRequestsPerMinute,
   useLlmChatTitles, setUseLlmChatTitles,
   opensearchAvailable,
   onSave, saving
 }: QueryDefaultsTabProps) {
+  const rerankProviderOptions = rerankProviders && rerankProviders.length > 0
+    ? rerankProviders
+    : [{ id: 'auto', label: 'Auto (recommended)' }, { id: 'voyage', label: 'Voyage' }]
+  const rerankProviderValue = rerankProvider || 'auto'
+  const rerankModelOptions =
+    (rerankModelsByProvider && rerankModelsByProvider[rerankProviderValue === 'auto' ? 'voyage' : rerankProviderValue]) || []
+  const rerankModelValue = rerankModel || (rerankModelOptions[0]?.id ?? 'rerank-2.5-lite')
+  const selectedRerankModelMeta = rerankModelOptions.find((m) => m.id === rerankModelValue)
 
   return (
     <div className="space-y-6">
@@ -2474,6 +2563,123 @@ function QueryDefaultsTab({
               </div>
             </>
           )}
+
+          <div className="mt-6 rounded-lg border border-gray-700 bg-gray-900/60 p-4">
+            <h4 className="text-sm font-semibold text-white">Reranking</h4>
+            <p className="mt-2 text-xs text-gray-500">
+              Optional second pass that reorders retrieved chunks before generation.
+            </p>
+
+            <div className="mt-3">
+              <label className="flex items-center gap-2 text-sm text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={rerankEnabled}
+                  onChange={(e) => setRerankEnabled(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
+                />
+                Enable reranking
+              </label>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Provider</label>
+                <select
+                  value={rerankProviderValue}
+                  onChange={(e) => setRerankProvider(e.target.value)}
+                  disabled={!rerankEnabled}
+                  className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100 disabled:opacity-50"
+                >
+                  {rerankProviderOptions.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Model</label>
+                <select
+                  value={rerankModelValue}
+                  onChange={(e) => setRerankModel(e.target.value)}
+                  disabled={!rerankEnabled}
+                  className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100 disabled:opacity-50"
+                >
+                  {rerankModelOptions.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Candidate pool: {rerankCandidatePool}
+                </label>
+                <input
+                  type="range"
+                  min="1"
+                  max="100"
+                  step="1"
+                  value={rerankCandidatePool}
+                  onChange={(e) => setRerankCandidatePool(parseInt(e.target.value))}
+                  disabled={!rerankEnabled}
+                  className="slider w-full disabled:opacity-50"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Keep top N: {rerankTopN}
+                </label>
+                <input
+                  type="range"
+                  min="1"
+                  max="100"
+                  step="1"
+                  value={rerankTopN}
+                  onChange={(e) => setRerankTopN(parseInt(e.target.value))}
+                  disabled={!rerankEnabled}
+                  className="slider w-full disabled:opacity-50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Min rerank score: {rerankMinScore.toFixed(2)}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={rerankMinScore}
+                  onChange={(e) => setRerankMinScore(parseFloat(e.target.value))}
+                  disabled={!rerankEnabled}
+                  className="slider w-full disabled:opacity-50"
+                />
+              </div>
+            </div>
+
+            {selectedRerankModelMeta && (
+              <div className="mt-4 rounded border border-gray-700 bg-gray-900 px-3 py-2 text-xs text-gray-300">
+                <div>
+                  Cost: ${selectedRerankModelMeta.price_per_million_tokens_usd?.toFixed(2) ?? 'n/a'} / 1M{' '}
+                  {selectedRerankModelMeta.pricing_unit ?? 'tokens'}
+                </div>
+                {rerankPricingFormula && (
+                  <div className="mt-1 text-gray-500">
+                    Token formula: {rerankPricingFormula}
+                  </div>
+                )}
+                {selectedRerankModelMeta.notes && (
+                  <div className="mt-1 text-gray-500">{selectedRerankModelMeta.notes}</div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

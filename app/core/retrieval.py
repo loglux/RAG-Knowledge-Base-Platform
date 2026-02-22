@@ -8,6 +8,7 @@ import logging
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
+import httpx
 from pydantic import BaseModel, Field
 
 from app.config import settings
@@ -526,23 +527,157 @@ class RetrievalEngine:
         self,
         query: str,
         chunks: List[RetrievedChunk],
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        min_score: Optional[float] = None,
     ) -> List[RetrievedChunk]:
         """
-        Re-rank retrieved chunks (placeholder for future implementation).
-
-        Could use cross-encoder or other re-ranking models.
+        Re-rank retrieved chunks using provider APIs (cross-encoders).
 
         Args:
             query: Original query
             chunks: Initial retrieved chunks
 
         Returns:
-            Re-ranked chunks
+            Re-ranked chunks. If provider call fails, original chunks are returned.
         """
-        # For MVP, just return chunks as-is
-        # Future: implement cross-encoder re-ranking
-        logger.debug("Re-ranking not implemented, returning original order")
-        return chunks
+        if not chunks:
+            return chunks
+        if not provider:
+            return chunks
+
+        provider_normalized = provider.strip().lower()
+        documents = [c.text for c in chunks]
+
+        try:
+            if provider_normalized == "voyage":
+                if not settings.VOYAGE_API_KEY:
+                    logger.warning("Skipping rerank: VOYAGE_API_KEY is missing")
+                    return chunks
+                ranked = await self._rerank_with_voyage(query=query, documents=documents, model=model)
+            elif provider_normalized == "cohere":
+                if not settings.COHERE_API_KEY:
+                    logger.warning("Skipping rerank: COHERE_API_KEY is missing")
+                    return chunks
+                ranked = await self._rerank_with_cohere(query=query, documents=documents, model=model)
+            else:
+                logger.warning("Unsupported rerank provider '%s'; skipping rerank", provider)
+                return chunks
+        except Exception as exc:
+            logger.warning("Rerank failed for provider=%s: %s", provider_normalized, exc)
+            return chunks
+
+        if not ranked:
+            logger.warning("Rerank returned empty results; falling back to original order")
+            return chunks
+
+        reranked_chunks: List[RetrievedChunk] = []
+        for index, score in ranked:
+            if index < 0 or index >= len(chunks):
+                continue
+            if min_score is not None and score < min_score:
+                continue
+            source = chunks[index]
+            metadata = dict(source.metadata or {})
+            metadata.update(
+                {
+                    "rerank_applied": True,
+                    "rerank_provider": provider_normalized,
+                    "rerank_model": model,
+                    "rerank_score": float(score),
+                    "pre_rerank_score": float(source.score),
+                }
+            )
+            reranked_chunks.append(
+                source.model_copy(
+                    update={
+                        "score": float(score),
+                        "metadata": metadata,
+                    }
+                )
+            )
+
+        if not reranked_chunks:
+            logger.info("Rerank applied but all results were filtered by min_score=%s", min_score)
+            return []
+
+        logger.info(
+            "Rerank applied: provider=%s model=%s input=%d output=%d min_score=%s",
+            provider_normalized,
+            model,
+            len(chunks),
+            len(reranked_chunks),
+            min_score,
+        )
+        return reranked_chunks
+
+    async def _rerank_with_voyage(
+        self,
+        *,
+        query: str,
+        documents: List[str],
+        model: Optional[str],
+    ) -> List[tuple[int, float]]:
+        rerank_model = model or "rerank-2.5-lite"
+        url = "https://api.voyageai.com/v1/rerank"
+        headers = {
+            "Authorization": f"Bearer {settings.VOYAGE_API_KEY}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "query": query,
+            "documents": documents,
+            "model": rerank_model,
+            "top_k": len(documents),
+            "truncation": True,
+        }
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            body = response.json()
+        results = body.get("data") or body.get("results") or []
+        ranked: List[tuple[int, float]] = []
+        for item in results:
+            idx = item.get("index")
+            score = item.get("relevance_score")
+            if isinstance(idx, int) and score is not None:
+                ranked.append((idx, float(score)))
+        ranked.sort(key=lambda x: x[1], reverse=True)
+        return ranked
+
+    async def _rerank_with_cohere(
+        self,
+        *,
+        query: str,
+        documents: List[str],
+        model: Optional[str],
+    ) -> List[tuple[int, float]]:
+        rerank_model = model or "rerank-v3.5"
+        url = "https://api.cohere.com/v2/rerank"
+        headers = {
+            "Authorization": f"Bearer {settings.COHERE_API_KEY}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        payload = {
+            "model": rerank_model,
+            "query": query,
+            "documents": documents,
+            "top_n": len(documents),
+        }
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            body = response.json()
+        results = body.get("results") or body.get("data") or []
+        ranked: List[tuple[int, float]] = []
+        for item in results:
+            idx = item.get("index")
+            score = item.get("relevance_score")
+            if isinstance(idx, int) and score is not None:
+                ranked.append((idx, float(score)))
+        ranked.sort(key=lambda x: x[1], reverse=True)
+        return ranked
 
 
 # Singleton instance

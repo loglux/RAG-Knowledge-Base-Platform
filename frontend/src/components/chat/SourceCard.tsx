@@ -26,6 +26,13 @@ export function SourceCard({ source, index, anchorPrefix }: SourceCardProps) {
   const denseScoreRaw = typeof metadata.dense_score_raw === 'number' ? metadata.dense_score_raw : null
   const lexicalScoreRaw = typeof metadata.lexical_score_raw === 'number' ? metadata.lexical_score_raw : null
   const combinedScore = typeof metadata.combined_score === 'number' ? metadata.combined_score : null
+  const rerankApplied = metadata.rerank_applied === true
+  const rerankProvider =
+    typeof metadata.rerank_provider === 'string' ? metadata.rerank_provider : null
+  const rerankModel = typeof metadata.rerank_model === 'string' ? metadata.rerank_model : null
+  const rerankScore = typeof metadata.rerank_score === 'number' ? metadata.rerank_score : null
+  const preRerankScore =
+    typeof metadata.pre_rerank_score === 'number' ? metadata.pre_rerank_score : null
 
   return (
     <div id={anchorId} className="panel p-3 text-sm scroll-mt-24">
@@ -43,11 +50,34 @@ export function SourceCard({ source, index, anchorPrefix }: SourceCardProps) {
         </div>
       </div>
 
-      {(sourceType || denseScoreRaw !== null || lexicalScoreRaw !== null || combinedScore !== null) && (
+      {(sourceType ||
+        denseScoreRaw !== null ||
+        lexicalScoreRaw !== null ||
+        combinedScore !== null ||
+        rerankApplied ||
+        rerankScore !== null ||
+        preRerankScore !== null) && (
         <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] text-gray-400">
           {sourceType && (
             <span className="rounded border border-gray-600 px-2 py-0.5">
               source: {sourceType}
+            </span>
+          )}
+          {rerankApplied && (
+            <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-emerald-300">
+              reranked
+              {rerankProvider ? `: ${rerankProvider}` : ''}
+              {rerankModel ? ` (${rerankModel})` : ''}
+            </span>
+          )}
+          {rerankScore !== null && (
+            <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-emerald-300">
+              rerank: {rerankScore.toFixed(3)}
+            </span>
+          )}
+          {preRerankScore !== null && (
+            <span className="rounded border border-gray-600 px-2 py-0.5">
+              pre: {preRerankScore.toFixed(3)}
             </span>
           )}
           {denseScoreRaw !== null && (

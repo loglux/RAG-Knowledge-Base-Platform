@@ -51,6 +51,7 @@ class SystemSettingsResponse(BaseModel):
     # API Keys (masked)
     openai_api_key: Optional[str] = Field(None, description="OpenAI API key (masked)")
     voyage_api_key: Optional[str] = Field(None, description="VoyageAI API key (masked)")
+    cohere_api_key: Optional[str] = Field(None, description="Cohere API key (masked)")
     anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key (masked)")
     deepseek_api_key: Optional[str] = Field(None, description="DeepSeek API key (masked)")
     ollama_base_url: Optional[str] = Field(None, description="Ollama API base URL")
@@ -93,6 +94,7 @@ class SystemSettingsUpdate(BaseModel):
     # API Keys
     openai_api_key: Optional[str] = Field(None, description="OpenAI API key")
     voyage_api_key: Optional[str] = Field(None, description="VoyageAI API key")
+    cohere_api_key: Optional[str] = Field(None, description="Cohere API key")
     anthropic_api_key: Optional[str] = Field(None, description="Anthropic API key")
     deepseek_api_key: Optional[str] = Field(None, description="DeepSeek API key")
     ollama_base_url: Optional[str] = Field(None, description="Ollama API base URL")
@@ -139,7 +141,9 @@ class PostgresPasswordUpdate(BaseModel):
 class ProviderTestRequest(BaseModel):
     """Test connectivity for a provider API key/base URL."""
 
-    provider: str = Field(..., description="Provider name: openai|anthropic|deepseek|voyage|ollama")
+    provider: str = Field(
+        ..., description="Provider name: openai|anthropic|cohere|deepseek|voyage|ollama"
+    )
     api_key: Optional[str] = Field(
         None, description="API key to test (optional, uses stored key if omitted)"
     )
@@ -181,6 +185,7 @@ async def _resolve_provider_key(
     key_map = {
         "openai": "openai_api_key",
         "anthropic": "anthropic_api_key",
+        "cohere": "cohere_api_key",
         "deepseek": "deepseek_api_key",
         "voyage": "voyage_api_key",
     }
@@ -205,6 +210,7 @@ async def get_system_settings(db: AsyncSession = Depends(get_db)):
         return SystemSettingsResponse(
             openai_api_key=_mask_sensitive(settings_dict.get("openai_api_key")),
             voyage_api_key=_mask_sensitive(settings_dict.get("voyage_api_key")),
+            cohere_api_key=_mask_sensitive(settings_dict.get("cohere_api_key")),
             anthropic_api_key=_mask_sensitive(settings_dict.get("anthropic_api_key")),
             deepseek_api_key=_mask_sensitive(settings_dict.get("deepseek_api_key")),
             ollama_base_url=settings_dict.get("ollama_base_url"),  # Not sensitive
@@ -285,6 +291,17 @@ async def update_system_settings(
                 value=payload.voyage_api_key,
                 category="api",
                 description="VoyageAI API key",
+                is_encrypted=False,
+            )
+            updated_count += 1
+
+        if payload.cohere_api_key is not None:
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="cohere_api_key",
+                value=payload.cohere_api_key,
+                category="api",
+                description="Cohere API key",
                 is_encrypted=False,
             )
             updated_count += 1
@@ -610,7 +627,7 @@ async def test_provider_key(
     db: AsyncSession = Depends(get_db),
 ):
     provider = (payload.provider or "").strip().lower()
-    if provider not in {"openai", "anthropic", "deepseek", "voyage", "ollama"}:
+    if provider not in {"openai", "anthropic", "cohere", "deepseek", "voyage", "ollama"}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported provider")
 
     api_key = await _resolve_provider_key(db, provider, payload.api_key)
@@ -643,6 +660,12 @@ async def test_provider_key(
         base = base_url or "https://api.deepseek.com"
         url = base.rstrip("/") + "/models"
         headers = {"Authorization": f"Bearer {api_key}"}
+    elif provider == "cohere":
+        url = "https://api.cohere.com/v1/models"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
+        }
     elif provider == "voyage":
         url = "https://api.voyageai.com/v1/embeddings"
         headers = {

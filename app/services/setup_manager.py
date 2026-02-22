@@ -126,6 +126,7 @@ class SetupManager:
         db: AsyncSession,
         openai_api_key: Optional[str] = None,
         voyage_api_key: Optional[str] = None,
+        cohere_api_key: Optional[str] = None,
         anthropic_api_key: Optional[str] = None,
         deepseek_api_key: Optional[str] = None,
         ollama_base_url: Optional[str] = None,
@@ -138,6 +139,7 @@ class SetupManager:
             db: Database session
             openai_api_key: OpenAI API key (optional)
             voyage_api_key: VoyageAI API key (optional)
+            cohere_api_key: Cohere API key (optional)
             anthropic_api_key: Anthropic API key (optional)
             deepseek_api_key: DeepSeek API key (optional)
             ollama_base_url: Ollama API base URL (optional)
@@ -179,6 +181,18 @@ class SetupManager:
                     value=anthropic_api_key,
                     category="api",
                     description="Anthropic API key for Claude models",
+                    is_encrypted=False,
+                    updated_by=updated_by,
+                )
+
+            # Save Cohere key
+            if cohere_api_key:
+                await SystemSettingsManager.save_setting(
+                    db=db,
+                    key="cohere_api_key",
+                    value=cohere_api_key,
+                    category="api",
+                    description="Cohere API key for reranking",
                     is_encrypted=False,
                     updated_by=updated_by,
                 )
