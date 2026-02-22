@@ -10,22 +10,22 @@ echo "✨ No .env file needed! All defaults are in docker-compose.yml"
 echo "   Change database password later via Setup Wizard"
 echo ""
 
-# Stop any running containers
-if [ "$(docker ps -q)" ]; then
-    echo "🛑 Stopping running containers..."
-    docker-compose down
+# Stop only this project stack if it is running
+if docker compose ps --status running 2>/dev/null | grep -q .; then
+    echo "🛑 Stopping current project containers..."
+    docker compose down
 fi
 
 # Start services
 echo "🐳 Starting Docker services..."
-docker-compose up -d --build
+docker compose up -d --build
 
 echo ""
 echo "⏳ Waiting for services to be ready (30 seconds)..."
 sleep 30
 
 # Check if services are running
-if docker-compose ps | grep -q "Up"; then
+if docker compose ps --status running | grep -q .; then
     echo ""
     echo "✅ Installation complete!"
     echo ""
@@ -39,13 +39,13 @@ if docker-compose ps | grep -q "Up"; then
     echo "   Complete Setup Wizard to configure API keys and settings"
     echo ""
     echo "📚 Useful commands:"
-    echo "   - View logs: docker-compose logs -f"
-    echo "   - Check status: docker-compose ps"
-    echo "   - Restart: docker-compose restart"
+    echo "   - View logs: docker compose logs -f"
+    echo "   - Check status: docker compose ps"
+    echo "   - Restart: docker compose restart"
     echo ""
 else
     echo ""
     echo "❌ Some services failed to start"
-    echo "Run 'docker-compose logs' to see errors"
+    echo "Run 'docker compose logs' to see errors"
     exit 1
 fi
