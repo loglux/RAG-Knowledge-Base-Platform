@@ -2,9 +2,11 @@
 
 import base64
 import hashlib
+import json
 import secrets
 from datetime import datetime, timedelta
 from typing import Optional
+from urllib.parse import urlparse
 
 import bcrypt
 from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
@@ -38,6 +40,65 @@ def _hash_code(code: str) -> str:
 def _s256_challenge(verifier: str) -> str:
     digest = hashlib.sha256(verifier.encode("utf-8")).digest()
     return base64.urlsafe_b64encode(digest).decode("utf-8").rstrip("=")
+
+
+def _parse_list_setting(raw: Optional[str]) -> list[str]:
+    if raw is None:
+        return []
+    raw = raw.strip()
+    if not raw:
+        return []
+    if raw.startswith("["):
+        try:
+            return [str(item).strip() for item in json.loads(raw) if str(item).strip()]
+        except Exception:
+            return []
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def _validate_redirect_uri_format(redirect_uri: str) -> None:
+    parsed = urlparse(redirect_uri)
+    if parsed.scheme not in {"https", "http"} or not parsed.netloc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid redirect_uri")
+    if parsed.fragment:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="redirect_uri must not contain fragment"
+        )
+    if parsed.scheme == "http":
+        host = (parsed.hostname or "").lower()
+        if host not in {"localhost", "127.0.0.1", "::1"}:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="HTTP redirect_uri is allowed only for localhost",
+            )
+
+
+async def _validate_oauth_client(db: AsyncSession, client_id: str, redirect_uri: str) -> None:
+    if not client_id or len(client_id) < 3 or len(client_id) > 128:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid client_id")
+
+    _validate_redirect_uri_format(redirect_uri)
+
+    allowed_clients = _parse_list_setting(
+        await SystemSettingsManager.get_setting(db, "mcp_oauth_allowed_client_ids")
+    )
+    if allowed_clients and client_id not in allowed_clients:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="OAuth client is not allowed"
+        )
+
+    allowed_redirect_uris = _parse_list_setting(
+        await SystemSettingsManager.get_setting(db, "mcp_oauth_allowed_redirect_uris")
+    )
+    if not allowed_redirect_uris:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OAuth redirect allowlist is not configured",
+        )
+    if redirect_uri not in allowed_redirect_uris:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="redirect_uri is not allowed"
+        )
 
 
 def _normalize_base_url(base_url: Optional[str], mcp_path: str) -> Optional[str]:
@@ -116,6 +177,7 @@ async def oauth_authorize_form(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported code_challenge_method"
         )
+    await _validate_oauth_client(db, client_id, redirect_uri)
 
     hidden = {
         "response_type": response_type,
@@ -168,6 +230,7 @@ async def oauth_authorize(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported code_challenge_method"
         )
+    await _validate_oauth_client(db, client_id, redirect_uri)
 
     mode = (await SystemSettingsManager.get_setting(db, "mcp_auth_mode") or "bearer").lower()
     if mode != "oauth2":
@@ -334,6 +397,7 @@ async def _handle_oauth_token(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Missing authorization_code parameters",
             )
+        await _validate_oauth_client(db, client_id, redirect_uri)
 
         code_hash = _hash_code(code)
         result = await db.execute(select(MCPAuthCode).where(MCPAuthCode.code_hash == code_hash))

@@ -33,7 +33,10 @@ from app.models.schemas import (
     RetrievalSettingsUpdate,
 )
 from app.services.chat_titles import build_conversation_title
-from app.services.retrieval_settings import load_kb_retrieval_settings, resolve_retrieval_settings
+from app.services.retrieval_settings import (
+    load_kb_retrieval_settings,
+    resolve_retrieval_settings_scoped_with_explain,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -271,12 +274,18 @@ async def _build_retrieval_settings_envelope(
     app_settings = settings_result.scalar_one_or_none()
 
     stored = load_kb_retrieval_settings(kb)
-    effective = resolve_retrieval_settings(kb=kb, app_settings=app_settings, overrides=None)
+    effective, explain = resolve_retrieval_settings_scoped_with_explain(
+        kb=kb,
+        app_settings=app_settings,
+        conversation_overrides=None,
+        request_overrides=None,
+    )
 
     stored_payload = RetrievalSettingsUpdate(**stored) if stored else None
     return RetrievalSettingsEnvelope(
         stored=stored_payload,
         effective=EffectiveRetrievalSettings(**effective),
+        explain=explain,
     )
 
 

@@ -340,6 +340,9 @@ class RetrievalSettingsEnvelope(BaseModel):
 
     stored: Optional[RetrievalSettingsUpdate] = Field(default=None)
     effective: EffectiveRetrievalSettings
+    explain: Optional[Dict[str, str]] = Field(
+        default=None, description="Per-field source for effective retrieval settings"
+    )
 
 
 class RetrieveRequest(RetrievalSettingsUpdate):

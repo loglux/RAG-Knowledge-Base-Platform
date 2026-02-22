@@ -36,6 +36,8 @@ RETRIEVAL_FIELDS = (
     "context_window",
 )
 
+ALL_RETRIEVAL_FIELDS = RETRIEVAL_FIELDS + BM25_FIELDS
+
 
 def _default_retrieval_settings() -> Dict[str, Any]:
     return {
@@ -64,6 +66,19 @@ def _apply_settings(
     for field in fields:
         if field in source and source[field] is not None:
             target[field] = source[field]
+
+
+def _apply_settings_with_source(
+    target: Dict[str, Any],
+    explain: Dict[str, str],
+    source: Dict[str, Any],
+    fields: tuple[str, ...],
+    source_name: str,
+) -> None:
+    for field in fields:
+        if field in source and source[field] is not None:
+            target[field] = source[field]
+            explain[field] = source_name
 
 
 def load_kb_retrieval_settings(kb: KnowledgeBaseModel) -> Dict[str, Any]:
@@ -99,7 +114,55 @@ def resolve_retrieval_settings(
       4) app settings
       5) hard defaults
     """
+    return resolve_retrieval_settings_scoped(
+        kb=kb,
+        app_settings=app_settings,
+        conversation_overrides=None,
+        request_overrides=overrides,
+    )
+
+
+def resolve_retrieval_settings_scoped(
+    *,
+    kb: KnowledgeBaseModel,
+    app_settings: Optional[AppSettingsModel],
+    conversation_overrides: Optional[Dict[str, Any]] = None,
+    request_overrides: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Resolve effective retrieval settings with explicit scope precedence.
+
+    Precedence (lowest -> highest):
+      1) hard defaults
+      2) app settings
+      3) KB dedicated BM25 columns
+      4) KB retrieval_settings_json
+      5) conversation overrides (chat scope only)
+      6) request overrides (current call)
+
+    Non-retrieval fields are ignored.
+    """
+    resolved, _ = resolve_retrieval_settings_scoped_with_explain(
+        kb=kb,
+        app_settings=app_settings,
+        conversation_overrides=conversation_overrides,
+        request_overrides=request_overrides,
+    )
+    return resolved
+
+
+def resolve_retrieval_settings_scoped_with_explain(
+    *,
+    kb: KnowledgeBaseModel,
+    app_settings: Optional[AppSettingsModel],
+    conversation_overrides: Optional[Dict[str, Any]] = None,
+    request_overrides: Optional[Dict[str, Any]] = None,
+) -> tuple[Dict[str, Any], Dict[str, str]]:
+    """
+    Same as resolve_retrieval_settings_scoped, but also returns per-field source map.
+    """
     resolved = _default_retrieval_settings()
+    explain: Dict[str, str] = {field: "defaults" for field in ALL_RETRIEVAL_FIELDS}
 
     if app_settings:
         app_values = {
@@ -116,7 +179,9 @@ def resolve_retrieval_settings(
             "bm25_use_phrase": app_settings.bm25_use_phrase,
             "bm25_analyzer": app_settings.bm25_analyzer,
         }
-        _apply_settings(resolved, app_values, RETRIEVAL_FIELDS + BM25_FIELDS)
+        _apply_settings_with_source(
+            resolved, explain, app_values, ALL_RETRIEVAL_FIELDS, "app_settings"
+        )
 
     kb_bm25 = {
         "bm25_match_mode": kb.bm25_match_mode,
@@ -124,15 +189,24 @@ def resolve_retrieval_settings(
         "bm25_use_phrase": kb.bm25_use_phrase,
         "bm25_analyzer": kb.bm25_analyzer,
     }
-    _apply_settings(resolved, kb_bm25, BM25_FIELDS)
+    _apply_settings_with_source(resolved, explain, kb_bm25, BM25_FIELDS, "kb_columns")
 
     kb_settings = load_kb_retrieval_settings(kb)
-    _apply_settings(resolved, kb_settings, RETRIEVAL_FIELDS + BM25_FIELDS)
+    _apply_settings_with_source(
+        resolved, explain, kb_settings, ALL_RETRIEVAL_FIELDS, "kb_retrieval_settings"
+    )
 
-    if overrides:
-        _apply_settings(resolved, overrides, RETRIEVAL_FIELDS + BM25_FIELDS)
+    if conversation_overrides:
+        _apply_settings_with_source(
+            resolved, explain, conversation_overrides, ALL_RETRIEVAL_FIELDS, "conversation_settings"
+        )
+
+    if request_overrides:
+        _apply_settings_with_source(
+            resolved, explain, request_overrides, ALL_RETRIEVAL_FIELDS, "request_overrides"
+        )
 
     if resolved.get("retrieval_mode") is None:
         resolved["retrieval_mode"] = RetrievalMode.DENSE
 
-    return resolved
+    return resolved, explain

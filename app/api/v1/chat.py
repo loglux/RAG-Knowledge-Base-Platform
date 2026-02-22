@@ -32,18 +32,15 @@ from app.models.schemas import (
 from app.services.chat_titles import build_conversation_title
 from app.services.prompts import get_active_chat_prompt
 from app.services.rag import RAGService, get_rag_service
+from app.services.retrieval_settings import (
+    BM25_FIELDS,
+    RETRIEVAL_FIELDS,
+    resolve_retrieval_settings_scoped,
+)
+from app.services.settings_resolution import parse_uuid_list, resolve_scoped_value
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-def _bm25_defaults() -> dict:
-    return {
-        "bm25_match_mode": app_settings.BM25_DEFAULT_MATCH_MODE,
-        "bm25_min_should_match": app_settings.BM25_DEFAULT_MIN_SHOULD_MATCH,
-        "bm25_use_phrase": app_settings.BM25_DEFAULT_USE_PHRASE,
-        "bm25_analyzer": app_settings.BM25_DEFAULT_ANALYZER,
-    }
 
 
 def _format_chat_error(exc: Exception) -> tuple[int, str]:
@@ -149,20 +146,34 @@ async def chat_query(
                 detail="Prompt templates are not configured. Please set an active prompt.",
             )
 
-        # Convert conversation history to dict format
-        history_dicts = None
-        use_history = request.use_conversation_history
-        history_limit = request.conversation_history_limit
-
-        if use_history is None and conversation and conversation.settings_json:
+        # Resolve conversation-level settings payload (if any)
+        conversation_settings_payload: dict = {}
+        if conversation and conversation.settings_json:
             try:
-                settings_payload = json.loads(conversation.settings_json)
-                if use_history is None:
-                    use_history = settings_payload.get("use_conversation_history")
-                if history_limit is None:
-                    history_limit = settings_payload.get("conversation_history_limit")
+                loaded = json.loads(conversation.settings_json)
+                if isinstance(loaded, dict):
+                    conversation_settings_payload = loaded
             except Exception:
-                pass
+                conversation_settings_payload = {}
+
+        request_payload = request.model_dump(exclude_unset=True, exclude_none=True)
+
+        # Resolve conversation history behavior
+        history_dicts = None
+        use_history = resolve_scoped_value(
+            key="use_conversation_history",
+            request_overrides=request_payload,
+            request_value=request.use_conversation_history,
+            conversation_overrides=conversation_settings_payload,
+            fallback=True,
+        )
+        history_limit = resolve_scoped_value(
+            key="conversation_history_limit",
+            request_overrides=request_payload,
+            request_value=request.conversation_history_limit,
+            conversation_overrides=conversation_settings_payload,
+            fallback=10,
+        )
 
         if use_history is None:
             use_history = True
@@ -189,64 +200,111 @@ async def chat_query(
                     {"role": msg.role, "content": msg.content} for msg in history_messages
                 ]
 
-        # Resolve BM25 settings (request > KB override > global defaults > hard defaults)
         settings_result = await db.execute(
             select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1)
         )
         app_settings_row = settings_result.scalar_one_or_none()
-        bm25_defaults = _bm25_defaults()
-
-        def _resolve_bm25(field: str):
-            req_val = getattr(request, field, None)
-            if req_val is not None:
-                return req_val
-            kb_val = getattr(kb, field, None)
-            if kb_val is not None:
-                return kb_val
-            if app_settings_row is not None:
-                app_val = getattr(app_settings_row, field, None)
-                if app_val is not None:
-                    return app_val
-            return bm25_defaults[field]
-
-        bm25_match_mode = _resolve_bm25("bm25_match_mode")
-        bm25_min_should_match = _resolve_bm25("bm25_min_should_match")
-        bm25_use_phrase = _resolve_bm25("bm25_use_phrase")
-        bm25_analyzer = _resolve_bm25("bm25_analyzer")
-        llm_provider = request.llm_provider or (
-            app_settings_row.llm_provider if app_settings_row else None
+        app_scope = (
+            {
+                "llm_provider": app_settings_row.llm_provider,
+                "llm_model": app_settings_row.llm_model,
+                "temperature": app_settings_row.temperature,
+            }
+            if app_settings_row
+            else {}
         )
-        llm_model = request.llm_model or (app_settings_row.llm_model if app_settings_row else None)
+
+        # Resolve retrieval settings via shared resolver used by /retrieve and MCP.
+        retrieval_fields = set(RETRIEVAL_FIELDS + BM25_FIELDS)
+        conversation_retrieval_overrides = {
+            key: value
+            for key, value in conversation_settings_payload.items()
+            if key in retrieval_fields and value is not None
+        }
+        request_retrieval_overrides = {
+            key: value for key, value in request_payload.items() if key in retrieval_fields
+        }
+        effective = resolve_retrieval_settings_scoped(
+            kb=kb,
+            app_settings=app_settings_row,
+            conversation_overrides=conversation_retrieval_overrides or None,
+            request_overrides=request_retrieval_overrides or None,
+        )
+
+        llm_provider = resolve_scoped_value(
+            key="llm_provider",
+            request_overrides=request_payload,
+            request_value=request.llm_provider,
+            conversation_overrides=conversation_settings_payload,
+            app_overrides=app_scope,
+            fallback=app_settings.LLM_PROVIDER,
+        )
+        llm_model = resolve_scoped_value(
+            key="llm_model",
+            request_overrides=request_payload,
+            request_value=request.llm_model,
+            conversation_overrides=conversation_settings_payload,
+            app_overrides=app_scope,
+            fallback=app_settings.OPENAI_CHAT_MODEL,
+        )
+        temperature = resolve_scoped_value(
+            key="temperature",
+            request_overrides=request_payload,
+            request_value=request.temperature,
+            conversation_overrides=conversation_settings_payload,
+            app_overrides=app_scope,
+            fallback=app_settings.OPENAI_TEMPERATURE,
+        )
+        use_self_check = resolve_scoped_value(
+            key="use_self_check",
+            request_overrides=request_payload,
+            request_value=request.use_self_check,
+            conversation_overrides=conversation_settings_payload,
+            fallback=False,
+        )
+
+        # Optional document filter inheritance from conversation settings.
+        # Explicit request.document_ids always has priority.
+        effective_document_ids = request.document_ids
+        if (
+            effective_document_ids is None
+            and conversation_settings_payload.get("use_document_filter")
+            and conversation_settings_payload.get("document_ids")
+        ):
+            parsed_doc_ids = parse_uuid_list(conversation_settings_payload.get("document_ids"))
+            effective_document_ids = parsed_doc_ids or None
 
         rag_response = await rag_service.query(
             question=request.question,
             collection_name=kb.collection_name,
             embedding_model=kb.embedding_model,  # Pass KB's embedding model
-            top_k=request.top_k,
-            retrieval_mode=request.retrieval_mode,
-            lexical_top_k=request.lexical_top_k,
-            dense_weight=request.hybrid_dense_weight,
-            lexical_weight=request.hybrid_lexical_weight,
-            bm25_match_mode=bm25_match_mode,
-            bm25_min_should_match=bm25_min_should_match,
-            bm25_use_phrase=bm25_use_phrase,
-            bm25_analyzer=bm25_analyzer,
-            temperature=request.temperature,
+            top_k=effective.get("top_k", 5),
+            retrieval_mode=effective.get("retrieval_mode"),
+            lexical_top_k=effective.get("lexical_top_k"),
+            dense_weight=effective.get("hybrid_dense_weight", 0.6),
+            lexical_weight=effective.get("hybrid_lexical_weight", 0.4),
+            bm25_match_mode=effective.get("bm25_match_mode"),
+            bm25_min_should_match=effective.get("bm25_min_should_match"),
+            bm25_use_phrase=effective.get("bm25_use_phrase"),
+            bm25_analyzer=effective.get("bm25_analyzer"),
+            temperature=temperature,
             max_tokens=request.max_tokens,
-            max_context_chars=request.max_context_chars,
-            score_threshold=request.score_threshold,
+            max_context_chars=effective.get("max_context_chars"),
+            score_threshold=effective.get("score_threshold"),
             llm_model=llm_model,
             llm_provider=llm_provider,
             conversation_history=history_dicts,
-            use_structure=request.use_structure,
-            use_mmr=request.use_mmr,
-            mmr_diversity=request.mmr_diversity,
-            use_self_check=request.use_self_check,
+            use_structure=effective.get("use_structure", False),
+            use_mmr=effective.get("use_mmr", False),
+            mmr_diversity=effective.get("mmr_diversity", 0.5),
+            use_self_check=bool(use_self_check),
             document_ids=(
-                [str(doc_id) for doc_id in request.document_ids] if request.document_ids else None
+                [str(doc_id) for doc_id in effective_document_ids]
+                if effective_document_ids
+                else None
             ),
-            context_expansion=request.context_expansion,
-            context_window=request.context_window,
+            context_expansion=effective.get("context_expansion"),
+            context_window=effective.get("context_window"),
             db=db,
             kb_id=request.knowledge_base_id,
         )
@@ -254,26 +312,28 @@ async def chat_query(
         # 5. Ensure conversation exists (create if needed)
         if conversation is None:
             settings_payload = {
-                "top_k": request.top_k,
-                "temperature": request.temperature,
-                "max_context_chars": request.max_context_chars,
-                "score_threshold": request.score_threshold,
+                "top_k": effective.get("top_k", 5),
+                "temperature": temperature,
+                "max_context_chars": effective.get("max_context_chars"),
+                "score_threshold": effective.get("score_threshold"),
                 "llm_model": llm_model,
                 "llm_provider": llm_provider,
-                "use_structure": request.use_structure,
-                "retrieval_mode": request.retrieval_mode,
-                "lexical_top_k": request.lexical_top_k,
-                "hybrid_dense_weight": request.hybrid_dense_weight,
-                "hybrid_lexical_weight": request.hybrid_lexical_weight,
-                "bm25_match_mode": bm25_match_mode,
-                "bm25_min_should_match": bm25_min_should_match,
-                "bm25_use_phrase": bm25_use_phrase,
-                "bm25_analyzer": bm25_analyzer,
-                "use_mmr": request.use_mmr,
-                "mmr_diversity": request.mmr_diversity,
-                "use_self_check": request.use_self_check,
-                "context_expansion": request.context_expansion,
-                "context_window": request.context_window,
+                "use_structure": effective.get("use_structure", False),
+                "retrieval_mode": effective.get("retrieval_mode"),
+                "lexical_top_k": effective.get("lexical_top_k"),
+                "hybrid_dense_weight": effective.get("hybrid_dense_weight", 0.6),
+                "hybrid_lexical_weight": effective.get("hybrid_lexical_weight", 0.4),
+                "bm25_match_mode": effective.get("bm25_match_mode"),
+                "bm25_min_should_match": effective.get("bm25_min_should_match"),
+                "bm25_use_phrase": effective.get("bm25_use_phrase"),
+                "bm25_analyzer": effective.get("bm25_analyzer"),
+                "use_mmr": effective.get("use_mmr", False),
+                "mmr_diversity": effective.get("mmr_diversity", 0.5),
+                "use_self_check": bool(use_self_check),
+                "use_conversation_history": bool(use_history),
+                "conversation_history_limit": history_limit,
+                "context_expansion": effective.get("context_expansion"),
+                "context_window": effective.get("context_window"),
             }
             conversation = ConversationModel(
                 knowledge_base_id=request.knowledge_base_id,
@@ -292,34 +352,34 @@ async def chat_query(
                     existing_settings = {}
             existing_settings.update(
                 {
-                    "top_k": request.top_k,
-                    "temperature": request.temperature,
-                    "max_context_chars": request.max_context_chars,
-                    "score_threshold": request.score_threshold,
-                    "llm_model": request.llm_model,
-                    "llm_provider": request.llm_provider,
-                    "use_structure": request.use_structure,
-                    "retrieval_mode": request.retrieval_mode,
-                    "lexical_top_k": request.lexical_top_k,
-                    "hybrid_dense_weight": request.hybrid_dense_weight,
-                    "hybrid_lexical_weight": request.hybrid_lexical_weight,
-                    "bm25_match_mode": bm25_match_mode,
-                    "bm25_min_should_match": bm25_min_should_match,
-                    "bm25_use_phrase": bm25_use_phrase,
-                    "bm25_analyzer": bm25_analyzer,
-                    "use_mmr": request.use_mmr,
-                    "mmr_diversity": request.mmr_diversity,
-                    "use_self_check": request.use_self_check,
-                    "use_conversation_history": request.use_conversation_history,
-                    "conversation_history_limit": request.conversation_history_limit,
-                    "use_document_filter": request.use_document_filter,
+                    "top_k": effective.get("top_k", 5),
+                    "temperature": temperature,
+                    "max_context_chars": effective.get("max_context_chars"),
+                    "score_threshold": effective.get("score_threshold"),
+                    "llm_model": llm_model,
+                    "llm_provider": llm_provider,
+                    "use_structure": effective.get("use_structure", False),
+                    "retrieval_mode": effective.get("retrieval_mode"),
+                    "lexical_top_k": effective.get("lexical_top_k"),
+                    "hybrid_dense_weight": effective.get("hybrid_dense_weight", 0.6),
+                    "hybrid_lexical_weight": effective.get("hybrid_lexical_weight", 0.4),
+                    "bm25_match_mode": effective.get("bm25_match_mode"),
+                    "bm25_min_should_match": effective.get("bm25_min_should_match"),
+                    "bm25_use_phrase": effective.get("bm25_use_phrase"),
+                    "bm25_analyzer": effective.get("bm25_analyzer"),
+                    "use_mmr": effective.get("use_mmr", False),
+                    "mmr_diversity": effective.get("mmr_diversity", 0.5),
+                    "use_self_check": bool(use_self_check),
+                    "use_conversation_history": bool(use_history),
+                    "conversation_history_limit": history_limit,
+                    "use_document_filter": bool(effective_document_ids),
                     "document_ids": (
-                        [str(doc_id) for doc_id in request.document_ids]
-                        if request.document_ids
+                        [str(doc_id) for doc_id in effective_document_ids]
+                        if effective_document_ids
                         else None
                     ),
-                    "context_expansion": request.context_expansion,
-                    "context_window": request.context_window,
+                    "context_expansion": effective.get("context_expansion"),
+                    "context_window": effective.get("context_window"),
                 }
             )
             conversation.settings_json = json.dumps(existing_settings)
@@ -402,9 +462,9 @@ async def chat_query(
             user_message_id=user_message.id,
             assistant_message_id=assistant_message.id,
             prompt_version_id=rag_response.prompt_version_id,
-            use_mmr=request.use_mmr if request.use_mmr else None,
-            mmr_diversity=request.mmr_diversity if request.use_mmr else None,
-            use_self_check=request.use_self_check if request.use_self_check else None,
+            use_mmr=effective.get("use_mmr") if effective.get("use_mmr") else None,
+            mmr_diversity=effective.get("mmr_diversity") if effective.get("use_mmr") else None,
+            use_self_check=bool(use_self_check) if use_self_check else None,
         )
 
         logger.info(

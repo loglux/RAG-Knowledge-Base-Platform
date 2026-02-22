@@ -1,6 +1,7 @@
 """Setup wizard business logic."""
 
 import logging
+import re
 import secrets
 import string
 from datetime import datetime
@@ -30,6 +31,8 @@ class SetupAlreadyCompleteError(SetupError):
 
 class SetupManager:
     """Manager for system setup wizard."""
+
+    _PG_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}$")
 
     @staticmethod
     def hash_password(password: str) -> str:
@@ -152,7 +155,7 @@ class SetupManager:
                     value=openai_api_key,
                     category="api",
                     description="OpenAI API key for embeddings and chat",
-                    is_encrypted=False,  # No encryption in MVP
+                    is_encrypted=False,
                     updated_by=updated_by,
                 )
 
@@ -512,11 +515,13 @@ class SetupManager:
             SetupError: If password change fails
         """
         try:
-            # Execute ALTER USER command
-            # Escape single quotes in password by doubling them (SQL standard)
-            escaped_password = new_password.replace("'", "''")
-            alter_query = text(f"ALTER USER {username} WITH PASSWORD '{escaped_password}'")
-            await db.execute(alter_query)
+            username = (username or "").strip()
+            if not SetupManager._PG_IDENTIFIER_RE.fullmatch(username):
+                raise SetupError("Invalid PostgreSQL username format")
+
+            # Validate identifier with strict allowlist and bind password as parameter.
+            alter_query = text(f'ALTER USER "{username}" WITH PASSWORD :password')
+            await db.execute(alter_query, {"password": new_password})
             await db.commit()
 
             # Get current DATABASE_URL from config

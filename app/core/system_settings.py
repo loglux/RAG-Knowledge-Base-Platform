@@ -1,12 +1,16 @@
 """System settings manager - loads configuration from database."""
 
+import base64
+import hashlib
 import logging
 from datetime import datetime
 from typing import Any, Dict, Optional
 
+from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models.database import SystemSettings
 
 logger = logging.getLogger(__name__)
@@ -14,6 +18,15 @@ logger = logging.getLogger(__name__)
 
 class SystemSettingsManager:
     """Manager for system settings stored in database."""
+
+    SENSITIVE_KEYS = {
+        "openai_api_key",
+        "voyage_api_key",
+        "anthropic_api_key",
+        "deepseek_api_key",
+        "qdrant_api_key",
+        "opensearch_password",
+    }
 
     # Settings that can be loaded from database
     # (DATABASE_URL always comes from env/secret to avoid circular dependency)
@@ -32,6 +45,8 @@ class SystemSettingsManager:
         "mcp_auth_mode": "MCP_AUTH_MODE",
         "mcp_access_token_ttl_minutes": "MCP_ACCESS_TOKEN_TTL_MINUTES",
         "mcp_refresh_token_ttl_days": "MCP_REFRESH_TOKEN_TTL_DAYS",
+        "mcp_oauth_allowed_redirect_uris": "MCP_OAUTH_ALLOWED_REDIRECT_URIS",
+        "mcp_oauth_allowed_client_ids": "MCP_OAUTH_ALLOWED_CLIENT_IDS",
         # Database URLs
         "qdrant_url": "QDRANT_URL",
         "qdrant_api_key": "QDRANT_API_KEY",
@@ -62,8 +77,10 @@ class SystemSettingsManager:
 
             settings_dict = {}
             for setting in settings:
-                # For now, we don't decrypt (no encryption in MVP)
-                settings_dict[setting.key] = setting.value
+                value = setting.value
+                if setting.is_encrypted and value:
+                    value = SystemSettingsManager._decrypt_value(value, setting.key)
+                settings_dict[setting.key] = value
 
             logger.info(f"Loaded {len(settings_dict)} settings from database")
             return settings_dict
@@ -137,26 +154,31 @@ class SystemSettingsManager:
         """
         if isinstance(value, str):
             value = value.strip()
+        should_encrypt = is_encrypted or key in SystemSettingsManager.SENSITIVE_KEYS
+        stored_value = value
+        if should_encrypt and value:
+            stored_value = SystemSettingsManager._encrypt_value(value)
+
         # Check if setting exists
         result = await db.execute(select(SystemSettings).where(SystemSettings.key == key))
         setting = result.scalar_one_or_none()
 
         if setting:
             # Update existing
-            setting.value = value
+            setting.value = stored_value
             setting.category = category
             setting.description = description
-            setting.is_encrypted = is_encrypted
+            setting.is_encrypted = should_encrypt
             setting.updated_by = updated_by
             setting.updated_at = datetime.utcnow()
         else:
             # Create new
             setting = SystemSettings(
                 key=key,
-                value=value,
+                value=stored_value,
                 category=category,
                 description=description,
-                is_encrypted=is_encrypted,
+                is_encrypted=should_encrypt,
                 updated_by=updated_by,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
@@ -184,12 +206,38 @@ class SystemSettingsManager:
         try:
             result = await db.execute(select(SystemSettings).where(SystemSettings.key == key))
             setting = result.scalar_one_or_none()
-
-            return setting.value if setting else None
+            if not setting:
+                return None
+            if setting.is_encrypted and setting.value:
+                return SystemSettingsManager._decrypt_value(setting.value, setting.key)
+            return setting.value
 
         except Exception as e:
             logger.warning(f"Failed to get setting '{key}': {e}")
             return None
+
+    @staticmethod
+    def _build_fernet() -> Fernet:
+        """
+        Derive a deterministic Fernet key from application SECRET_KEY.
+        """
+        digest = hashlib.sha256(settings.SECRET_KEY.encode("utf-8")).digest()
+        key = base64.urlsafe_b64encode(digest)
+        return Fernet(key)
+
+    @staticmethod
+    def _encrypt_value(value: str) -> str:
+        token = SystemSettingsManager._build_fernet().encrypt(value.encode("utf-8"))
+        return token.decode("utf-8")
+
+    @staticmethod
+    def _decrypt_value(value: str, key_name: str) -> str:
+        try:
+            plaintext = SystemSettingsManager._build_fernet().decrypt(value.encode("utf-8"))
+            return plaintext.decode("utf-8")
+        except InvalidToken:
+            logger.warning("Failed to decrypt setting '%s': invalid token", key_name)
+            return value
 
     @staticmethod
     async def ensure_defaults(

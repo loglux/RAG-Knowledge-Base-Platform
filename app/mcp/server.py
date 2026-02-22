@@ -16,7 +16,11 @@ from app.models.database import AppSettings as AppSettingsModel
 from app.models.database import Document as DocumentModel
 from app.models.database import KnowledgeBase as KnowledgeBaseModel
 from app.services.rag import get_rag_service
-from app.services.retrieval_settings import load_kb_retrieval_settings, resolve_retrieval_settings
+from app.services.retrieval_settings import (
+    load_kb_retrieval_settings,
+    resolve_retrieval_settings,
+    resolve_retrieval_settings_scoped_with_explain,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +32,7 @@ MCP_TOOL_NAMES = [
     "get_kb_retrieval_settings",
     "set_kb_retrieval_settings",
     "clear_kb_retrieval_settings",
+    "get_kb_effective_settings",
 ]
 
 
@@ -300,7 +305,12 @@ def build_mcp_app() -> FastMCP:
             )
             app_settings = settings_result.scalar_one_or_none()
             stored = load_kb_retrieval_settings(kb)
-            effective = resolve_retrieval_settings(kb=kb, app_settings=app_settings, overrides=None)
+            effective, explain = resolve_retrieval_settings_scoped_with_explain(
+                kb=kb,
+                app_settings=app_settings,
+                conversation_overrides=None,
+                request_overrides=None,
+            )
 
         payload = {
             "stored": stored,
@@ -339,6 +349,86 @@ def build_mcp_app() -> FastMCP:
             kb.retrieval_settings_json = None
             await db.commit()
         return "OK"
+
+    @mcp.tool()
+    async def get_kb_effective_settings(knowledge_base_id: str) -> str:
+        """Return KB configuration and effective retrieval settings."""
+        disabled = await _ensure_tool_enabled("get_kb_effective_settings")
+        if disabled:
+            return disabled
+
+        async with get_db_session() as db:
+            kb = await _get_kb(db, knowledge_base_id)
+            if not kb:
+                return "Error: knowledge_base_id is required."
+
+            settings_result = await db.execute(
+                select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1)
+            )
+            app_settings = settings_result.scalar_one_or_none()
+
+            stored = load_kb_retrieval_settings(kb)
+            effective, explain = resolve_retrieval_settings_scoped_with_explain(
+                kb=kb,
+                app_settings=app_settings,
+                conversation_overrides=None,
+                request_overrides=None,
+            )
+
+            payload = {
+                "knowledge_base": {
+                    "id": str(kb.id),
+                    "name": kb.name,
+                    "collection_name": kb.collection_name,
+                    "embedding_model": kb.embedding_model,
+                    "embedding_provider": kb.embedding_provider,
+                    "embedding_dimension": kb.embedding_dimension,
+                    "chunk_size": kb.chunk_size,
+                    "chunk_overlap": kb.chunk_overlap,
+                    "chunking_strategy": (
+                        kb.chunking_strategy.value
+                        if hasattr(kb.chunking_strategy, "value")
+                        else str(kb.chunking_strategy)
+                    ),
+                    "upsert_batch_size": kb.upsert_batch_size,
+                    "structure_llm_model": kb.structure_llm_model,
+                    "use_llm_chat_titles": kb.use_llm_chat_titles,
+                    "document_count": kb.document_count,
+                    "total_chunks": kb.total_chunks,
+                },
+                "retrieval": {
+                    "stored": stored,
+                    "effective": effective,
+                    "explain": explain,
+                },
+                "app_defaults": (
+                    {
+                        "llm_model": app_settings.llm_model,
+                        "llm_provider": app_settings.llm_provider,
+                        "temperature": app_settings.temperature,
+                        "top_k": app_settings.top_k,
+                        "max_context_chars": app_settings.max_context_chars,
+                        "score_threshold": app_settings.score_threshold,
+                        "use_structure": app_settings.use_structure,
+                        "retrieval_mode": app_settings.retrieval_mode,
+                        "lexical_top_k": app_settings.lexical_top_k,
+                        "hybrid_dense_weight": app_settings.hybrid_dense_weight,
+                        "hybrid_lexical_weight": app_settings.hybrid_lexical_weight,
+                        "bm25_match_mode": app_settings.bm25_match_mode,
+                        "bm25_min_should_match": app_settings.bm25_min_should_match,
+                        "bm25_use_phrase": app_settings.bm25_use_phrase,
+                        "bm25_analyzer": app_settings.bm25_analyzer,
+                        "kb_chunk_size": app_settings.kb_chunk_size,
+                        "kb_chunk_overlap": app_settings.kb_chunk_overlap,
+                        "kb_upsert_batch_size": app_settings.kb_upsert_batch_size,
+                        "use_llm_chat_titles": app_settings.use_llm_chat_titles,
+                    }
+                    if app_settings
+                    else None
+                ),
+            }
+
+        return json.dumps(payload, ensure_ascii=False, indent=2)
 
     return mcp
 

@@ -201,6 +201,7 @@ class Settings(BaseSettings):
             "get_kb_retrieval_settings",
             "set_kb_retrieval_settings",
             "clear_kb_retrieval_settings",
+            "get_kb_effective_settings",
         ],
         description="Enabled MCP tool names",
     )

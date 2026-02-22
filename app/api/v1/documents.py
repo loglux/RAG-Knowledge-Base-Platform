@@ -700,7 +700,7 @@ async def analyze_document_structure(
         if "rate_limit_error" in error_msg or "Error code: 429" in error_msg:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Analysis failed: Rate limit exceeded. Please wait a moment and try again. {error_msg}",
+                detail="Analysis failed: Rate limit exceeded. Please wait and try again.",
             )
 
         # Check for other API errors that should be passed through
@@ -711,11 +711,13 @@ async def analyze_document_structure(
             match = re.search(r"Error code: (\d+)", error_msg)
             if match:
                 error_code = int(match.group(1))
-                raise HTTPException(status_code=error_code, detail=f"Analysis failed: {error_msg}")
+                raise HTTPException(
+                    status_code=error_code, detail="Analysis failed by upstream provider"
+                )
 
         # Generic server error for unexpected issues
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Analysis failed: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Analysis failed"
         )
 
 
@@ -760,7 +762,7 @@ async def apply_document_structure(
         logger.error(f"Failed to apply structure for document {doc_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to apply structure: {str(e)}",
+            detail="Failed to apply structure",
         )
 
 

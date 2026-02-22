@@ -68,6 +68,12 @@ class SystemSettingsResponse(BaseModel):
     mcp_refresh_token_ttl_days: Optional[int] = Field(
         None, description="MCP OAuth refresh token TTL (days)"
     )
+    mcp_oauth_allowed_redirect_uris: Optional[list[str]] = Field(
+        None, description="Allowed OAuth redirect URIs"
+    )
+    mcp_oauth_allowed_client_ids: Optional[list[str]] = Field(
+        None, description="Allowed OAuth client IDs"
+    )
 
     # Database URLs
     qdrant_url: Optional[str] = Field(None, description="Qdrant URL")
@@ -103,6 +109,12 @@ class SystemSettingsUpdate(BaseModel):
     )
     mcp_refresh_token_ttl_days: Optional[int] = Field(
         None, description="MCP OAuth refresh token TTL (days)"
+    )
+    mcp_oauth_allowed_redirect_uris: Optional[list[str]] = Field(
+        None, description="Allowed OAuth redirect URIs"
+    )
+    mcp_oauth_allowed_client_ids: Optional[list[str]] = Field(
+        None, description="Allowed OAuth client IDs"
     )
 
     # Database URLs
@@ -212,6 +224,12 @@ async def get_system_settings(db: AsyncSession = Depends(get_db)):
                 if settings_dict.get("mcp_refresh_token_ttl_days") is not None
                 else None
             ),
+            mcp_oauth_allowed_redirect_uris=_coerce_list(
+                settings_dict.get("mcp_oauth_allowed_redirect_uris")
+            ),
+            mcp_oauth_allowed_client_ids=_coerce_list(
+                settings_dict.get("mcp_oauth_allowed_client_ids")
+            ),
             qdrant_url=settings_dict.get("qdrant_url"),
             qdrant_api_key=_mask_sensitive(settings_dict.get("qdrant_api_key")),
             opensearch_url=settings_dict.get("opensearch_url"),
@@ -229,7 +247,7 @@ async def get_system_settings(db: AsyncSession = Depends(get_db)):
         logger.error(f"Failed to get system settings: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get system settings: {str(e)}",
+            detail="Failed to get system settings",
         )
 
 
@@ -402,6 +420,34 @@ async def update_system_settings(
             updated_count += 1
             mcp_updated = True
 
+        if payload.mcp_oauth_allowed_redirect_uris is not None:
+            import json
+
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="mcp_oauth_allowed_redirect_uris",
+                value=json.dumps(payload.mcp_oauth_allowed_redirect_uris),
+                category="mcp",
+                description="Allowed OAuth redirect URIs",
+                is_encrypted=False,
+            )
+            updated_count += 1
+            mcp_updated = True
+
+        if payload.mcp_oauth_allowed_client_ids is not None:
+            import json
+
+            await SystemSettingsManager.save_setting(
+                db=db,
+                key="mcp_oauth_allowed_client_ids",
+                value=json.dumps(payload.mcp_oauth_allowed_client_ids),
+                category="mcp",
+                description="Allowed OAuth client IDs",
+                is_encrypted=False,
+            )
+            updated_count += 1
+            mcp_updated = True
+
         # Update database URLs
         if payload.qdrant_url is not None:
             await SystemSettingsManager.save_setting(
@@ -522,7 +568,7 @@ async def update_system_settings(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update system settings: {str(e)}",
+            detail="Failed to update system settings",
         )
 
 
@@ -554,7 +600,7 @@ async def change_postgres_password(
         logger.error(f"Failed to change PostgreSQL password: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to change PostgreSQL password: {str(e)}",
+            detail="Failed to change PostgreSQL password",
         )
 
 

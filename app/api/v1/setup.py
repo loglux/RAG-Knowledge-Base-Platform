@@ -4,16 +4,39 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.system_settings import SystemSettingsManager
 from app.db.session import get_db
+from app.dependencies import get_current_user
 from app.services.setup_manager import SetupError, SetupManager
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/setup", tags=["setup"])
+_bearer = HTTPBearer(auto_error=False)
+
+
+async def require_setup_write_access(
+    db: AsyncSession = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> int | None:
+    """
+    Guard for setup mutation endpoints.
+
+    - Before setup completion: allow unauthenticated setup flow.
+    - After setup completion: require valid admin bearer token.
+    """
+    is_complete = await SystemSettingsManager.is_setup_complete(db)
+    if not is_complete:
+        return None
+
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+    return await get_current_user(credentials)
 
 
 # Pydantic schemas
@@ -96,12 +119,16 @@ async def get_setup_status(db: AsyncSession = Depends(get_db)):
         logger.error(f"Failed to get setup status: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get setup status: {str(e)}",
+            detail="Failed to get setup status",
         )
 
 
 @router.post("/admin")
-async def create_admin_user(request: AdminCreateRequest, db: AsyncSession = Depends(get_db)):
+async def create_admin_user(
+    request: AdminCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    _: int | None = Depends(require_setup_write_access),
+):
     """
     Create initial admin user.
 
@@ -142,7 +169,7 @@ async def create_admin_user(request: AdminCreateRequest, db: AsyncSession = Depe
         logger.error(f"Failed to create admin user: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create admin user: {str(e)}",
+            detail="Failed to create admin user",
         )
 
 
@@ -167,13 +194,15 @@ async def generate_password_preview():
         logger.error(f"Failed to generate password: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate password: {str(e)}",
+            detail="Failed to generate password",
         )
 
 
 @router.post("/postgres-password", response_model=PostgresPasswordResponse)
 async def change_postgres_password(
-    request: PostgresPasswordRequest, db: AsyncSession = Depends(get_db)
+    request: PostgresPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    _: int | None = Depends(require_setup_write_access),
 ):
     """
     Change PostgreSQL password or generate a new secure password.
@@ -218,12 +247,16 @@ async def change_postgres_password(
         logger.error(f"Failed to change PostgreSQL password: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to change PostgreSQL password: {str(e)}",
+            detail="Failed to change PostgreSQL password",
         )
 
 
 @router.post("/api-keys")
-async def save_api_keys(request: APIKeysRequest, db: AsyncSession = Depends(get_db)):
+async def save_api_keys(
+    request: APIKeysRequest,
+    db: AsyncSession = Depends(get_db),
+    _: int | None = Depends(require_setup_write_access),
+):
     """
     Save API keys for external services.
 
@@ -266,13 +299,15 @@ async def save_api_keys(request: APIKeysRequest, db: AsyncSession = Depends(get_
         logger.error(f"Failed to save API keys: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to save API keys: {str(e)}",
+            detail="Failed to save API keys",
         )
 
 
 @router.post("/database")
 async def save_database_settings(
-    request: DatabaseSettingsRequest, db: AsyncSession = Depends(get_db)
+    request: DatabaseSettingsRequest,
+    db: AsyncSession = Depends(get_db),
+    _: int | None = Depends(require_setup_write_access),
 ):
     """
     Save database connection settings.
@@ -298,12 +333,16 @@ async def save_database_settings(
         logger.error(f"Failed to save database settings: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to save database settings: {str(e)}",
+            detail="Failed to save database settings",
         )
 
 
 @router.post("/system")
-async def save_system_settings(request: SystemSettingsRequest, db: AsyncSession = Depends(get_db)):
+async def save_system_settings(
+    request: SystemSettingsRequest,
+    db: AsyncSession = Depends(get_db),
+    _: int | None = Depends(require_setup_write_access),
+):
     """
     Save general system settings.
 
@@ -327,12 +366,16 @@ async def save_system_settings(request: SystemSettingsRequest, db: AsyncSession 
         logger.error(f"Failed to save system settings: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to save system settings: {str(e)}",
+            detail="Failed to save system settings",
         )
 
 
 @router.post("/complete")
-async def complete_setup(request: SetupCompleteRequest, db: AsyncSession = Depends(get_db)):
+async def complete_setup(
+    request: SetupCompleteRequest,
+    db: AsyncSession = Depends(get_db),
+    _: int | None = Depends(require_setup_write_access),
+):
     """
     Mark setup as complete.
 
@@ -371,5 +414,5 @@ async def complete_setup(request: SetupCompleteRequest, db: AsyncSession = Depen
         logger.error(f"Failed to complete setup: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to complete setup: {str(e)}",
+            detail="Failed to complete setup",
         )
