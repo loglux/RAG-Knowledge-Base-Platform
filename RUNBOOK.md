@@ -29,6 +29,15 @@ These are local conventions only—ports can be changed if needed (including the
 - Health: `http://<host>:8004/api/v1/health`
 - OpenSearch: `http://<host>:9200`
 
+### Critical: Docker port binding for NAS + router nginx
+
+For this deployment, service ports that must be reachable from LAN/router **must not** be bound to loopback.
+
+- Correct: `0.0.0.0:PORT:PORT`
+- Wrong for this setup: `127.0.0.1:PORT:PORT`
+
+If `db/qdrant/opensearch` are bound to `127.0.0.1`, external reverse proxy paths can fail with `502 Bad Gateway` even when containers look healthy locally.
+
 ---
 
 ## 3) Stack (Docker)
@@ -146,6 +155,12 @@ curl -s http://<host>:8004/api/v1/knowledge-bases/
 3) Frontend reachable:
 Open `http://<host>:5174`
 
+4) MCP smoke test (via gateway):
+- `tools/list`
+- `list_knowledge_bases`
+- `list_documents` for a known KB
+- `rag_query` with a simple prompt
+
 ---
 
 ## 10) BM25 / Hybrid Notes
@@ -178,3 +193,14 @@ Fix:
 1) Set `VITE_API_BASE_URL` to server IP
 2) Restart Vite
 3) Hard refresh browser
+
+### `502 Bad Gateway` on `<PUBLIC_DOMAIN>`
+Cause:
+- Router nginx cannot reach upstream on NAS
+- Docker service published to loopback (`127.0.0.1`) instead of LAN (`0.0.0.0`)
+- API healthcheck endpoint returns redirect and container never reaches `healthy`
+
+Fix:
+1) Verify published ports: `docker compose ps` (must show `0.0.0.0:...->...`)
+2) Verify API health URL used by Docker healthcheck returns `200` directly (no `307`)
+3) Recreate services: `docker compose up -d --build`
