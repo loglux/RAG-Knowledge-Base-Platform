@@ -93,9 +93,7 @@ async def get_settings_metadata():
         "bm25_analyzers": app_settings.BM25_ANALYZERS,
         "rerank_providers": RERANK_PROVIDERS,
         "rerank_models_by_provider": RERANK_MODELS_BY_PROVIDER,
-        "rerank_pricing_formula": (
-            "(query_tokens * num_documents) + sum(document_tokens)"
-        ),
+        "rerank_pricing_formula": ("(query_tokens * num_documents) + sum(document_tokens)"),
     }
 
 

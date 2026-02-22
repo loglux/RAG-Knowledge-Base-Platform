@@ -301,10 +301,14 @@ Retrieved Context:
                     else:
                         provider_normalized = None
                 if provider_normalized == "voyage" and not settings.VOYAGE_API_KEY:
-                    logger.warning("Rerank provider 'voyage' selected but VOYAGE_API_KEY is missing")
+                    logger.warning(
+                        "Rerank provider 'voyage' selected but VOYAGE_API_KEY is missing"
+                    )
                     provider_normalized = None
                 if provider_normalized == "cohere" and not settings.COHERE_API_KEY:
-                    logger.warning("Rerank provider 'cohere' selected but COHERE_API_KEY is missing")
+                    logger.warning(
+                        "Rerank provider 'cohere' selected but COHERE_API_KEY is missing"
+                    )
                     provider_normalized = None
 
                 candidate_pool = rerank_candidate_pool or len(chunks)

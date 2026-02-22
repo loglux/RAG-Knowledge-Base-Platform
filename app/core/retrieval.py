@@ -554,12 +554,16 @@ class RetrievalEngine:
                 if not settings.VOYAGE_API_KEY:
                     logger.warning("Skipping rerank: VOYAGE_API_KEY is missing")
                     return chunks
-                ranked = await self._rerank_with_voyage(query=query, documents=documents, model=model)
+                ranked = await self._rerank_with_voyage(
+                    query=query, documents=documents, model=model
+                )
             elif provider_normalized == "cohere":
                 if not settings.COHERE_API_KEY:
                     logger.warning("Skipping rerank: COHERE_API_KEY is missing")
                     return chunks
-                ranked = await self._rerank_with_cohere(query=query, documents=documents, model=model)
+                ranked = await self._rerank_with_cohere(
+                    query=query, documents=documents, model=model
+                )
             else:
                 logger.warning("Unsupported rerank provider '%s'; skipping rerank", provider)
                 return chunks
