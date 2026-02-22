@@ -2,6 +2,29 @@
 
 Collection of utility scripts for managing the Knowledge Base Platform.
 
+## Code Quality
+
+### check.sh
+Unified local quality gate for Python code.
+
+```bash
+# Full checks (format/lint/secrets/tests)
+./scripts/check.sh
+
+# Fast checks only for staged Python files
+./scripts/check.sh --staged
+
+# Auto-fix formatting/import order, then run checks
+./scripts/check.sh --fix --no-tests
+```
+
+Checks included:
+- `black`
+- `isort`
+- `flake8` (blocking only `F*` errors)
+- basic secret pattern scan
+- `pytest` (full mode)
+
 ## 🔄 Data Management
 
 ### backup.sh

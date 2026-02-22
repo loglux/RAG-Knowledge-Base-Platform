@@ -154,13 +154,14 @@ docs/
 !docs/GRAPH_PLAN.md
 docs/MCP_SECURITY_TEST_PLAN.local.md
 examples/
-scripts/
+scripts/*
 !scripts/backup.sh
 !scripts/restore.sh
 !scripts/migrate_dev_to_prod.sh
 !scripts/fix_enum_case.sh
 !scripts/deploy_backend.sh
 !scripts/deploy_frontend.sh
+!scripts/check.sh
 !scripts/README.md
 tests/
 frontend/_local/
@@ -196,3 +197,7 @@ check_documents.py
 # Local secrets and uploads
 secrets/
 uploads/
+
+# Private local agent/testing docs
+AGENTS.local.md
+TESTING.local.md
