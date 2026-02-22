@@ -150,8 +150,6 @@ tmp/
 logs/
 *.db
 docs/
-!docs/PRODUCTION_DEPLOYMENT.md
-!docs/GRAPH_PLAN.md
 docs/MCP_SECURITY_TEST_PLAN.local.md
 examples/
 scripts/*
@@ -173,7 +171,6 @@ chat*.png
 /*.md
 !/README.md
 !/RUNBOOK.md
-!/PROJECT_ROADMAP.md
 !/DEVELOPMENT_LOG.md
 !/MIGRATION_GUIDE.md
 !/DEPLOY.md
