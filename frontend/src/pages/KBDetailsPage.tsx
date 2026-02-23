@@ -70,20 +70,20 @@ export function KBDetailsPage() {
     chunk_overlap: 200,
     upsert_batch_size: 256,
     chunking_strategy: 'smart' as 'simple' | 'smart' | 'semantic',
-    bm25_override: false,
-    bm25_match_mode: '',
-    bm25_min_should_match: 0,
-    bm25_use_phrase: true,
-    bm25_analyzer: '',
     structure_llm_model: '',
-    chat_title_mode: 'default' as 'default' | 'enabled' | 'disabled',
   })
   const [settingsErrors, setSettingsErrors] = useState<Record<string, string>>({})
   const [settingsSaving, setSettingsSaving] = useState(false)
   const [mainTab, setMainTab] = useState<'documents' | 'settings' | 'evaluation'>('documents')
   const [configTab, setConfigTab] = useState<'chunking' | 'search' | 'llm'>('chunking')
   const [isEditingLlm, setIsEditingLlm] = useState(false)
-  const [llmDraft, setLlmDraft] = useState<{ llm_model: string | null; llm_provider: string | null; temperature: number | null; use_self_check: boolean | null }>({ llm_model: null, llm_provider: null, temperature: null, use_self_check: null })
+  const [llmDraft, setLlmDraft] = useState<{
+    llm_model: string | null
+    llm_provider: string | null
+    temperature: number | null
+    use_self_check: boolean | null
+    chat_title_mode: 'default' | 'enabled' | 'disabled'
+  }>({ llm_model: null, llm_provider: null, temperature: null, use_self_check: null, chat_title_mode: 'default' })
   const [llmSaving, setLlmSaving] = useState(false)
   const [retrievalEnvelope, setRetrievalEnvelope] = useState<KBRetrievalSettingsEnvelope | null>(null)
   const [isEditingRetrieval, setIsEditingRetrieval] = useState(false)
@@ -136,27 +136,31 @@ export function KBDetailsPage() {
     }
   }
 
-  const buildSettingsData = (kbData: KnowledgeBase, defaults?: AppSettings | null) => {
-    const bm25Override = kbData.bm25_match_mode !== null
-      || kbData.bm25_min_should_match !== null
-      || kbData.bm25_use_phrase !== null
-      || kbData.bm25_analyzer !== null
-
+  const buildSettingsData = (kbData: KnowledgeBase) => {
     return {
       chunk_size: kbData.chunk_size,
       chunk_overlap: kbData.chunk_overlap,
       upsert_batch_size: kbData.upsert_batch_size,
       chunking_strategy: kbData.chunking_strategy as 'simple' | 'smart' | 'semantic',
-      bm25_override: bm25Override,
-      bm25_match_mode: kbData.bm25_match_mode ?? defaults?.bm25_match_mode ?? '',
-      bm25_min_should_match: kbData.bm25_min_should_match ?? defaults?.bm25_min_should_match ?? 0,
-      bm25_use_phrase: kbData.bm25_use_phrase ?? defaults?.bm25_use_phrase ?? true,
-      bm25_analyzer: kbData.bm25_analyzer ?? defaults?.bm25_analyzer ?? '',
       structure_llm_model: kbData.structure_llm_model ?? '',
-      chat_title_mode: kbData.use_llm_chat_titles === null || kbData.use_llm_chat_titles === undefined
-        ? 'default'
-        : (kbData.use_llm_chat_titles ? 'enabled' : 'disabled'),
     }
+  }
+
+  const renderEffectiveRetrievalRow = (label: string, field: string, value: string) => {
+    if (!retrievalEnvelope) return null
+    const source = retrievalEnvelope.explain[field] ?? 'defaults'
+    const isKbOverride = source === 'kb_retrieval_settings' || source === 'kb_columns'
+    return (
+      <div key={field} className="flex items-center justify-between">
+        <span className="text-gray-400">{label}:</span>
+        <div className="flex items-center gap-2">
+          <span className="text-white font-medium">{value}</span>
+          <span className={`text-xs px-1.5 py-0.5 rounded ${isKbOverride ? 'bg-primary-500/20 text-primary-400' : 'bg-gray-700 text-gray-400'}`}>
+            {isKbOverride ? 'KB' : 'global'}
+          </span>
+        </div>
+      </div>
+    )
   }
 
   const {
@@ -184,7 +188,7 @@ export function KBDetailsPage() {
         setKb(data)
         loadRetrievalSettings(id!)
         setNameDraft(data.name)
-        setSettingsData(buildSettingsData(data, appDefaults))
+        setSettingsData(buildSettingsData(data))
       } catch (err) {
         setKbError(err instanceof Error ? err.message : 'Failed to load knowledge base')
       } finally {
@@ -363,9 +367,9 @@ export function KBDetailsPage() {
 
   useEffect(() => {
     if (!kb || isEditingSettings) return
-    setSettingsData(buildSettingsData(kb, appDefaults))
+    setSettingsData(buildSettingsData(kb))
     setStructureModelOverride(Boolean(kb.structure_llm_model))
-  }, [kb, appDefaults, isEditingSettings])
+  }, [kb, isEditingSettings])
 
   useEffect(() => {
     const loadSettingsMetadata = async () => {
@@ -401,18 +405,6 @@ export function KBDetailsPage() {
       newErrors.upsert_batch_size = 'Batch size must be between 64 and 1024'
     }
 
-    if (settingsData.bm25_override) {
-      if (bm25MatchModes && bm25MatchModes.length > 0 && !bm25MatchModes.includes(settingsData.bm25_match_mode)) {
-        newErrors.bm25_match_mode = 'Match mode must be one of the allowed values'
-      }
-      if (settingsData.bm25_min_should_match < 0 || settingsData.bm25_min_should_match > 100) {
-        newErrors.bm25_min_should_match = 'Minimum should match must be between 0 and 100'
-      }
-      if (bm25Analyzers && bm25Analyzers.length > 0 && !bm25Analyzers.includes(settingsData.bm25_analyzer)) {
-        newErrors.bm25_analyzer = 'Analyzer must be one of the allowed values'
-      }
-    }
-
     if (structureModelOverride && !settingsData.structure_llm_model) {
       newErrors.structure_llm_model = 'Select a model or disable override'
     }
@@ -431,22 +423,12 @@ export function KBDetailsPage() {
 
     setSettingsSaving(true)
     try {
-      const chatTitleValue = settingsData.chat_title_mode === 'default'
-        ? null
-        : settingsData.chat_title_mode === 'enabled'
-          ? true
-          : false
       const updated = await apiClient.updateKnowledgeBase(kb.id, {
         chunk_size: settingsData.chunk_size,
         chunk_overlap: settingsData.chunk_overlap,
         upsert_batch_size: settingsData.upsert_batch_size,
         chunking_strategy: settingsData.chunking_strategy,
-        bm25_match_mode: settingsData.bm25_override ? settingsData.bm25_match_mode : null,
-        bm25_min_should_match: settingsData.bm25_override ? settingsData.bm25_min_should_match : null,
-        bm25_use_phrase: settingsData.bm25_override ? settingsData.bm25_use_phrase : null,
-        bm25_analyzer: settingsData.bm25_override ? settingsData.bm25_analyzer : null,
         structure_llm_model: structureModelOverride ? (settingsData.structure_llm_model || null) : null,
-        use_llm_chat_titles: chatTitleValue,
       })
       setKb(updated)
       setIsEditingSettings(false)
@@ -462,7 +444,7 @@ export function KBDetailsPage() {
 
   const handleCancelSettings = () => {
     if (!kb) return
-    setSettingsData(buildSettingsData(kb, appDefaults))
+    setSettingsData(buildSettingsData(kb))
     setStructureModelOverride(Boolean(kb.structure_llm_model))
     setSettingsErrors({})
     setIsEditingSettings(false)
@@ -830,7 +812,7 @@ export function KBDetailsPage() {
           {/* Upload Area */}
           <div className="mb-6">
             <FileUpload onUpload={handleUpload} accept=".txt,.md,.fb2,.docx" maxSize={50} multiple />
-            <label className="mt-2 flex items-center gap-2 text-xs text-gray-400">
+            <label className="mt-2 flex items-center gap-2 text-sm text-gray-400">
               <input
                 type="checkbox"
                 checked={detectDuplicatesOnUpload}
@@ -839,6 +821,10 @@ export function KBDetailsPage() {
               />
               Compute duplicate chunks on upload
             </label>
+            <p className="mt-2 text-sm text-gray-500">
+              Reindex/reprocess actions on this tab rebuild both vector and BM25 indexes for existing documents.
+              Use this after changing chunking settings or BM25 analyzer.
+            </p>
           </div>
 
           {/* Document List */}
@@ -872,6 +858,56 @@ export function KBDetailsPage() {
               ))}
             </div>
           )}
+
+          <div className="mt-6 border-t border-gray-700 pt-4 space-y-3">
+            <div className="text-sm text-gray-500">
+              Full reindex rebuilds chunking output, vector index, and BM25 index for all existing documents.
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-500">
+                Use after changing chunking strategy/size/overlap or BM25 analyzer.
+              </div>
+              <Button
+                onClick={handleReindexBm25}
+                size="xs-wide"
+                disabled={reindexing}
+              >
+                {reindexing ? 'Reindexing…' : 'Reindex All (Full)'}
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-500">
+                Full reindex using the current chunking strategy and settings.
+              </div>
+              <Button
+                onClick={handleReprocessWithNewStrategy}
+                size="xs-wide"
+                disabled={reindexing}
+              >
+                {reindexing ? 'Reprocessing…' : 'Reindex All (Strategy)'}
+              </Button>
+            </div>
+
+            <div className="text-sm text-gray-500">
+              Duplicate analysis on upload: {detectDuplicatesOnUpload ? 'enabled' : 'disabled'}.
+            </div>
+            <div className="text-xs text-gray-500">
+              Duplicate analysis on reindex: {detectDuplicatesOnReindex ? 'enabled' : 'disabled'}.
+            </div>
+            <label className="flex items-center gap-2 text-sm text-gray-400">
+              <input
+                type="checkbox"
+                checked={detectDuplicatesOnReindex}
+                onChange={(e) => setDetectDuplicatesOnReindex(e.target.checked)}
+                className="rounded border-gray-600 bg-gray-800"
+              />
+              Compute duplicate chunks on reindex
+            </label>
+            {reindexMessage && (
+              <div className="text-sm text-gray-400">{reindexMessage}</div>
+            )}
+          </div>
         </div>
         )}
 
@@ -1222,6 +1258,10 @@ export function KBDetailsPage() {
                     llm_provider: kb.llm_provider ?? null,
                     temperature: kb.temperature ?? null,
                     use_self_check: kb.use_self_check ?? null,
+                    chat_title_mode:
+                      kb.use_llm_chat_titles == null
+                        ? 'default'
+                        : (kb.use_llm_chat_titles ? 'enabled' : 'disabled'),
                   })
                   setIsEditingLlm(true)
                 }}
@@ -1293,8 +1333,8 @@ export function KBDetailsPage() {
                   <option value="smart">🧠 Smart (Recursive) - Recommended</option>
                   <option value="semantic">🎯 Semantic (Embeddings) ✓</option>
                 </select>
-                <p className="mt-2 text-xs text-yellow-500">
-                  ⚠️ Changing this affects only NEW documents. To apply to existing documents, save settings and use "Reprocess All Documents" button below.
+                <p className="mt-2 text-sm text-yellow-500">
+                  ⚠️ Changing this affects only NEW documents. To apply to existing documents, save settings and run full reindex from the Documents tab.
                 </p>
               </div>
 
@@ -1313,7 +1353,7 @@ export function KBDetailsPage() {
                   className="w-full"
                   disabled={settingsSaving}
                 />
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <div className="flex justify-between text-sm text-gray-500 mt-1">
                   <span>100</span>
                   <span>2000</span>
                 </div>
@@ -1340,7 +1380,7 @@ export function KBDetailsPage() {
                     className="w-full"
                     disabled={settingsSaving}
                   />
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                  <div className="flex justify-between text-sm text-gray-500 mt-1">
                     <span>0</span>
                     <span>500</span>
                   </div>
@@ -1351,7 +1391,7 @@ export function KBDetailsPage() {
               {/* Info message for semantic chunking */}
               {settingsData.chunking_strategy === 'semantic' && (
                 <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                  <p className="text-xs text-blue-400">
+                  <p className="text-sm text-blue-400">
                     ℹ️ <strong>Semantic chunking</strong> finds natural topic boundaries using embeddings.
                     Chunk overlap is not used - boundaries are determined by semantic similarity.
                   </p>
@@ -1373,7 +1413,7 @@ export function KBDetailsPage() {
                   className="w-full"
                   disabled={settingsSaving}
                 />
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <div className="flex justify-between text-sm text-gray-500 mt-1">
                   <span>64</span>
                   <span>1024</span>
                 </div>
@@ -1385,7 +1425,7 @@ export function KBDetailsPage() {
                   <label className="block text-gray-400">
                     TOC / Structure model
                   </label>
-                  <label className="flex items-center gap-2 text-xs text-gray-300">
+                  <label className="flex items-center gap-2 text-sm text-gray-300">
                     <input
                       type="checkbox"
                       checked={structureModelOverride}
@@ -1402,7 +1442,7 @@ export function KBDetailsPage() {
                     onChange={(model, _provider) => setSettingsData({ ...settingsData, structure_llm_model: model })}
                   />
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-sm text-gray-500 mt-1">
                   {structureModelOverride
                     ? 'Model used for TOC analysis in this KB'
                     : `Using global default: ${appDefaults?.llm_model || 'not set'}`}
@@ -1412,139 +1452,8 @@ export function KBDetailsPage() {
                 )}
               </div>
 
-              <div>
-                <label className="block text-gray-400 mb-2">
-                  Chat title generation
-                </label>
-                <select
-                  value={settingsData.chat_title_mode}
-                  onChange={(e) => setSettingsData({
-                    ...settingsData,
-                    chat_title_mode: e.target.value as 'default' | 'enabled' | 'disabled',
-                  })}
-                  className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100"
-                  disabled={settingsSaving}
-                >
-                  <option value="default">Use global default</option>
-                  <option value="enabled">Enabled (LLM)</option>
-                  <option value="disabled">Disabled (fallback)</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  {settingsData.chat_title_mode === 'default'
-                    ? `Using global default: ${
-                      appDefaults?.use_llm_chat_titles === true
-                        ? 'Enabled'
-                        : appDefaults?.use_llm_chat_titles === false
-                          ? 'Disabled'
-                          : 'Unknown'
-                    }`
-                    : settingsData.chat_title_mode === 'enabled'
-                      ? 'LLM generates short titles from the first Q&A'
-                      : 'Title falls back to the first user question'}
-                </p>
-              </div>
-
-              <div className="border-t border-gray-700 pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-semibold text-white">BM25 Overrides</h4>
-                  <label className="flex items-center gap-2 text-xs text-gray-300">
-                    <input
-                      type="checkbox"
-                      checked={settingsData.bm25_override}
-                      onChange={(e) => setSettingsData({ ...settingsData, bm25_override: e.target.checked })}
-                      className="w-4 h-4 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
-                      disabled={settingsSaving}
-                    />
-                    Override global BM25 defaults
-                  </label>
-                </div>
-
-                {settingsData.bm25_override && (
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <div>
-                      <label className="block text-gray-400 mb-2">
-                        Match mode
-                      </label>
-                      <select
-                        value={settingsData.bm25_match_mode || (bm25MatchModes?.[0] ?? '')}
-                        onChange={(e) => setSettingsData({ ...settingsData, bm25_match_mode: e.target.value })}
-                        className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100"
-                        disabled={settingsSaving || !bm25MatchModes || bm25MatchModes.length === 0}
-                      >
-                        {(!bm25MatchModes || bm25MatchModes.length === 0) && <option value="">Loading…</option>}
-                        {bm25MatchModes?.map((mode) => (
-                          <option key={mode} value={mode}>
-                            {mode}
-                          </option>
-                        ))}
-                      </select>
-                      {settingsErrors.bm25_match_mode && (
-                        <p className="mt-1 text-sm text-red-500">{settingsErrors.bm25_match_mode}</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-gray-400 mb-2">
-                        Minimum should match: <span className="text-white font-medium">{settingsData.bm25_min_should_match}%</span>
-                      </label>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        step="5"
-                        value={settingsData.bm25_min_should_match}
-                        onChange={(e) => setSettingsData({ ...settingsData, bm25_min_should_match: parseInt(e.target.value) })}
-                        className="w-full"
-                        disabled={settingsSaving}
-                      />
-                      {settingsErrors.bm25_min_should_match && (
-                        <p className="mt-1 text-sm text-red-500">{settingsErrors.bm25_min_should_match}</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-gray-400 mb-2">
-                        Use phrase match
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-gray-300">
-                        <input
-                          type="checkbox"
-                          checked={settingsData.bm25_use_phrase}
-                          onChange={(e) => setSettingsData({ ...settingsData, bm25_use_phrase: e.target.checked })}
-                          className="w-4 h-4 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
-                          disabled={settingsSaving}
-                        />
-                        Include exact phrase matches
-                      </label>
-                    </div>
-
-                    <div>
-                      <label className="block text-gray-400 mb-2">
-                        Analyzer profile
-                      </label>
-                      <select
-                        value={settingsData.bm25_analyzer || (bm25Analyzers?.[0] ?? '')}
-                        onChange={(e) => setSettingsData({ ...settingsData, bm25_analyzer: e.target.value })}
-                        className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100"
-                        disabled={settingsSaving || !bm25Analyzers || bm25Analyzers.length === 0}
-                      >
-                        {(!bm25Analyzers || bm25Analyzers.length === 0) && <option value="">Loading…</option>}
-                        {bm25Analyzers?.map((analyzer) => (
-                          <option key={analyzer} value={analyzer}>
-                            {analyzer}
-                          </option>
-                        ))}
-                      </select>
-                      {settingsErrors.bm25_analyzer && (
-                        <p className="mt-1 text-sm text-red-500">{settingsErrors.bm25_analyzer}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="text-xs text-gray-500">
-                Changes apply to new or reprocessed documents only.
+              <div className="text-sm text-gray-500">
+                Changes apply to new or reprocessed documents only. Reindex actions are available in the Documents tab.
               </div>
 
               {settingsErrors.submit && (
@@ -1592,14 +1501,6 @@ export function KBDetailsPage() {
                   {kb.structure_llm_model || 'Default'}
                 </span>
               </div>
-              <div>
-                <span className="text-gray-400">Chat titles:</span>
-                <span className="text-white ml-2 font-medium">
-                  {kb.use_llm_chat_titles === null || kb.use_llm_chat_titles === undefined
-                    ? 'Default'
-                    : kb.use_llm_chat_titles ? 'Enabled' : 'Disabled'}
-                </span>
-              </div>
               <div className="md:col-span-2">
                 <span className="text-gray-400">Chunking Strategy:</span>
                 <div className="mt-2 p-3 bg-gray-800 border border-gray-700 rounded-lg">
@@ -1609,7 +1510,7 @@ export function KBDetailsPage() {
                       <div className="text-sm font-medium text-white">
                         {getChunkingStrategyDisplay(kb.chunking_strategy).label}
                       </div>
-                      <div className="text-xs text-gray-400 mt-0.5">
+                      <div className="text-sm text-gray-400 mt-0.5">
                         {getChunkingStrategyDisplay(kb.chunking_strategy).description}
                       </div>
                     </div>
@@ -1618,7 +1519,7 @@ export function KBDetailsPage() {
               </div>
               <div>
                 <span className="text-gray-400">Collection:</span>
-                <span className="text-white ml-2 font-mono text-xs">{kb.collection_name}</span>
+                <span className="text-white ml-2 font-mono text-sm">{kb.collection_name}</span>
               </div>
             </div>
           ) : null}
@@ -1628,83 +1529,98 @@ export function KBDetailsPage() {
               {isEditingRetrieval ? (
                 /* ── Edit mode ── */
                 <div className="space-y-4">
-                  {/* Retrieval Mode */}
-                  <div>
-                    <label className="block text-gray-400 mb-2">Retrieval Mode</label>
-                    <select
-                      value={retrievalDraft.retrieval_mode ?? ''}
-                      onChange={(e) => setRetrievalDraft({ ...retrievalDraft, retrieval_mode: (e.target.value || null) as 'dense' | 'hybrid' | 'lexical' | null })}
-                      className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100"
-                    >
-                      <option value="">— use global default ({retrievalEnvelope?.effective.retrieval_mode ?? 'dense'}) —</option>
-                      <option value="dense">Dense (vector)</option>
-                      <option value="hybrid">Hybrid (vector + BM25)</option>
-                      <option value="lexical">Lexical (BM25 only)</option>
-                    </select>
+                  <div className="space-y-4 p-3 bg-gray-800 rounded-lg">
+                    <div className="text-base text-gray-200 font-semibold">Core Retrieval</div>
+                    <div>
+                      <label className="block text-gray-400 mb-2">Retrieval Mode</label>
+                      <select
+                        value={retrievalDraft.retrieval_mode ?? ''}
+                        onChange={(e) => setRetrievalDraft({ ...retrievalDraft, retrieval_mode: (e.target.value || null) as 'dense' | 'hybrid' | 'lexical' | null })}
+                        className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100"
+                      >
+                        <option value="">— use global default ({retrievalEnvelope?.effective.retrieval_mode ?? 'dense'}) —</option>
+                        <option value="dense">Dense (vector)</option>
+                        <option value="hybrid">Hybrid (vector + BM25)</option>
+                        <option value="lexical">Lexical (BM25 only)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-gray-400 mb-2">
+                        Top-K: <span className="text-white font-medium">{retrievalDraft.top_k ?? retrievalEnvelope?.effective.top_k ?? 5}</span>
+                      </label>
+                      <input
+                        type="range"
+                        min="1" max="50" step="1"
+                        value={retrievalDraft.top_k ?? retrievalEnvelope?.effective.top_k ?? 5}
+                        onChange={(e) => setRetrievalDraft({ ...retrievalDraft, top_k: parseInt(e.target.value) })}
+                        className="w-full"
+                      />
+                      <div className="flex justify-between text-sm text-gray-500 mt-1"><span>1</span><span>50</span></div>
+                      {retrievalDraft.top_k == null && (
+                        <p className="text-sm text-gray-500 mt-1">Using global default</p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-gray-400 mb-2">
+                        Score Threshold: <span className="text-white font-medium">{(retrievalDraft.score_threshold ?? retrievalEnvelope?.effective.score_threshold ?? 0).toFixed(2)}</span>
+                      </label>
+                      <input
+                        type="range"
+                        min="0" max="1" step="0.05"
+                        value={retrievalDraft.score_threshold ?? retrievalEnvelope?.effective.score_threshold ?? 0}
+                        onChange={(e) => setRetrievalDraft({ ...retrievalDraft, score_threshold: parseFloat(e.target.value) })}
+                        className="w-full"
+                      />
+                      {retrievalDraft.score_threshold == null && (
+                        <p className="text-sm text-gray-500 mt-1">Using global default</p>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Top-K */}
-                  <div>
-                    <label className="block text-gray-400 mb-2">
-                      Top-K: <span className="text-white font-medium">{retrievalDraft.top_k ?? retrievalEnvelope?.effective.top_k ?? 5}</span>
-                    </label>
-                    <input
-                      type="range"
-                      min="1" max="50" step="1"
-                      value={retrievalDraft.top_k ?? retrievalEnvelope?.effective.top_k ?? 5}
-                      onChange={(e) => setRetrievalDraft({ ...retrievalDraft, top_k: parseInt(e.target.value) })}
-                      className="w-full"
-                    />
-                    <div className="flex justify-between text-xs text-gray-500 mt-1"><span>1</span><span>50</span></div>
-                    {retrievalDraft.top_k == null && (
-                      <p className="text-xs text-gray-500 mt-1">Using global default</p>
-                    )}
-                  </div>
-
-                  {/* Score Threshold */}
-                  <div>
-                    <label className="block text-gray-400 mb-2">
-                      Score Threshold: <span className="text-white font-medium">{(retrievalDraft.score_threshold ?? retrievalEnvelope?.effective.score_threshold ?? 0).toFixed(2)}</span>
-                    </label>
-                    <input
-                      type="range"
-                      min="0" max="1" step="0.05"
-                      value={retrievalDraft.score_threshold ?? retrievalEnvelope?.effective.score_threshold ?? 0}
-                      onChange={(e) => setRetrievalDraft({ ...retrievalDraft, score_threshold: parseFloat(e.target.value) })}
-                      className="w-full"
-                    />
-                    {retrievalDraft.score_threshold == null && (
-                      <p className="text-xs text-gray-500 mt-1">Using global default</p>
-                    )}
-                  </div>
-
-                  {/* Max Context Chars */}
-                  <div>
-                    <label className="block text-gray-400 mb-2">
-                      Max context chars: <span className="text-white font-medium">
-                        {(retrievalDraft.max_context_chars ?? retrievalEnvelope?.effective.max_context_chars ?? 0) === 0
-                          ? 'unlimited'
-                          : (retrievalDraft.max_context_chars ?? retrievalEnvelope?.effective.max_context_chars ?? 0).toLocaleString()}
-                      </span>
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="1000"
-                      value={retrievalDraft.max_context_chars ?? retrievalEnvelope?.effective.max_context_chars ?? 0}
-                      onChange={(e) => setRetrievalDraft({ ...retrievalDraft, max_context_chars: parseInt(e.target.value) || 0 })}
-                      className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">0 = unlimited</p>
+                  <div className="space-y-3 p-3 bg-gray-800 rounded-lg">
+                    <div className="text-base text-gray-200 font-semibold">Context Assembly</div>
+                    <div>
+                      <label className="block text-gray-400 mb-2">
+                        Max context chars: <span className="text-white font-medium">
+                          {(retrievalDraft.max_context_chars ?? retrievalEnvelope?.effective.max_context_chars ?? 0) === 0
+                            ? 'unlimited'
+                            : (retrievalDraft.max_context_chars ?? retrievalEnvelope?.effective.max_context_chars ?? 0).toLocaleString()}
+                        </span>
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1000"
+                        value={retrievalDraft.max_context_chars ?? retrievalEnvelope?.effective.max_context_chars ?? 0}
+                        onChange={(e) => setRetrievalDraft({ ...retrievalDraft, max_context_chars: parseInt(e.target.value) || 0 })}
+                        className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm"
+                      />
+                      <p className="text-sm text-gray-500 mt-1">0 = unlimited</p>
+                    </div>
+                    <div>
+                      <label className="flex items-center gap-2 text-gray-400 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={retrievalDraft.use_structure ?? retrievalEnvelope?.effective.use_structure ?? false}
+                          onChange={(e) => setRetrievalDraft({ ...retrievalDraft, use_structure: e.target.checked })}
+                          className="rounded border-gray-600 bg-gray-900"
+                        />
+                        Use document structure (TOC) for retrieval
+                      </label>
+                      {retrievalDraft.use_structure == null && (
+                        <p className="text-sm text-gray-500 mt-1 ml-5">Using global default</p>
+                      )}
+                    </div>
                   </div>
 
                   {/* Hybrid weights + BM25 - show when mode is hybrid or lexical */}
                   {(['hybrid', 'lexical'].includes(retrievalDraft.retrieval_mode ?? retrievalEnvelope?.effective.retrieval_mode ?? '')) && (
                     <div className="space-y-3 p-3 bg-gray-800 rounded-lg">
+                      <div className="text-base text-gray-200 font-semibold">Hybrid / Lexical Retrieval</div>
                       {(retrievalDraft.retrieval_mode ?? retrievalEnvelope?.effective.retrieval_mode) === 'hybrid' && (<>
                       <div className="flex items-center justify-between">
-                        <div className="text-xs text-gray-400 font-medium">Hybrid Weights</div>
-                        <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer select-none">
+                        <div className="text-base text-gray-200 font-semibold">Hybrid Weights</div>
+                        <label className="flex items-center gap-1.5 text-sm text-gray-400 cursor-pointer select-none">
                           <input
                             type="checkbox"
                             checked={linkHybridWeights}
@@ -1715,7 +1631,7 @@ export function KBDetailsPage() {
                         </label>
                       </div>
                       <div>
-                        <label className="block text-gray-400 mb-1 text-xs">
+                        <label className="block text-gray-400 mb-1 text-sm">
                           Dense weight: <span className="text-white">{(retrievalDraft.hybrid_dense_weight ?? retrievalEnvelope?.effective.hybrid_dense_weight ?? 0.6).toFixed(2)}</span>
                         </label>
                         <input
@@ -1733,7 +1649,7 @@ export function KBDetailsPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-gray-400 mb-1 text-xs">
+                        <label className="block text-gray-400 mb-1 text-sm">
                           Lexical weight: <span className="text-white">{(retrievalDraft.hybrid_lexical_weight ?? retrievalEnvelope?.effective.hybrid_lexical_weight ?? 0.4).toFixed(2)}</span>
                         </label>
                         <input
@@ -1752,7 +1668,7 @@ export function KBDetailsPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-gray-400 mb-1 text-xs">
+                        <label className="block text-gray-400 mb-1 text-sm">
                           Lexical Top-K: <span className="text-white">{retrievalDraft.lexical_top_k ?? retrievalEnvelope?.effective.lexical_top_k ?? 20}</span>
                         </label>
                         <input
@@ -1764,14 +1680,14 @@ export function KBDetailsPage() {
                       </div>
                       </>)}
                       <div className="border-t border-gray-700 pt-3 mt-1">
-                        <div className="text-xs text-gray-400 font-medium mb-3">BM25 Settings</div>
+                        <div className="text-base text-gray-200 font-semibold mb-3">BM25 Settings</div>
                         <div className="grid grid-cols-1 gap-3">
                           <div>
-                            <label className="block text-gray-400 mb-1 text-xs">Match mode</label>
+                            <label className="block text-gray-400 mb-1 text-sm">Match mode</label>
                             <select
                               value={retrievalDraft.bm25_match_mode ?? retrievalEnvelope?.effective.bm25_match_mode ?? ''}
                               onChange={(e) => setRetrievalDraft({ ...retrievalDraft, bm25_match_mode: e.target.value || null })}
-                              className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100 text-xs"
+                              className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100 text-sm"
                             >
                               <option value="">— global default —</option>
                               {(bm25MatchModes ?? ['strict', 'balanced', 'loose']).map((m) => (
@@ -1780,7 +1696,7 @@ export function KBDetailsPage() {
                             </select>
                           </div>
                           <div>
-                            <label className="block text-gray-400 mb-1 text-xs">
+                            <label className="block text-gray-400 mb-1 text-sm">
                               Min should match: <span className="text-white">{retrievalDraft.bm25_min_should_match ?? retrievalEnvelope?.effective.bm25_min_should_match ?? 0}%</span>
                             </label>
                             <input
@@ -1797,16 +1713,16 @@ export function KBDetailsPage() {
                               onChange={(e) => setRetrievalDraft({ ...retrievalDraft, bm25_use_phrase: e.target.checked })}
                               className="rounded"
                             />
-                            <label className="text-xs text-gray-400">Use phrase match</label>
+                            <label className="text-sm text-gray-400">Use phrase match</label>
                           </div>
                           <div>
-                            <label className="block text-gray-400 mb-1 text-xs">
+                            <label className="block text-gray-400 mb-1 text-sm">
                               Analyzer <span className="text-gray-500">(advanced — requires reindex)</span>
                             </label>
                             <select
                               value={retrievalDraft.bm25_analyzer ?? retrievalEnvelope?.effective.bm25_analyzer ?? ''}
                               onChange={(e) => setRetrievalDraft({ ...retrievalDraft, bm25_analyzer: e.target.value || null })}
-                              className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100 text-xs"
+                              className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100 text-sm"
                             >
                               <option value="">— global default —</option>
                               {(bm25Analyzers ?? ['auto', 'ru', 'en']).map((a) => (
@@ -1815,6 +1731,10 @@ export function KBDetailsPage() {
                             </select>
                           </div>
                         </div>
+                        <p className="text-sm text-gray-500">
+                          BM25 analyzer affects index build. After changing it, run full reindex in the Documents tab.
+                          Other BM25 fields (match mode / min should match / phrase) apply immediately to new queries.
+                        </p>
                       </div>
                     </div>
                   )}
@@ -1822,8 +1742,8 @@ export function KBDetailsPage() {
                   {/* Rerank */}
                   <div className="space-y-2 p-3 bg-gray-800 rounded-lg">
                     <div className="flex items-center justify-between">
-                      <label className="text-gray-400 text-xs font-medium">Reranking</label>
-                      <label className="flex items-center gap-2 text-xs text-gray-300">
+                      <label className="text-base text-gray-200 font-semibold">Reranking</label>
+                      <label className="flex items-center gap-2 text-sm text-gray-300">
                         <input
                           type="checkbox"
                           checked={retrievalDraft.rerank_enabled ?? retrievalEnvelope?.effective.rerank_enabled ?? false}
@@ -1837,28 +1757,28 @@ export function KBDetailsPage() {
                       <div className="space-y-3 mt-2">
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-gray-400 mb-1 text-xs">Provider</label>
+                            <label className="block text-gray-400 mb-1 text-sm">Provider</label>
                             <input
                               type="text"
                               value={retrievalDraft.rerank_provider ?? retrievalEnvelope?.effective.rerank_provider ?? ''}
                               onChange={(e) => setRetrievalDraft({ ...retrievalDraft, rerank_provider: e.target.value || null })}
                               placeholder="e.g. cohere, voyage"
-                              className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100 text-xs"
+                              className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100 text-sm"
                             />
                           </div>
                           <div>
-                            <label className="block text-gray-400 mb-1 text-xs">Model</label>
+                            <label className="block text-gray-400 mb-1 text-sm">Model</label>
                             <input
                               type="text"
                               value={retrievalDraft.rerank_model ?? retrievalEnvelope?.effective.rerank_model ?? ''}
                               onChange={(e) => setRetrievalDraft({ ...retrievalDraft, rerank_model: e.target.value || null })}
                               placeholder="e.g. rerank-2.5-lite"
-                              className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100 text-xs"
+                              className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100 text-sm"
                             />
                           </div>
                         </div>
                         <div>
-                          <label className="block text-gray-400 mb-1 text-xs">
+                          <label className="block text-gray-400 mb-1 text-sm">
                             Candidate pool: <span className="text-white">{retrievalDraft.rerank_candidate_pool ?? retrievalEnvelope?.effective.rerank_candidate_pool ?? 20}</span>
                           </label>
                           <input
@@ -1869,7 +1789,7 @@ export function KBDetailsPage() {
                           />
                         </div>
                         <div>
-                          <label className="block text-gray-400 mb-1 text-xs">
+                          <label className="block text-gray-400 mb-1 text-sm">
                             Top-N after rerank: <span className="text-white">{retrievalDraft.rerank_top_n ?? retrievalEnvelope?.effective.rerank_top_n ?? '—'}</span>
                           </label>
                           <input
@@ -1880,7 +1800,7 @@ export function KBDetailsPage() {
                           />
                         </div>
                         <div>
-                          <label className="block text-gray-400 mb-1 text-xs">
+                          <label className="block text-gray-400 mb-1 text-sm">
                             Min rerank score: <span className="text-white">{(retrievalDraft.rerank_min_score ?? retrievalEnvelope?.effective.rerank_min_score ?? 0).toFixed(2)}</span>
                           </label>
                           <input
@@ -1891,22 +1811,6 @@ export function KBDetailsPage() {
                           />
                         </div>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Use Structure */}
-                  <div>
-                    <label className="flex items-center gap-2 text-gray-400 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={retrievalDraft.use_structure ?? retrievalEnvelope?.effective.use_structure ?? false}
-                        onChange={(e) => setRetrievalDraft({ ...retrievalDraft, use_structure: e.target.checked })}
-                        className="rounded border-gray-600 bg-gray-900"
-                      />
-                      Use document structure (TOC) for retrieval
-                    </label>
-                    {retrievalDraft.use_structure == null && (
-                      <p className="text-xs text-gray-500 mt-1 ml-5">Using global default</p>
                     )}
                   </div>
 
@@ -1976,40 +1880,51 @@ export function KBDetailsPage() {
               ) : (
                 /* ── View mode ── */
                 retrievalEnvelope ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {[
-                      { label: 'Retrieval Mode', field: 'retrieval_mode', value: retrievalEnvelope.effective.retrieval_mode },
-                      { label: 'Top-K', field: 'top_k', value: String(retrievalEnvelope.effective.top_k) },
-                      { label: 'Score Threshold', field: 'score_threshold', value: String(retrievalEnvelope.effective.score_threshold) },
-                      { label: 'Max Context Chars', field: 'max_context_chars', value: retrievalEnvelope.effective.max_context_chars === 0 ? 'unlimited' : String(retrievalEnvelope.effective.max_context_chars) },
-                      { label: 'Lexical Top-K', field: 'lexical_top_k', value: String(retrievalEnvelope.effective.lexical_top_k) },
-                      { label: 'Dense Weight', field: 'hybrid_dense_weight', value: String(retrievalEnvelope.effective.hybrid_dense_weight) },
-                      { label: 'Lexical Weight', field: 'hybrid_lexical_weight', value: String(retrievalEnvelope.effective.hybrid_lexical_weight) },
-                      { label: 'BM25 Match Mode', field: 'bm25_match_mode', value: retrievalEnvelope.effective.bm25_match_mode ?? '—' },
-                      { label: 'BM25 Min Match', field: 'bm25_min_should_match', value: retrievalEnvelope.effective.bm25_min_should_match != null ? `${retrievalEnvelope.effective.bm25_min_should_match}%` : '—' },
-                      { label: 'BM25 Phrase', field: 'bm25_use_phrase', value: retrievalEnvelope.effective.bm25_use_phrase ? 'yes' : 'no' },
-                      { label: 'BM25 Analyzer', field: 'bm25_analyzer', value: retrievalEnvelope.effective.bm25_analyzer ?? '—' },
-                      { label: 'Rerank', field: 'rerank_enabled', value: retrievalEnvelope.effective.rerank_enabled ? 'enabled' : 'disabled' },
-                      { label: 'Rerank Provider', field: 'rerank_provider', value: retrievalEnvelope.effective.rerank_provider ?? '—' },
-                      { label: 'Rerank Model', field: 'rerank_model', value: retrievalEnvelope.effective.rerank_model ?? '—' },
-                      { label: 'Candidate Pool', field: 'rerank_candidate_pool', value: String(retrievalEnvelope.effective.rerank_candidate_pool) },
-                      { label: 'Rerank Top-N', field: 'rerank_top_n', value: retrievalEnvelope.effective.rerank_top_n != null ? String(retrievalEnvelope.effective.rerank_top_n) : '—' },
-                      { label: 'Use Structure', field: 'use_structure', value: retrievalEnvelope.effective.use_structure ? 'yes' : 'no' },
-                    ].map(({ label, field, value }) => {
-                      const source = retrievalEnvelope.explain[field] ?? 'defaults'
-                      const isKbOverride = source === 'kb_retrieval_settings' || source === 'kb_columns'
-                      return (
-                        <div key={field} className="flex items-center justify-between">
-                          <span className="text-gray-400">{label}:</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-white font-medium">{value}</span>
-                            <span className={`text-xs px-1.5 py-0.5 rounded ${isKbOverride ? 'bg-primary-500/20 text-primary-400' : 'bg-gray-700 text-gray-400'}`}>
-                              {isKbOverride ? 'KB' : 'global'}
-                            </span>
-                          </div>
-                        </div>
-                      )
-                    })}
+                  <div className="space-y-4">
+                    <div className="text-sm text-gray-500">Badge indicates source: `KB` override or inherited `global` default.</div>
+
+                    <div className="space-y-2 p-3 bg-gray-800 rounded-lg">
+                      <div className="text-base text-gray-200 font-semibold">Core Retrieval</div>
+                      {renderEffectiveRetrievalRow('Retrieval Mode', 'retrieval_mode', retrievalEnvelope.effective.retrieval_mode)}
+                      {renderEffectiveRetrievalRow('Top-K', 'top_k', String(retrievalEnvelope.effective.top_k))}
+                      {renderEffectiveRetrievalRow('Score Threshold', 'score_threshold', String(retrievalEnvelope.effective.score_threshold))}
+                    </div>
+
+                    <div className="space-y-2 p-3 bg-gray-800 rounded-lg">
+                      <div className="text-base text-gray-200 font-semibold">Context Assembly</div>
+                      {renderEffectiveRetrievalRow('Max Context Chars', 'max_context_chars', retrievalEnvelope.effective.max_context_chars === 0 ? 'unlimited' : String(retrievalEnvelope.effective.max_context_chars))}
+                      {renderEffectiveRetrievalRow('Use Structure', 'use_structure', retrievalEnvelope.effective.use_structure ? 'yes' : 'no')}
+                    </div>
+
+                    {(['hybrid', 'lexical'].includes(retrievalEnvelope.effective.retrieval_mode)) && (
+                      <div className="space-y-2 p-3 bg-gray-800 rounded-lg">
+                        <div className="text-base text-gray-200 font-semibold">Hybrid / BM25</div>
+                        {retrievalEnvelope.effective.retrieval_mode === 'hybrid' && (
+                          <>
+                            {renderEffectiveRetrievalRow('Lexical Top-K', 'lexical_top_k', String(retrievalEnvelope.effective.lexical_top_k))}
+                            {renderEffectiveRetrievalRow('Dense Weight', 'hybrid_dense_weight', String(retrievalEnvelope.effective.hybrid_dense_weight))}
+                            {renderEffectiveRetrievalRow('Lexical Weight', 'hybrid_lexical_weight', String(retrievalEnvelope.effective.hybrid_lexical_weight))}
+                          </>
+                        )}
+                        {renderEffectiveRetrievalRow('BM25 Match Mode', 'bm25_match_mode', retrievalEnvelope.effective.bm25_match_mode ?? '—')}
+                        {renderEffectiveRetrievalRow('BM25 Min Match', 'bm25_min_should_match', retrievalEnvelope.effective.bm25_min_should_match != null ? `${retrievalEnvelope.effective.bm25_min_should_match}%` : '—')}
+                        {renderEffectiveRetrievalRow('BM25 Phrase', 'bm25_use_phrase', retrievalEnvelope.effective.bm25_use_phrase ? 'yes' : 'no')}
+                        {renderEffectiveRetrievalRow('BM25 Analyzer', 'bm25_analyzer', retrievalEnvelope.effective.bm25_analyzer ?? '—')}
+                      </div>
+                    )}
+
+                    <div className="space-y-2 p-3 bg-gray-800 rounded-lg">
+                      <div className="text-base text-gray-200 font-semibold">Reranking</div>
+                      {renderEffectiveRetrievalRow('Rerank', 'rerank_enabled', retrievalEnvelope.effective.rerank_enabled ? 'enabled' : 'disabled')}
+                      {retrievalEnvelope.effective.rerank_enabled && (
+                        <>
+                          {renderEffectiveRetrievalRow('Rerank Provider', 'rerank_provider', retrievalEnvelope.effective.rerank_provider ?? '—')}
+                          {renderEffectiveRetrievalRow('Rerank Model', 'rerank_model', retrievalEnvelope.effective.rerank_model ?? '—')}
+                          {renderEffectiveRetrievalRow('Candidate Pool', 'rerank_candidate_pool', String(retrievalEnvelope.effective.rerank_candidate_pool))}
+                          {renderEffectiveRetrievalRow('Rerank Top-N', 'rerank_top_n', retrievalEnvelope.effective.rerank_top_n != null ? String(retrievalEnvelope.effective.rerank_top_n) : '—')}
+                        </>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="text-sm text-gray-500">Loading...</div>
@@ -2030,7 +1945,7 @@ export function KBDetailsPage() {
                       value={llmDraft.llm_model ?? ''}
                       onChange={(model, provider) => setLlmDraft({ ...llmDraft, llm_model: model || null, llm_provider: provider || null })}
                     />
-                    <p className="text-xs text-gray-500 mt-1">Leave empty to use global default</p>
+                    <p className="text-sm text-gray-500 mt-1">Leave empty to use global default</p>
                   </div>
 
                   {/* Temperature */}
@@ -2046,9 +1961,9 @@ export function KBDetailsPage() {
                       onChange={(e) => setLlmDraft({ ...llmDraft, temperature: parseFloat(e.target.value) })}
                       className="w-full"
                     />
-                    <div className="flex justify-between text-xs text-gray-500 mt-1"><span>0 (precise)</span><span>1</span><span>2 (creative)</span></div>
+                    <div className="flex justify-between text-sm text-gray-500 mt-1"><span>0 (precise)</span><span>1</span><span>2 (creative)</span></div>
                     {llmDraft.temperature != null && (
-                      <button onClick={() => setLlmDraft({ ...llmDraft, temperature: null })} className="mt-1 text-xs text-gray-500 hover:text-gray-300">
+                      <button onClick={() => setLlmDraft({ ...llmDraft, temperature: null })} className="mt-1 text-sm text-gray-500 hover:text-gray-300">
                         Reset to global default
                       </button>
                     )}
@@ -2056,7 +1971,7 @@ export function KBDetailsPage() {
 
                   {/* Self-check */}
                   <div className="p-3 bg-gray-800 rounded-lg space-y-1">
-                    <label className="flex items-center gap-2 text-gray-300 text-xs">
+                    <label className="flex items-center gap-2 text-gray-300 text-sm">
                       <input
                         type="checkbox"
                         checked={llmDraft.use_self_check ?? false}
@@ -2065,10 +1980,39 @@ export function KBDetailsPage() {
                       />
                       Enable Self-Check Validation
                     </label>
-                    <p className="text-xs text-gray-500 ml-5">Second LLM pass to validate the answer against retrieved chunks. More accurate but slower.</p>
+                    <p className="text-sm text-gray-500 ml-5">Second LLM pass to validate the answer against retrieved chunks. More accurate but slower.</p>
                     {llmDraft.use_self_check == null && (
-                      <p className="text-xs text-gray-500 ml-5">Using global default</p>
+                      <p className="text-sm text-gray-500 ml-5">Using global default</p>
                     )}
+                  </div>
+
+                  <div>
+                    <label className="block text-gray-400 mb-2">Chat title generation</label>
+                    <select
+                      value={llmDraft.chat_title_mode}
+                      onChange={(e) => setLlmDraft({
+                        ...llmDraft,
+                        chat_title_mode: e.target.value as 'default' | 'enabled' | 'disabled',
+                      })}
+                      className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100"
+                    >
+                      <option value="default">Use global default</option>
+                      <option value="enabled">Enabled (LLM)</option>
+                      <option value="disabled">Disabled (fallback)</option>
+                    </select>
+                    <p className="text-sm text-gray-500 mt-1">
+                      {llmDraft.chat_title_mode === 'default'
+                        ? `Using global default: ${
+                          appDefaults?.use_llm_chat_titles === true
+                            ? 'Enabled'
+                            : appDefaults?.use_llm_chat_titles === false
+                              ? 'Disabled'
+                              : 'Unknown'
+                        }`
+                        : llmDraft.chat_title_mode === 'enabled'
+                          ? 'LLM generates short titles from the first Q&A'
+                          : 'Title falls back to the first user question'}
+                    </p>
                   </div>
 
                   <div className="flex items-center gap-2 pt-1">
@@ -2077,11 +2021,17 @@ export function KBDetailsPage() {
                         if (!id || !kb) return
                         setLlmSaving(true)
                         try {
+                          const chatTitleValue = llmDraft.chat_title_mode === 'default'
+                            ? null
+                            : llmDraft.chat_title_mode === 'enabled'
+                              ? true
+                              : false
                           const updated = await apiClient.updateKnowledgeBase(id, {
                             llm_model: llmDraft.llm_model,
                             llm_provider: llmDraft.llm_provider,
                             temperature: llmDraft.temperature,
                             use_self_check: llmDraft.use_self_check,
+                            use_llm_chat_titles: chatTitleValue,
                           })
                           setKb(updated)
                           setIsEditingLlm(false)
@@ -2100,7 +2050,7 @@ export function KBDetailsPage() {
                     <Button onClick={() => setIsEditingLlm(false)} size="xs-wide" disabled={llmSaving}>
                       Cancel
                     </Button>
-                    {(kb.llm_model || kb.temperature != null || kb.use_self_check != null) && (
+                    {(kb.llm_model || kb.temperature != null || kb.use_self_check != null || kb.use_llm_chat_titles != null) && (
                       <Button
                         onClick={async () => {
                           if (!id || !window.confirm('Reset LLM settings to global defaults for this KB?')) return
@@ -2111,9 +2061,16 @@ export function KBDetailsPage() {
                               llm_provider: null,
                               temperature: null,
                               use_self_check: null,
+                              use_llm_chat_titles: null,
                             })
                             setKb(updated)
-                            setLlmDraft({ llm_model: null, llm_provider: null, temperature: null, use_self_check: null })
+                            setLlmDraft({
+                              llm_model: null,
+                              llm_provider: null,
+                              temperature: null,
+                              use_self_check: null,
+                              chat_title_mode: 'default',
+                            })
                             setIsEditingLlm(false)
                           } catch {
                             // ignore
@@ -2136,6 +2093,11 @@ export function KBDetailsPage() {
                     { label: 'LLM Provider', value: kb.llm_provider ?? '—', isOverride: !!kb.llm_provider },
                     { label: 'Temperature', value: kb.temperature != null ? kb.temperature.toFixed(1) : '—', isOverride: kb.temperature != null },
                     { label: 'Self-Check', value: kb.use_self_check != null ? (kb.use_self_check ? 'enabled' : 'disabled') : '—', isOverride: kb.use_self_check != null },
+                    {
+                      label: 'Chat Titles',
+                      value: kb.use_llm_chat_titles != null ? (kb.use_llm_chat_titles ? 'enabled' : 'disabled') : '—',
+                      isOverride: kb.use_llm_chat_titles != null,
+                    },
                   ].map(({ label, value, isOverride }) => (
                     <div key={label} className="flex items-center justify-between">
                       <span className="text-gray-400">{label}:</span>
@@ -2152,58 +2114,12 @@ export function KBDetailsPage() {
             </div>
           )}
 
-          <div className="mt-6 flex items-center justify-between">
-            <div className="text-xs text-gray-500">
-              Full reindex: re-chunk, re-embed, and rebuild BM25 for all existing documents.
-            </div>
-            <Button
-              onClick={handleReindexBm25}
-              size="xs-wide"
-              disabled={reindexing}
-            >
-              {reindexing ? 'Reindexing…' : 'Reindex All (Full)'}
-            </Button>
-          </div>
-
-          <div className="mt-4 flex items-center justify-between">
-            <div className="text-xs text-gray-500">
-              Full reindex using the current chunking strategy and settings.
-            </div>
-            <Button
-              onClick={handleReprocessWithNewStrategy}
-              size="xs-wide"
-              disabled={reindexing}
-            >
-              {reindexing ? 'Reprocessing…' : 'Reindex All (Strategy)'}
-            </Button>
-          </div>
-
-          <div className="mt-2 text-xs text-gray-500">
-            Duplicate analysis on upload: {detectDuplicatesOnUpload ? 'enabled' : 'disabled'}.
-          </div>
-
-          <div className="mt-2 text-xs text-gray-500">
-            Duplicate analysis on reindex: {detectDuplicatesOnReindex ? 'enabled' : 'disabled'}.
-          </div>
-
-          <div className="mt-2 flex items-center gap-2">
-            <label className="flex items-center gap-2 text-xs text-gray-400">
-              <input
-                type="checkbox"
-                checked={detectDuplicatesOnReindex}
-                onChange={(e) => setDetectDuplicatesOnReindex(e.target.checked)}
-                className="rounded border-gray-600 bg-gray-800"
-              />
-              Compute duplicate chunks on reindex
-            </label>
-          </div>
-
           <div className="mt-4 border-t border-gray-700 pt-4 space-y-3">
-            <div className="text-xs text-gray-400">
+            <div className="text-sm text-gray-400">
               Regenerate chat titles for this KB (uses the first Q&amp;A per conversation).
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <label className="flex items-center gap-2 text-xs text-gray-300">
+              <label className="flex items-center gap-2 text-sm text-gray-300">
                 <input
                   type="checkbox"
                   checked={regenIncludeExisting}
@@ -2220,7 +2136,7 @@ export function KBDetailsPage() {
                   placeholder="Limit (optional)"
                   value={regenLimit}
                   onChange={(e) => setRegenLimit(e.target.value)}
-                  className="w-40 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-100"
+                  className="w-40 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-sm text-gray-100"
                   disabled={regenTitlesLoading}
                 />
                 <Button
@@ -2233,13 +2149,10 @@ export function KBDetailsPage() {
               </div>
             </div>
             {regenTitlesMessage && (
-              <div className="text-xs text-gray-400">{regenTitlesMessage}</div>
+              <div className="text-sm text-gray-400">{regenTitlesMessage}</div>
             )}
           </div>
 
-          {reindexMessage && (
-            <div className="mt-2 text-xs text-gray-400">{reindexMessage}</div>
-          )}
         </div>
         )}
 
