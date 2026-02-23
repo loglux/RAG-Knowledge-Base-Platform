@@ -56,6 +56,18 @@ class KnowledgeBaseBase(BaseModel):
     use_llm_chat_titles: Optional[bool] = Field(
         default=None, description="Override for LLM-generated chat titles (None = use app default)"
     )
+    llm_model: Optional[str] = Field(
+        default=None, description="KB-level LLM model override for chat"
+    )
+    llm_provider: Optional[str] = Field(
+        default=None, description="KB-level LLM provider override for chat"
+    )
+    temperature: Optional[float] = Field(
+        default=None, ge=0.0, le=2.0, description="KB-level temperature override"
+    )
+    use_self_check: Optional[bool] = Field(
+        default=None, description="KB-level self-check validation override"
+    )
 
     @field_validator("chunk_overlap")
     @classmethod
@@ -501,6 +513,9 @@ class AppSettingsBase(BaseModel):
     bm25_min_should_match: Optional[int] = Field(default=None, ge=0, le=100)
     bm25_use_phrase: Optional[bool] = Field(default=None)
     bm25_analyzer: Optional[str] = Field(default=None)
+    use_self_check: Optional[bool] = Field(
+        default=None, description="Default self-check validation for all chats"
+    )
     structure_requests_per_minute: Optional[int] = Field(default=None, ge=0, le=120)
     kb_chunk_size: Optional[int] = Field(default=None, ge=100, le=2000)
     kb_chunk_overlap: Optional[int] = Field(default=None, ge=0, le=500)

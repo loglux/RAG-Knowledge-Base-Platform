@@ -12,17 +12,20 @@ def resolve_scoped_value(
     request_overrides: Mapping[str, Any],
     request_value: Any,
     conversation_overrides: Mapping[str, Any] | None = None,
+    kb_overrides: Mapping[str, Any] | None = None,
     app_overrides: Mapping[str, Any] | None = None,
     fallback: Any = None,
 ) -> Any:
     """
     Resolve a setting value with deterministic precedence:
-    request > conversation > app > fallback.
+    request > conversation > kb > app > fallback.
     """
     if key in request_overrides:
         return request_value
     if conversation_overrides and conversation_overrides.get(key) is not None:
         return conversation_overrides.get(key)
+    if kb_overrides and kb_overrides.get(key) is not None:
+        return kb_overrides.get(key)
     if app_overrides and app_overrides.get(key) is not None:
         return app_overrides.get(key)
     return fallback

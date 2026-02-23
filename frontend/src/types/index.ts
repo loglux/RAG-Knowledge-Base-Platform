@@ -13,6 +13,10 @@ export interface KnowledgeBase {
   bm25_analyzer?: string | null
   structure_llm_model?: string | null
   use_llm_chat_titles?: boolean | null
+  llm_model?: string | null
+  llm_provider?: string | null
+  temperature?: number | null
+  use_self_check?: boolean | null
   collection_name: string
   document_count: number
   total_chunks: number
@@ -39,6 +43,10 @@ export interface CreateKBRequest {
   bm25_analyzer?: string | null
   structure_llm_model?: string | null
   use_llm_chat_titles?: boolean | null
+  llm_model?: string | null
+  llm_provider?: string | null
+  temperature?: number | null
+  use_self_check?: boolean | null
 }
 
 export interface EmbeddingModel {
@@ -545,4 +553,52 @@ export interface MCPOAuthEvent {
   ip_address?: string | null
   user_agent?: string | null
   created_at: string
+}
+
+export interface KBRetrievalSettingsStored {
+  top_k?: number | null
+  retrieval_mode?: 'dense' | 'hybrid' | 'lexical' | null
+  lexical_top_k?: number | null
+  hybrid_dense_weight?: number | null
+  hybrid_lexical_weight?: number | null
+  max_context_chars?: number | null
+  score_threshold?: number | null
+  use_structure?: boolean | null
+  rerank_enabled?: boolean | null
+  rerank_provider?: string | null
+  rerank_model?: string | null
+  rerank_candidate_pool?: number | null
+  rerank_top_n?: number | null
+  rerank_min_score?: number | null
+  bm25_match_mode?: string | null
+  bm25_min_should_match?: number | null
+  bm25_use_phrase?: boolean | null
+  bm25_analyzer?: string | null
+}
+
+export interface KBRetrievalSettingsEffective {
+  top_k: number
+  retrieval_mode: 'dense' | 'hybrid' | 'lexical'
+  lexical_top_k: number
+  hybrid_dense_weight: number
+  hybrid_lexical_weight: number
+  max_context_chars: number
+  score_threshold: number
+  use_structure: boolean
+  rerank_enabled: boolean
+  rerank_provider: string | null
+  rerank_model: string | null
+  rerank_candidate_pool: number
+  rerank_top_n: number | null
+  rerank_min_score: number | null
+  bm25_match_mode: string | null
+  bm25_min_should_match: number | null
+  bm25_use_phrase: boolean | null
+  bm25_analyzer: string | null
+}
+
+export interface KBRetrievalSettingsEnvelope {
+  stored: KBRetrievalSettingsStored | null
+  effective: KBRetrievalSettingsEffective
+  explain: Record<string, string>
 }

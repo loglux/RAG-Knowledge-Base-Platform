@@ -209,10 +209,17 @@ async def chat_query(
                 "llm_provider": app_settings_row.llm_provider,
                 "llm_model": app_settings_row.llm_model,
                 "temperature": app_settings_row.temperature,
+                "use_self_check": app_settings_row.use_self_check,
             }
             if app_settings_row
             else {}
         )
+        kb_scope = {
+            "llm_provider": kb.llm_provider,
+            "llm_model": kb.llm_model,
+            "temperature": kb.temperature,
+            "use_self_check": kb.use_self_check,
+        }
 
         # Resolve retrieval settings via shared resolver used by /retrieve and MCP.
         retrieval_fields = set(RETRIEVAL_FIELDS + BM25_FIELDS)
@@ -236,6 +243,7 @@ async def chat_query(
             request_overrides=request_payload,
             request_value=request.llm_provider,
             conversation_overrides=conversation_settings_payload,
+            kb_overrides=kb_scope,
             app_overrides=app_scope,
             fallback=app_settings.LLM_PROVIDER,
         )
@@ -244,6 +252,7 @@ async def chat_query(
             request_overrides=request_payload,
             request_value=request.llm_model,
             conversation_overrides=conversation_settings_payload,
+            kb_overrides=kb_scope,
             app_overrides=app_scope,
             fallback=app_settings.OPENAI_CHAT_MODEL,
         )
@@ -252,6 +261,7 @@ async def chat_query(
             request_overrides=request_payload,
             request_value=request.temperature,
             conversation_overrides=conversation_settings_payload,
+            kb_overrides=kb_scope,
             app_overrides=app_scope,
             fallback=app_settings.OPENAI_TEMPERATURE,
         )
@@ -260,6 +270,8 @@ async def chat_query(
             request_overrides=request_payload,
             request_value=request.use_self_check,
             conversation_overrides=conversation_settings_payload,
+            kb_overrides=kb_scope,
+            app_overrides=app_scope,
             fallback=False,
         )
 

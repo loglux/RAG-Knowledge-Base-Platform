@@ -41,6 +41,8 @@ import type {
   MCPRefreshToken,
   MCPOAuthEvent,
   OAuthTokenResponse,
+  KBRetrievalSettingsStored,
+  KBRetrievalSettingsEnvelope,
 } from '../types/index'
 
 const ACCESS_TOKEN_KEY = 'kb_access_token'
@@ -383,6 +385,21 @@ class APIClient {
 
   async updateKnowledgeBase(id: string, data: Partial<CreateKBRequest>): Promise<KnowledgeBase> {
     const response = await this.client.put<KnowledgeBase>(`/knowledge-bases/${id}`, data)
+    return response.data
+  }
+
+  async getKBRetrievalSettings(id: string): Promise<KBRetrievalSettingsEnvelope> {
+    const response = await this.client.get<KBRetrievalSettingsEnvelope>(`/knowledge-bases/${id}/retrieval-settings`)
+    return response.data
+  }
+
+  async updateKBRetrievalSettings(id: string, data: KBRetrievalSettingsStored): Promise<KBRetrievalSettingsEnvelope> {
+    const response = await this.client.put<KBRetrievalSettingsEnvelope>(`/knowledge-bases/${id}/retrieval-settings`, data)
+    return response.data
+  }
+
+  async clearKBRetrievalSettings(id: string): Promise<KBRetrievalSettingsEnvelope> {
+    const response = await this.client.delete<KBRetrievalSettingsEnvelope>(`/knowledge-bases/${id}/retrieval-settings`)
     return response.data
   }
 

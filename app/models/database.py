@@ -85,6 +85,18 @@ class KnowledgeBase(Base):
     retrieval_settings_json: Mapped[Optional[str]] = mapped_column(
         Text, nullable=True, comment="JSON-encoded retrieval settings overrides"
     )
+    llm_model: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True, comment="KB-level LLM model override for chat"
+    )
+    llm_provider: Mapped[Optional[str]] = mapped_column(
+        String(50), nullable=True, comment="KB-level LLM provider override for chat"
+    )
+    temperature: Mapped[Optional[float]] = mapped_column(
+        sa.Float, nullable=True, comment="KB-level temperature override for chat"
+    )
+    use_self_check: Mapped[Optional[bool]] = mapped_column(
+        Boolean, nullable=True, comment="KB-level self-check validation override"
+    )
 
     # Statistics
     document_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -418,6 +430,7 @@ class AppSettings(Base):
     bm25_min_should_match: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     bm25_use_phrase: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     bm25_analyzer: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    use_self_check: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     structure_requests_per_minute: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     kb_chunk_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     kb_chunk_overlap: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)

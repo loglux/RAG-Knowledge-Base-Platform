@@ -8,7 +8,7 @@ import { useDocumentPolling } from '../hooks/useDocumentPolling'
 import { FileUpload } from '../components/documents/FileUpload'
 import { DocumentItem } from '../components/documents/DocumentItem'
 import { LLMSelector } from '../components/chat/LLMSelector'
-import type { KnowledgeBase, AppSettings, QAEvalRun, QAEvalRunDetail } from '../types/index'
+import type { KnowledgeBase, AppSettings, QAEvalRun, QAEvalRunDetail, KBRetrievalSettingsEnvelope, KBRetrievalSettingsStored } from '../types/index'
 
 export function KBDetailsPage() {
   const { id } = useParams<{ id: string }>()
@@ -80,6 +80,16 @@ export function KBDetailsPage() {
   })
   const [settingsErrors, setSettingsErrors] = useState<Record<string, string>>({})
   const [settingsSaving, setSettingsSaving] = useState(false)
+  const [mainTab, setMainTab] = useState<'documents' | 'settings' | 'evaluation'>('documents')
+  const [configTab, setConfigTab] = useState<'chunking' | 'search' | 'llm'>('chunking')
+  const [isEditingLlm, setIsEditingLlm] = useState(false)
+  const [llmDraft, setLlmDraft] = useState<{ llm_model: string | null; llm_provider: string | null; temperature: number | null; use_self_check: boolean | null }>({ llm_model: null, llm_provider: null, temperature: null, use_self_check: null })
+  const [llmSaving, setLlmSaving] = useState(false)
+  const [retrievalEnvelope, setRetrievalEnvelope] = useState<KBRetrievalSettingsEnvelope | null>(null)
+  const [isEditingRetrieval, setIsEditingRetrieval] = useState(false)
+  const [retrievalDraft, setRetrievalDraft] = useState<KBRetrievalSettingsStored>({})
+  const [retrievalSaving, setRetrievalSaving] = useState(false)
+  const [linkHybridWeights, setLinkHybridWeights] = useState(true)
   const [structureModelOverride, setStructureModelOverride] = useState(false)
   const [reindexing, setReindexing] = useState(false)
   const [reindexMessage, setReindexMessage] = useState<string | null>(null)
@@ -115,6 +125,16 @@ export function KBDetailsPage() {
   const [qaOnlyLow, setQaOnlyLow] = useState(false)
   const [qaDeleting, setQaDeleting] = useState(false)
   const [qaDetailsSeed, setQaDetailsSeed] = useState(0)
+
+  const loadRetrievalSettings = async (kbId: string) => {
+    try {
+      const envelope = await apiClient.getKBRetrievalSettings(kbId)
+      setRetrievalEnvelope(envelope)
+      setRetrievalDraft(envelope.stored ?? {})
+    } catch {
+      // Silently ignore - retrieval settings are optional
+    }
+  }
 
   const buildSettingsData = (kbData: KnowledgeBase, defaults?: AppSettings | null) => {
     const bm25Override = kbData.bm25_match_mode !== null
@@ -162,6 +182,7 @@ export function KBDetailsPage() {
         setKbError(null)
         const data = await apiClient.getKnowledgeBase(id!)
         setKb(data)
+        loadRetrievalSettings(id!)
         setNameDraft(data.name)
         setSettingsData(buildSettingsData(data, appDefaults))
       } catch (err) {
@@ -738,8 +759,8 @@ export function KBDetailsPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Action Buttons */}
-        <div className="flex items-center space-x-4 mb-8">
+        {/* Top bar: Chat button + main tab navigation */}
+        <div className="flex items-center justify-between mb-6">
           <Button
             onClick={() => navigate(`/kb/${kb.id}/chat`)}
             variant="primary"
@@ -748,44 +769,63 @@ export function KBDetailsPage() {
             <span>💬</span>
             <span>Chat with KB</span>
           </Button>
-          <Button onClick={refreshDocuments} className="flex items-center space-x-2">
-            <span>⟳</span>
-            <span>Refresh</span>
-          </Button>
-          <Button
-            onClick={handleAnalyzeAll}
-            disabled={bulkAnalyzing}
-            className="flex items-center space-x-2 disabled:opacity-60"
-          >
-            <span>🔍</span>
-            <span>{bulkAnalyzing ? 'Analyzing…' : 'Analyze All'}</span>
-          </Button>
-          <label className="flex items-center space-x-2 text-sm text-gray-400">
-            <input
-              type="checkbox"
-              checked={bulkSkipAnalyzed}
-              onChange={(e) => setBulkSkipAnalyzed(e.target.checked)}
-              className="rounded border-gray-600 bg-gray-800"
-            />
-            <span>Skip already analyzed</span>
-          </label>
         </div>
-        {bulkError && (
-          <div className="mb-4 p-3 rounded border border-red-500 bg-red-500/10 text-red-400 text-sm">
-            {bulkError}
-          </div>
-        )}
-        {bulkAnalyzing && (
-          <div className="mb-4 text-xs text-gray-400">
-            Analyzing documents: {bulkProgress.done}/{bulkProgress.total}
-          </div>
-        )}
 
-        {/* Documents Section */}
+        {/* Main Tabs */}
+        <div className="flex gap-0 border-b border-gray-700 mb-6">
+          {([
+            { key: 'documents', label: `📄 Documents (${documents.length})` },
+            { key: 'settings',   label: '⚙️ Settings' },
+            { key: 'evaluation', label: '🎯 Evaluation' },
+          ] as const).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setMainTab(key)}
+              className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                mainTab === key
+                  ? 'border-primary-500 text-primary-500'
+                  : 'border-transparent text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Documents Tab ── */}
+        {mainTab === 'documents' && (
         <div className="mb-8">
-          <h2 className="text-xl font-semibold text-white mb-4">
-            📄 Documents ({documents.length})
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-white">Documents</h2>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 text-xs text-gray-400">
+                <input
+                  type="checkbox"
+                  checked={bulkSkipAnalyzed}
+                  onChange={(e) => setBulkSkipAnalyzed(e.target.checked)}
+                  className="rounded border-gray-600 bg-gray-800"
+                />
+                Skip already analyzed
+              </label>
+              <Button
+                onClick={handleAnalyzeAll}
+                disabled={bulkAnalyzing}
+                size="xs-wide"
+                className="flex items-center gap-1.5 disabled:opacity-60"
+              >
+                🔍 {bulkAnalyzing ? `Analyzing… ${bulkProgress.done}/${bulkProgress.total}` : 'Analyze All'}
+              </Button>
+              <Button onClick={refreshDocuments} size="xs-wide" className="flex items-center gap-1.5">
+                ⟳ Refresh
+              </Button>
+            </div>
+          </div>
+
+          {bulkError && (
+            <div className="mb-4 p-3 rounded border border-red-500 bg-red-500/10 text-red-400 text-sm">
+              {bulkError}
+            </div>
+          )}
 
           {/* Upload Area */}
           <div className="mb-6">
@@ -833,8 +873,10 @@ export function KBDetailsPage() {
             </div>
           )}
         </div>
+        )}
 
-        {/* Auto-Tuning (Gold QA) */}
+        {/* ── Evaluation Tab ── */}
+        {mainTab === 'evaluation' && (
         <div className="card mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -1146,12 +1188,14 @@ export function KBDetailsPage() {
             </div>
           )}
         </div>
+        )}
 
-        {/* KB Settings */}
+        {/* ── Settings Tab ── */}
+        {mainTab === 'settings' && (
         <div className="card">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-white">Configuration</h3>
-            {!isEditingSettings && (
+            {configTab === 'chunking' && !isEditingSettings && (
               <Button
                 onClick={() => setIsEditingSettings(true)}
                 size="xs-wide"
@@ -1159,9 +1203,70 @@ export function KBDetailsPage() {
                 Edit
               </Button>
             )}
+            {configTab === 'search' && !isEditingRetrieval && (
+              <Button
+                onClick={() => {
+                  setRetrievalDraft(retrievalEnvelope?.stored ?? {})
+                  setIsEditingRetrieval(true)
+                }}
+                size="xs-wide"
+              >
+                Edit
+              </Button>
+            )}
+            {configTab === 'llm' && !isEditingLlm && (
+              <Button
+                onClick={() => {
+                  setLlmDraft({
+                    llm_model: kb.llm_model ?? null,
+                    llm_provider: kb.llm_provider ?? null,
+                    temperature: kb.temperature ?? null,
+                    use_self_check: kb.use_self_check ?? null,
+                  })
+                  setIsEditingLlm(true)
+                }}
+                size="xs-wide"
+              >
+                Edit
+              </Button>
+            )}
           </div>
 
-          {isEditingSettings ? (
+          {/* Config Tabs */}
+          <div className="flex gap-0 border-b border-gray-700 mb-4">
+            <button
+              onClick={() => setConfigTab('chunking')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                configTab === 'chunking'
+                  ? 'border-primary-500 text-primary-500'
+                  : 'border-transparent text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              Chunking
+            </button>
+            <button
+              onClick={() => setConfigTab('search')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                configTab === 'search'
+                  ? 'border-primary-500 text-primary-500'
+                  : 'border-transparent text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              Search & Retrieval
+            </button>
+            <button
+              onClick={() => setConfigTab('llm')}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                configTab === 'llm'
+                  ? 'border-primary-500 text-primary-500'
+                  : 'border-transparent text-gray-400 hover:text-gray-300'
+              }`}
+            >
+              LLM & Chat
+            </button>
+          </div>
+
+          {configTab === 'chunking' && isEditingSettings ? (
             <div className="space-y-4 text-sm">
               {/* Chunking Strategy */}
               <div>
@@ -1464,7 +1569,7 @@ export function KBDetailsPage() {
                 </Button>
               </div>
             </div>
-          ) : (
+          ) : configTab === 'chunking' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-gray-400">Chunk Size:</span>
@@ -1515,6 +1620,535 @@ export function KBDetailsPage() {
                 <span className="text-gray-400">Collection:</span>
                 <span className="text-white ml-2 font-mono text-xs">{kb.collection_name}</span>
               </div>
+            </div>
+          ) : null}
+
+          {configTab === 'search' && (
+            <div className="space-y-4 text-sm">
+              {isEditingRetrieval ? (
+                /* ── Edit mode ── */
+                <div className="space-y-4">
+                  {/* Retrieval Mode */}
+                  <div>
+                    <label className="block text-gray-400 mb-2">Retrieval Mode</label>
+                    <select
+                      value={retrievalDraft.retrieval_mode ?? ''}
+                      onChange={(e) => setRetrievalDraft({ ...retrievalDraft, retrieval_mode: (e.target.value || null) as 'dense' | 'hybrid' | 'lexical' | null })}
+                      className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100"
+                    >
+                      <option value="">— use global default ({retrievalEnvelope?.effective.retrieval_mode ?? 'dense'}) —</option>
+                      <option value="dense">Dense (vector)</option>
+                      <option value="hybrid">Hybrid (vector + BM25)</option>
+                      <option value="lexical">Lexical (BM25 only)</option>
+                    </select>
+                  </div>
+
+                  {/* Top-K */}
+                  <div>
+                    <label className="block text-gray-400 mb-2">
+                      Top-K: <span className="text-white font-medium">{retrievalDraft.top_k ?? retrievalEnvelope?.effective.top_k ?? 5}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="1" max="50" step="1"
+                      value={retrievalDraft.top_k ?? retrievalEnvelope?.effective.top_k ?? 5}
+                      onChange={(e) => setRetrievalDraft({ ...retrievalDraft, top_k: parseInt(e.target.value) })}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500 mt-1"><span>1</span><span>50</span></div>
+                    {retrievalDraft.top_k == null && (
+                      <p className="text-xs text-gray-500 mt-1">Using global default</p>
+                    )}
+                  </div>
+
+                  {/* Score Threshold */}
+                  <div>
+                    <label className="block text-gray-400 mb-2">
+                      Score Threshold: <span className="text-white font-medium">{(retrievalDraft.score_threshold ?? retrievalEnvelope?.effective.score_threshold ?? 0).toFixed(2)}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="0" max="1" step="0.05"
+                      value={retrievalDraft.score_threshold ?? retrievalEnvelope?.effective.score_threshold ?? 0}
+                      onChange={(e) => setRetrievalDraft({ ...retrievalDraft, score_threshold: parseFloat(e.target.value) })}
+                      className="w-full"
+                    />
+                    {retrievalDraft.score_threshold == null && (
+                      <p className="text-xs text-gray-500 mt-1">Using global default</p>
+                    )}
+                  </div>
+
+                  {/* Max Context Chars */}
+                  <div>
+                    <label className="block text-gray-400 mb-2">
+                      Max context chars: <span className="text-white font-medium">
+                        {(retrievalDraft.max_context_chars ?? retrievalEnvelope?.effective.max_context_chars ?? 0) === 0
+                          ? 'unlimited'
+                          : (retrievalDraft.max_context_chars ?? retrievalEnvelope?.effective.max_context_chars ?? 0).toLocaleString()}
+                      </span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1000"
+                      value={retrievalDraft.max_context_chars ?? retrievalEnvelope?.effective.max_context_chars ?? 0}
+                      onChange={(e) => setRetrievalDraft({ ...retrievalDraft, max_context_chars: parseInt(e.target.value) || 0 })}
+                      className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">0 = unlimited</p>
+                  </div>
+
+                  {/* Hybrid weights + BM25 - show when mode is hybrid or lexical */}
+                  {(['hybrid', 'lexical'].includes(retrievalDraft.retrieval_mode ?? retrievalEnvelope?.effective.retrieval_mode ?? '')) && (
+                    <div className="space-y-3 p-3 bg-gray-800 rounded-lg">
+                      {(retrievalDraft.retrieval_mode ?? retrievalEnvelope?.effective.retrieval_mode) === 'hybrid' && (<>
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs text-gray-400 font-medium">Hybrid Weights</div>
+                        <label className="flex items-center gap-1.5 text-xs text-gray-400 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={linkHybridWeights}
+                            onChange={(e) => setLinkHybridWeights(e.target.checked)}
+                            className="rounded"
+                          />
+                          Link weights (lexical = 1 − dense)
+                        </label>
+                      </div>
+                      <div>
+                        <label className="block text-gray-400 mb-1 text-xs">
+                          Dense weight: <span className="text-white">{(retrievalDraft.hybrid_dense_weight ?? retrievalEnvelope?.effective.hybrid_dense_weight ?? 0.6).toFixed(2)}</span>
+                        </label>
+                        <input
+                          type="range" min="0" max="1" step="0.05"
+                          value={retrievalDraft.hybrid_dense_weight ?? retrievalEnvelope?.effective.hybrid_dense_weight ?? 0.6}
+                          onChange={(e) => {
+                            const dense = parseFloat(e.target.value)
+                            setRetrievalDraft({
+                              ...retrievalDraft,
+                              hybrid_dense_weight: dense,
+                              ...(linkHybridWeights ? { hybrid_lexical_weight: parseFloat((1 - dense).toFixed(2)) } : {}),
+                            })
+                          }}
+                          className="w-full"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-gray-400 mb-1 text-xs">
+                          Lexical weight: <span className="text-white">{(retrievalDraft.hybrid_lexical_weight ?? retrievalEnvelope?.effective.hybrid_lexical_weight ?? 0.4).toFixed(2)}</span>
+                        </label>
+                        <input
+                          type="range" min="0" max="1" step="0.05"
+                          value={retrievalDraft.hybrid_lexical_weight ?? retrievalEnvelope?.effective.hybrid_lexical_weight ?? 0.4}
+                          disabled={linkHybridWeights}
+                          onChange={(e) => {
+                            const lexical = parseFloat(e.target.value)
+                            setRetrievalDraft({
+                              ...retrievalDraft,
+                              hybrid_lexical_weight: lexical,
+                              ...(linkHybridWeights ? { hybrid_dense_weight: parseFloat((1 - lexical).toFixed(2)) } : {}),
+                            })
+                          }}
+                          className="w-full disabled:opacity-40"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-gray-400 mb-1 text-xs">
+                          Lexical Top-K: <span className="text-white">{retrievalDraft.lexical_top_k ?? retrievalEnvelope?.effective.lexical_top_k ?? 20}</span>
+                        </label>
+                        <input
+                          type="range" min="1" max="100" step="1"
+                          value={retrievalDraft.lexical_top_k ?? retrievalEnvelope?.effective.lexical_top_k ?? 20}
+                          onChange={(e) => setRetrievalDraft({ ...retrievalDraft, lexical_top_k: parseInt(e.target.value) })}
+                          className="w-full"
+                        />
+                      </div>
+                      </>)}
+                      <div className="border-t border-gray-700 pt-3 mt-1">
+                        <div className="text-xs text-gray-400 font-medium mb-3">BM25 Settings</div>
+                        <div className="grid grid-cols-1 gap-3">
+                          <div>
+                            <label className="block text-gray-400 mb-1 text-xs">Match mode</label>
+                            <select
+                              value={retrievalDraft.bm25_match_mode ?? retrievalEnvelope?.effective.bm25_match_mode ?? ''}
+                              onChange={(e) => setRetrievalDraft({ ...retrievalDraft, bm25_match_mode: e.target.value || null })}
+                              className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100 text-xs"
+                            >
+                              <option value="">— global default —</option>
+                              {(bm25MatchModes ?? ['strict', 'balanced', 'loose']).map((m) => (
+                                <option key={m} value={m}>{m}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-gray-400 mb-1 text-xs">
+                              Min should match: <span className="text-white">{retrievalDraft.bm25_min_should_match ?? retrievalEnvelope?.effective.bm25_min_should_match ?? 0}%</span>
+                            </label>
+                            <input
+                              type="range" min="0" max="100" step="5"
+                              value={retrievalDraft.bm25_min_should_match ?? retrievalEnvelope?.effective.bm25_min_should_match ?? 0}
+                              onChange={(e) => setRetrievalDraft({ ...retrievalDraft, bm25_min_should_match: parseInt(e.target.value) })}
+                              className="w-full"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={retrievalDraft.bm25_use_phrase ?? retrievalEnvelope?.effective.bm25_use_phrase ?? false}
+                              onChange={(e) => setRetrievalDraft({ ...retrievalDraft, bm25_use_phrase: e.target.checked })}
+                              className="rounded"
+                            />
+                            <label className="text-xs text-gray-400">Use phrase match</label>
+                          </div>
+                          <div>
+                            <label className="block text-gray-400 mb-1 text-xs">
+                              Analyzer <span className="text-gray-500">(advanced — requires reindex)</span>
+                            </label>
+                            <select
+                              value={retrievalDraft.bm25_analyzer ?? retrievalEnvelope?.effective.bm25_analyzer ?? ''}
+                              onChange={(e) => setRetrievalDraft({ ...retrievalDraft, bm25_analyzer: e.target.value || null })}
+                              className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1 text-gray-100 text-xs"
+                            >
+                              <option value="">— global default —</option>
+                              {(bm25Analyzers ?? ['auto', 'ru', 'en']).map((a) => (
+                                <option key={a} value={a}>{a}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Rerank */}
+                  <div className="space-y-2 p-3 bg-gray-800 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <label className="text-gray-400 text-xs font-medium">Reranking</label>
+                      <label className="flex items-center gap-2 text-xs text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={retrievalDraft.rerank_enabled ?? retrievalEnvelope?.effective.rerank_enabled ?? false}
+                          onChange={(e) => setRetrievalDraft({ ...retrievalDraft, rerank_enabled: e.target.checked })}
+                          className="rounded border-gray-600 bg-gray-900"
+                        />
+                        Enabled
+                      </label>
+                    </div>
+                    {(retrievalDraft.rerank_enabled ?? retrievalEnvelope?.effective.rerank_enabled) && (
+                      <div className="space-y-3 mt-2">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-gray-400 mb-1 text-xs">Provider</label>
+                            <input
+                              type="text"
+                              value={retrievalDraft.rerank_provider ?? retrievalEnvelope?.effective.rerank_provider ?? ''}
+                              onChange={(e) => setRetrievalDraft({ ...retrievalDraft, rerank_provider: e.target.value || null })}
+                              placeholder="e.g. cohere, voyage"
+                              className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100 text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-gray-400 mb-1 text-xs">Model</label>
+                            <input
+                              type="text"
+                              value={retrievalDraft.rerank_model ?? retrievalEnvelope?.effective.rerank_model ?? ''}
+                              onChange={(e) => setRetrievalDraft({ ...retrievalDraft, rerank_model: e.target.value || null })}
+                              placeholder="e.g. rerank-2.5-lite"
+                              className="w-full bg-gray-900 border border-gray-700 rounded px-2 py-1.5 text-gray-100 text-xs"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-gray-400 mb-1 text-xs">
+                            Candidate pool: <span className="text-white">{retrievalDraft.rerank_candidate_pool ?? retrievalEnvelope?.effective.rerank_candidate_pool ?? 20}</span>
+                          </label>
+                          <input
+                            type="range" min="1" max="100" step="1"
+                            value={retrievalDraft.rerank_candidate_pool ?? retrievalEnvelope?.effective.rerank_candidate_pool ?? 20}
+                            onChange={(e) => setRetrievalDraft({ ...retrievalDraft, rerank_candidate_pool: parseInt(e.target.value) })}
+                            className="w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-gray-400 mb-1 text-xs">
+                            Top-N after rerank: <span className="text-white">{retrievalDraft.rerank_top_n ?? retrievalEnvelope?.effective.rerank_top_n ?? '—'}</span>
+                          </label>
+                          <input
+                            type="range" min="1" max="50" step="1"
+                            value={retrievalDraft.rerank_top_n ?? retrievalEnvelope?.effective.rerank_top_n ?? 5}
+                            onChange={(e) => setRetrievalDraft({ ...retrievalDraft, rerank_top_n: parseInt(e.target.value) })}
+                            className="w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-gray-400 mb-1 text-xs">
+                            Min rerank score: <span className="text-white">{(retrievalDraft.rerank_min_score ?? retrievalEnvelope?.effective.rerank_min_score ?? 0).toFixed(2)}</span>
+                          </label>
+                          <input
+                            type="range" min="0" max="1" step="0.05"
+                            value={retrievalDraft.rerank_min_score ?? retrievalEnvelope?.effective.rerank_min_score ?? 0}
+                            onChange={(e) => setRetrievalDraft({ ...retrievalDraft, rerank_min_score: parseFloat(e.target.value) })}
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Use Structure */}
+                  <div>
+                    <label className="flex items-center gap-2 text-gray-400 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={retrievalDraft.use_structure ?? retrievalEnvelope?.effective.use_structure ?? false}
+                        onChange={(e) => setRetrievalDraft({ ...retrievalDraft, use_structure: e.target.checked })}
+                        className="rounded border-gray-600 bg-gray-900"
+                      />
+                      Use document structure (TOC) for retrieval
+                    </label>
+                    {retrievalDraft.use_structure == null && (
+                      <p className="text-xs text-gray-500 mt-1 ml-5">Using global default</p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2">
+                    <Button
+                      onClick={async () => {
+                        if (!id) return
+                        setRetrievalSaving(true)
+                        try {
+                          // Remove null/undefined fields before sending
+                          const payload: KBRetrievalSettingsStored = {}
+                          Object.entries(retrievalDraft).forEach(([k, v]) => {
+                            if (v !== null && v !== undefined && v !== '') {
+                              (payload as Record<string, unknown>)[k] = v
+                            }
+                          })
+                          const updated = await apiClient.updateKBRetrievalSettings(id, payload)
+                          setRetrievalEnvelope(updated)
+                          setRetrievalDraft(updated.stored ?? {})
+                          setIsEditingRetrieval(false)
+                        } catch {
+                          // ignore
+                        } finally {
+                          setRetrievalSaving(false)
+                        }
+                      }}
+                      variant="primary"
+                      size="xs-wide"
+                      disabled={retrievalSaving}
+                    >
+                      {retrievalSaving ? 'Saving...' : 'Save'}
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setRetrievalDraft(retrievalEnvelope?.stored ?? {})
+                        setIsEditingRetrieval(false)
+                      }}
+                      size="xs-wide"
+                      disabled={retrievalSaving}
+                    >
+                      Cancel
+                    </Button>
+                    {retrievalEnvelope?.stored && Object.keys(retrievalEnvelope.stored).length > 0 && (
+                      <Button
+                        onClick={async () => {
+                          if (!id || !window.confirm('Reset all search settings to global defaults for this KB?')) return
+                          setRetrievalSaving(true)
+                          try {
+                            const updated = await apiClient.clearKBRetrievalSettings(id)
+                            setRetrievalEnvelope(updated)
+                            setRetrievalDraft({})
+                            setIsEditingRetrieval(false)
+                          } catch {
+                            // ignore
+                          } finally {
+                            setRetrievalSaving(false)
+                          }
+                        }}
+                        size="xs-wide"
+                        disabled={retrievalSaving}
+                      >
+                        Reset to Global
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* ── View mode ── */
+                retrievalEnvelope ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {[
+                      { label: 'Retrieval Mode', field: 'retrieval_mode', value: retrievalEnvelope.effective.retrieval_mode },
+                      { label: 'Top-K', field: 'top_k', value: String(retrievalEnvelope.effective.top_k) },
+                      { label: 'Score Threshold', field: 'score_threshold', value: String(retrievalEnvelope.effective.score_threshold) },
+                      { label: 'Max Context Chars', field: 'max_context_chars', value: retrievalEnvelope.effective.max_context_chars === 0 ? 'unlimited' : String(retrievalEnvelope.effective.max_context_chars) },
+                      { label: 'Lexical Top-K', field: 'lexical_top_k', value: String(retrievalEnvelope.effective.lexical_top_k) },
+                      { label: 'Dense Weight', field: 'hybrid_dense_weight', value: String(retrievalEnvelope.effective.hybrid_dense_weight) },
+                      { label: 'Lexical Weight', field: 'hybrid_lexical_weight', value: String(retrievalEnvelope.effective.hybrid_lexical_weight) },
+                      { label: 'BM25 Match Mode', field: 'bm25_match_mode', value: retrievalEnvelope.effective.bm25_match_mode ?? '—' },
+                      { label: 'BM25 Min Match', field: 'bm25_min_should_match', value: retrievalEnvelope.effective.bm25_min_should_match != null ? `${retrievalEnvelope.effective.bm25_min_should_match}%` : '—' },
+                      { label: 'BM25 Phrase', field: 'bm25_use_phrase', value: retrievalEnvelope.effective.bm25_use_phrase ? 'yes' : 'no' },
+                      { label: 'BM25 Analyzer', field: 'bm25_analyzer', value: retrievalEnvelope.effective.bm25_analyzer ?? '—' },
+                      { label: 'Rerank', field: 'rerank_enabled', value: retrievalEnvelope.effective.rerank_enabled ? 'enabled' : 'disabled' },
+                      { label: 'Rerank Provider', field: 'rerank_provider', value: retrievalEnvelope.effective.rerank_provider ?? '—' },
+                      { label: 'Rerank Model', field: 'rerank_model', value: retrievalEnvelope.effective.rerank_model ?? '—' },
+                      { label: 'Candidate Pool', field: 'rerank_candidate_pool', value: String(retrievalEnvelope.effective.rerank_candidate_pool) },
+                      { label: 'Rerank Top-N', field: 'rerank_top_n', value: retrievalEnvelope.effective.rerank_top_n != null ? String(retrievalEnvelope.effective.rerank_top_n) : '—' },
+                      { label: 'Use Structure', field: 'use_structure', value: retrievalEnvelope.effective.use_structure ? 'yes' : 'no' },
+                    ].map(({ label, field, value }) => {
+                      const source = retrievalEnvelope.explain[field] ?? 'defaults'
+                      const isKbOverride = source === 'kb_retrieval_settings' || source === 'kb_columns'
+                      return (
+                        <div key={field} className="flex items-center justify-between">
+                          <span className="text-gray-400">{label}:</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-white font-medium">{value}</span>
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${isKbOverride ? 'bg-primary-500/20 text-primary-400' : 'bg-gray-700 text-gray-400'}`}>
+                              {isKbOverride ? 'KB' : 'global'}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500">Loading...</div>
+                )
+              )}
+            </div>
+          )}
+
+          {/* ── LLM & Chat Tab ── */}
+          {configTab === 'llm' && (
+            <div className="space-y-4 text-sm">
+              {isEditingLlm ? (
+                <div className="space-y-5">
+                  {/* LLM Model */}
+                  <div>
+                    <label className="block text-gray-400 mb-2">LLM Model</label>
+                    <LLMSelector
+                      value={llmDraft.llm_model ?? ''}
+                      onChange={(model, provider) => setLlmDraft({ ...llmDraft, llm_model: model || null, llm_provider: provider || null })}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Leave empty to use global default</p>
+                  </div>
+
+                  {/* Temperature */}
+                  <div>
+                    <label className="block text-gray-400 mb-2">
+                      Temperature: <span className="text-white font-medium">
+                        {llmDraft.temperature != null ? llmDraft.temperature.toFixed(1) : `global default (${appDefaults?.temperature ?? 0.7})`}
+                      </span>
+                    </label>
+                    <input
+                      type="range" min="0" max="2" step="0.1"
+                      value={llmDraft.temperature ?? appDefaults?.temperature ?? 0.7}
+                      onChange={(e) => setLlmDraft({ ...llmDraft, temperature: parseFloat(e.target.value) })}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500 mt-1"><span>0 (precise)</span><span>1</span><span>2 (creative)</span></div>
+                    {llmDraft.temperature != null && (
+                      <button onClick={() => setLlmDraft({ ...llmDraft, temperature: null })} className="mt-1 text-xs text-gray-500 hover:text-gray-300">
+                        Reset to global default
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Self-check */}
+                  <div className="p-3 bg-gray-800 rounded-lg space-y-1">
+                    <label className="flex items-center gap-2 text-gray-300 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={llmDraft.use_self_check ?? false}
+                        onChange={(e) => setLlmDraft({ ...llmDraft, use_self_check: e.target.checked })}
+                        className="rounded border-gray-600 bg-gray-900"
+                      />
+                      Enable Self-Check Validation
+                    </label>
+                    <p className="text-xs text-gray-500 ml-5">Second LLM pass to validate the answer against retrieved chunks. More accurate but slower.</p>
+                    {llmDraft.use_self_check == null && (
+                      <p className="text-xs text-gray-500 ml-5">Using global default</p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <Button
+                      onClick={async () => {
+                        if (!id || !kb) return
+                        setLlmSaving(true)
+                        try {
+                          const updated = await apiClient.updateKnowledgeBase(id, {
+                            llm_model: llmDraft.llm_model,
+                            llm_provider: llmDraft.llm_provider,
+                            temperature: llmDraft.temperature,
+                            use_self_check: llmDraft.use_self_check,
+                          })
+                          setKb(updated)
+                          setIsEditingLlm(false)
+                        } catch {
+                          // ignore
+                        } finally {
+                          setLlmSaving(false)
+                        }
+                      }}
+                      variant="primary"
+                      size="xs-wide"
+                      disabled={llmSaving}
+                    >
+                      {llmSaving ? 'Saving…' : 'Save'}
+                    </Button>
+                    <Button onClick={() => setIsEditingLlm(false)} size="xs-wide" disabled={llmSaving}>
+                      Cancel
+                    </Button>
+                    {(kb.llm_model || kb.temperature != null || kb.use_self_check != null) && (
+                      <Button
+                        onClick={async () => {
+                          if (!id || !window.confirm('Reset LLM settings to global defaults for this KB?')) return
+                          setLlmSaving(true)
+                          try {
+                            const updated = await apiClient.updateKnowledgeBase(id, {
+                              llm_model: null,
+                              llm_provider: null,
+                              temperature: null,
+                              use_self_check: null,
+                            })
+                            setKb(updated)
+                            setLlmDraft({ llm_model: null, llm_provider: null, temperature: null, use_self_check: null })
+                            setIsEditingLlm(false)
+                          } catch {
+                            // ignore
+                          } finally {
+                            setLlmSaving(false)
+                          }
+                        }}
+                        size="xs-wide"
+                        disabled={llmSaving}
+                      >
+                        Reset to Global
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {[
+                    { label: 'LLM Model', value: kb.llm_model ?? '—', isOverride: !!kb.llm_model },
+                    { label: 'LLM Provider', value: kb.llm_provider ?? '—', isOverride: !!kb.llm_provider },
+                    { label: 'Temperature', value: kb.temperature != null ? kb.temperature.toFixed(1) : '—', isOverride: kb.temperature != null },
+                    { label: 'Self-Check', value: kb.use_self_check != null ? (kb.use_self_check ? 'enabled' : 'disabled') : '—', isOverride: kb.use_self_check != null },
+                  ].map(({ label, value, isOverride }) => (
+                    <div key={label} className="flex items-center justify-between">
+                      <span className="text-gray-400">{label}:</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-white font-medium">{value}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${isOverride ? 'bg-primary-500/20 text-primary-400' : 'bg-gray-700 text-gray-400'}`}>
+                          {isOverride ? 'KB' : 'global'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -1607,6 +2241,8 @@ export function KBDetailsPage() {
             <div className="mt-2 text-xs text-gray-400">{reindexMessage}</div>
           )}
         </div>
+        )}
+
       </main>
     </div>
   )
