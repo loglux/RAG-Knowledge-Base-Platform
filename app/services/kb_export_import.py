@@ -14,7 +14,7 @@ from uuid import UUID, uuid4
 
 from opensearchpy.helpers import async_bulk
 from qdrant_client.models import Distance, FieldCondition, Filter, MatchValue, PointStruct
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.knowledge_bases import kb_id_to_collection_name
@@ -171,6 +171,8 @@ async def export_kbs(
                     "progress_percentage": doc.progress_percentage,
                     "chunk_count": doc.chunk_count,
                     "vector_ids": doc.vector_ids,
+                    "heading_map_json": doc.heading_map_json,
+                    "page_map_json": doc.page_map_json,
                     "user_id": str(doc.user_id) if doc.user_id else None,
                     "created_at": _dt(doc.created_at),
                     "updated_at": _dt(doc.updated_at),
@@ -613,6 +615,8 @@ async def import_kbs(
                 existing.progress_percentage = doc.get("progress_percentage", 0)
                 existing.chunk_count = doc.get("chunk_count", 0)
                 existing.vector_ids = doc.get("vector_ids")
+                existing.heading_map_json = doc.get("heading_map_json")
+                existing.page_map_json = doc.get("page_map_json")
             else:
                 doc_model = DocumentModel(
                     id=doc_id,
@@ -630,6 +634,8 @@ async def import_kbs(
                     progress_percentage=doc.get("progress_percentage", 0),
                     chunk_count=doc.get("chunk_count", 0),
                     vector_ids=doc.get("vector_ids"),
+                    heading_map_json=doc.get("heading_map_json"),
+                    page_map_json=doc.get("page_map_json"),
                 )
                 db.add(doc_model)
 
@@ -797,17 +803,33 @@ async def import_kbs(
         if include.uploads:
             uploads_src = os.path.join(root, "uploads")
             uploads_dst = os.path.join(os.getcwd(), "uploads")
-            if os.path.isdir(uploads_src):
+            if os.path.isdir(uploads_src) and include.documents:
                 os.makedirs(uploads_dst, exist_ok=True)
-                for item in os.listdir(uploads_src):
-                    src = os.path.join(uploads_src, item)
-                    dst = os.path.join(uploads_dst, item)
-                    if os.path.isdir(src):
-                        if os.path.exists(dst):
-                            shutil.rmtree(dst)
-                        shutil.copytree(src, dst)
-                    else:
-                        shutil.copy2(src, dst)
+                file_path_updates: Dict[str, str] = {}  # new_doc_id -> new_file_path
+                for doc in doc_rows:
+                    if not doc.get("file_type"):
+                        continue
+                    old_kb_id = doc["knowledge_base_id"]
+                    old_doc_id = doc["id"]
+                    new_kb_id = kb_id_map.get(old_kb_id, old_kb_id)
+                    new_doc_id = doc_id_map.get(old_doc_id, old_doc_id)
+                    ext = doc["file_type"]
+                    old_file = os.path.join(uploads_src, old_kb_id, f"{old_doc_id}.{ext}")
+                    if not os.path.exists(old_file):
+                        continue
+                    new_dir = os.path.join(uploads_dst, new_kb_id)
+                    os.makedirs(new_dir, exist_ok=True)
+                    new_file = os.path.join(new_dir, f"{new_doc_id}.{ext}")
+                    shutil.copy2(old_file, new_file)
+                    file_path_updates[new_doc_id] = new_file
+                if file_path_updates:
+                    for new_doc_id_str, fp in file_path_updates.items():
+                        await db.execute(
+                            update(DocumentModel)
+                            .where(DocumentModel.id == UUID(new_doc_id_str))
+                            .values(file_path=fp)
+                        )
+                    await db.commit()
 
         return {
             "status": "ok",
