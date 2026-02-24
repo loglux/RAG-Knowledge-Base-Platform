@@ -382,6 +382,8 @@ class RetrievalEngine:
                     "section_path": payload.get("section_path"),
                     "section_level": payload.get("section_level"),
                     "contextual_description": payload.get("contextual_description"),
+                    # PDF page tracking
+                    "page_number": payload.get("page_number"),
                 },
             )
 
