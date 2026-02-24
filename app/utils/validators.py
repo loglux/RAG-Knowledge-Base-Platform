@@ -181,7 +181,11 @@ def sanitize_text_content(content: str) -> str:
     # Remove null bytes
     content = content.replace("\x00", "")
 
-    # Remove other control characters except newlines and tabs
-    content = "".join(char for char in content if char == "\n" or char == "\t" or ord(char) >= 32)
+    # Remove C0 control chars (except \n and \t) and C1 control chars (U+0080–U+009F)
+    content = "".join(
+        char
+        for char in content
+        if char == "\n" or char == "\t" or (0x20 <= ord(char) <= 0x7E) or ord(char) > 0x9F
+    )
 
     return content.strip()

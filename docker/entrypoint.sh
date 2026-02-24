@@ -3,9 +3,13 @@ set -e
 
 echo "🚀 Starting Knowledge Base Platform API..."
 
-# Ensure appuser can write to logs volume
+# Ensure appuser can write to logs and uploads volumes
+# (bind mounts override Dockerfile ownership, so fix here as root)
 if [ -d /app/logs ]; then
     chown -R appuser:appuser /app/logs
+fi
+if [ -d /app/uploads ]; then
+    chown -R appuser:appuser /app/uploads
 fi
 
 # Wait for database to be ready
