@@ -15,7 +15,7 @@
 ![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
 
-Knowledge Base Platform is a production-ready RAG backend with a clean API and a modern web UI. It ingests documents, builds a semantic index in Qdrant, and answers questions with grounded citations. It also generates document structure (TOC metadata) to enable section-aware retrieval and precise "show me question X" queries, and provides a **retrieve-only** API for automation and MCP-style tools.
+Knowledge Base Platform is a production-ready RAG backend with a clean API and a modern web UI. It ingests documents (TXT, MD, FB2, DOCX, PDF), builds a semantic index in Qdrant, and answers questions with grounded citations. It extracts heading structure at upload time to enable section-aware retrieval and precise "show me question X" queries, and provides a **retrieve-only** API for automation and MCP-style tools.
 
 It can be used as a standalone service or integrated into other products via its API (plugin-style: you bring the data, it provides retrieval, citations, and answers).
 
@@ -30,7 +30,7 @@ It can be used as a standalone service or integrated into other products via its
 
 ## Key features
 
-- **Document ingestion with intelligent chunking** (txt, md, fb2, docx):
+- **Document ingestion with intelligent chunking** (txt, md, fb2, docx, pdf):
   - **Simple**: Fast fixed-size chunking with overlap
   - **Smart**: Recursive chunking respecting sentence/paragraph boundaries (recommended for most cases)
   - **Semantic**: Advanced embedding-based boundary detection using cosine similarity to find natural topic changes
@@ -46,7 +46,7 @@ It can be used as a standalone service or integrated into other products via its
 - **Chat history controls**: delete individual Q/A pairs from a conversation
 - **BM25 phrase matching**: adds an exact `match_phrase` clause for strict wording
 - **Windowed retrieval (context expansion)** for neighboring chunk context
-- Structured document analysis and TOC metadata
+- **Structural Metadata Indexing**: heading structure extracted at upload time (TXT/MD/FB2/DOCX/PDF), stored as `section_heading`, `section_path`, `section_level` in every Qdrant chunk payload for section-aware retrieval
 - RAG answers with citations
 - FastAPI backend + React frontend
 - Docker-first dev setup
@@ -301,8 +301,6 @@ Global Settings define defaults for new chats and retrieval behavior:
 
 - **Default LLM model**
 - **Top K / Max context / Score threshold / Temperature**
-- **Use Document Structure** default
-- **TOC requests per minute** (throttles structure analysis to avoid rate limits)
 - **General Knowledge Base Configuration** (chunk size/overlap, batch size, chunking strategy)
 
 These defaults are applied unless a specific knowledge base overrides them.
@@ -316,7 +314,6 @@ The chat UI exposes retrieval controls to tune answer quality:
 - **Max context chars**: limit for assembled context (0 = unlimited). Lower values reduce cost/latency; higher values preserve more context.
 - **Score threshold**: minimum similarity score (0–1) to filter low‑relevance chunks. 0 disables filtering; 0.2–0.4 is a good starting range.
 - **Temperature**: response randomness. Use 0–0.3 for factual extraction, higher for exploratory/creative explanations.
-- **Use Document Structure**: enables TOC‑aware, section‑targeted retrieval (e.g., "show question 2").
 - **Use MMR (Maximal Marginal Relevance)**: enables diversity-aware search to avoid retrieving too many similar chunks from the same section. Balances relevance and diversity.
 - **MMR Diversity** (when MMR enabled): controls the relevance-diversity tradeoff (0.0–1.0). See detailed guidance below.
 - **Windowed retrieval**: expands context by adding neighboring chunks (prevents truncated citations; useful for multi-part questions).
@@ -410,7 +407,6 @@ Query: *"Tell me about rounding methods"*
 
 ### How these settings interact
 
-- **Score threshold vs TOC**: TOC/structure queries can return chunks with lower similarity scores. If you see missing sections or "not found" responses, set **Score threshold = 0** (no filtering) before running TOC‑style queries.
 - **Top K and Max context**: higher Top K increases recall, but you may need a higher Max context to avoid truncation.
 - **Hybrid mode**: BM25 improves exact‑term matches. For paraphrases, keep some weight on dense vectors.
 - **MMR vs Top K**: MMR is most effective with larger Top K (20+). With small Top K (5-10), diversity impact is limited.
@@ -421,7 +417,6 @@ When you first enable hybrid search on an existing KB, use **Reindex for BM25** 
 
 ## KB settings (UI)
 
-Each knowledge base can override the **TOC / Structure model** used for document structure analysis. If override is disabled, the global LLM model is used.
 KB‑level configuration (chunk size/overlap, batch size, chunking strategy) is set per KB and affects only new or reprocessed documents.
 
 ## Repo layout (minimal)
