@@ -224,6 +224,7 @@ class DocumentWithContent(DocumentResponse):
     """Schema for Document response with full content."""
 
     content: str
+    heading_map: Optional[List[dict]] = None
 
 
 # ============================================================================
