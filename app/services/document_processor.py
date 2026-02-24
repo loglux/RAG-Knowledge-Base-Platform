@@ -359,6 +359,41 @@ class DocumentProcessor:
             except Exception as e:
                 logger.warning(f"Failed to delete OpenSearch chunks: {e}")
 
+            # Re-extract heading/page maps from original file if available
+            if document.file_path:
+                import json as _json
+                from pathlib import Path
+
+                from app.models.enums import FileType
+                from app.utils.file_handlers import FileHandlerFactory
+
+                _file_path = Path(document.file_path)
+                if _file_path.exists():
+                    logger.info(f"Re-extracting structure maps from {_file_path}")
+                    try:
+                        file_bytes = _file_path.read_bytes()
+                        handler = FileHandlerFactory.get_handler(document.file_type)
+                        try:
+                            headings = handler.extract_heading_map(file_bytes)
+                            document.heading_map_json = (
+                                _json.dumps(headings, ensure_ascii=False) if headings else None
+                            )
+                        except Exception as exc:
+                            logger.warning(f"Failed to re-extract heading map: {exc}")
+                        if document.file_type == FileType.PDF:
+                            try:
+                                page_map = handler.extract_page_map(file_bytes)
+                                document.page_map_json = _json.dumps(page_map) if page_map else None
+                            except Exception as exc:
+                                logger.warning(f"Failed to re-extract page map: {exc}")
+                        await db.flush()
+                    except Exception as exc:
+                        logger.warning(f"Failed to read file for re-extraction: {exc}")
+                else:
+                    logger.warning(
+                        f"Original file not found at {_file_path}, skipping re-extraction"
+                    )
+
             # Process document
             return await self.process_document(document_id, db, detect_duplicates=detect_duplicates)
 

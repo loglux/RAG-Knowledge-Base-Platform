@@ -3,6 +3,7 @@
 import hashlib
 import json
 import logging
+from pathlib import Path
 from typing import Optional
 from uuid import UUID
 
@@ -239,6 +240,15 @@ async def create_document(
     db.add(doc_model)
     await db.flush()  # Flush to make doc_model visible in queries
 
+    # Save original file to disk for future reprocessing
+    upload_path = Path("/app/uploads") / str(knowledge_base_id) / f"{doc_model.id}.{extension}"
+    try:
+        upload_path.parent.mkdir(parents=True, exist_ok=True)
+        upload_path.write_bytes(content_bytes)
+        doc_model.file_path = str(upload_path)
+    except Exception as exc:
+        logger.warning(f"Failed to save uploaded file to disk: {exc}")
+
     # Recalculate KB document count (prevents desync from incremental updates)
     doc_count = await db.scalar(
         select(func.count(DocumentModel.id)).where(
@@ -375,6 +385,13 @@ async def delete_document(
 
     # Soft delete document
     doc.is_deleted = True
+
+    # Delete original file from disk
+    if doc.file_path:
+        try:
+            Path(doc.file_path).unlink(missing_ok=True)
+        except Exception as exc:
+            logger.warning(f"Failed to delete file {doc.file_path}: {exc}")
 
     # Recalculate KB statistics (prevents desync from incremental updates)
     if kb:

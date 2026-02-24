@@ -211,6 +211,11 @@ class Document(Base):
         Text, nullable=True, comment="JSON [[char_offset, page_number], ...] for PDF page tracking"
     )
 
+    # Path to original uploaded file on disk (for reprocess support)
+    file_path: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True, comment="Path to original uploaded file on disk"
+    )
+
     # Future: User ownership (nullable for MVP)
     user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), nullable=True, index=True, comment="Owner user ID - nullable for MVP"
