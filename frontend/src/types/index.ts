@@ -81,6 +81,7 @@ export interface Document {
     total_chunks: number
     groups: Array<{ hash: string; chunks: number[]; count: number }>
   } | null
+  heading_map?: Array<{ pos: number; level: number; text: string }> | null
 }
 
 export interface DocumentStatusResponse {

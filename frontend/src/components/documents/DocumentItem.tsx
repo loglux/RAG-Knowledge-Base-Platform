@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { apiClient } from '../../services/api'
 import type { Document } from '../../types/index'
 
 interface DocumentItemProps {
@@ -8,8 +9,28 @@ interface DocumentItemProps {
   onRecomputeDuplicates?: (id: string) => Promise<any>
 }
 
+const STRUCTURED_TYPES = ['fb2', 'docx', 'pdf', 'md']
+
 export function DocumentItem({ document, onReprocess, onDelete, onRecomputeDuplicates }: DocumentItemProps) {
   const [isRecomputingDup, setIsRecomputingDup] = useState(false)
+  const [headingMap, setHeadingMap] = useState<Array<{ pos: number; level: number; text: string }> | null>(null)
+  const [headingMapLoading, setHeadingMapLoading] = useState(false)
+  const [headingMapLoaded, setHeadingMapLoaded] = useState(false)
+
+  const handleStructureToggle = async (e: React.MouseEvent<HTMLDetailsElement>) => {
+    const details = e.currentTarget
+    if (details.open || headingMapLoaded) return
+    setHeadingMapLoading(true)
+    try {
+      const full = await apiClient.getDocument(document.id)
+      setHeadingMap(full.heading_map ?? null)
+    } catch {
+      setHeadingMap(null)
+    } finally {
+      setHeadingMapLoading(false)
+      setHeadingMapLoaded(true)
+    }
+  }
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`
@@ -172,6 +193,36 @@ export function DocumentItem({ document, onReprocess, onDelete, onRecomputeDupli
                   </p>
                 </div>
               </div>
+            )}
+
+            {document.status === 'completed' && STRUCTURED_TYPES.includes(document.file_type) && (
+              <details className="mt-3 text-xs text-gray-400" onClick={handleStructureToggle}>
+                <summary className="cursor-pointer select-none text-gray-300">
+                  Structure
+                  {headingMapLoading && <span className="ml-2 text-gray-500">loading…</span>}
+                  {headingMapLoaded && headingMap && (
+                    <span className="ml-2 text-gray-500">({headingMap.length} headings)</span>
+                  )}
+                  {headingMapLoaded && !headingMap && (
+                    <span className="ml-2 text-gray-500">(no headings)</span>
+                  )}
+                </summary>
+                {headingMapLoaded && headingMap && headingMap.length > 0 && (
+                  <div className="mt-2 space-y-0.5 max-h-64 overflow-y-auto font-mono">
+                    {headingMap.map((h, idx) => (
+                      <div
+                        key={idx}
+                        className="truncate text-gray-400"
+                        style={{ paddingLeft: `${(h.level - 1) * 12}px` }}
+                        title={h.text}
+                      >
+                        <span className="text-gray-600 mr-1">{'›'.repeat(h.level)}</span>
+                        {h.text}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </details>
             )}
 
             {document.duplicate_chunks && document.duplicate_chunks.total_groups > 0 && (
