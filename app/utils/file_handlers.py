@@ -571,7 +571,7 @@ class PDFFileHandler(FileHandler):
                 # Bold-based: first non-empty line of block is ≥85% bold and
                 # short enough to be a heading (not a paragraph opening)
                 fl_bold_fraction = fl_bold / fl_total if fl_total > 0 else 0.0
-                is_bold_heading = fl_bold_fraction >= 0.85 and len(first_line_text) < 120
+                is_bold_heading = fl_bold_fraction >= 0.85 and 5 <= len(first_line_text) < 120
 
                 if is_size_heading:
                     ratio = max_size / median_size
@@ -609,8 +609,7 @@ class PDFFileHandler(FileHandler):
         # Heading texts that repeat on many pages are running headers (e.g.
         # "Unit 9", chapter titles in the margin).  Keep the first occurrence
         # and drop the rest so they don't pollute section_path in every chunk.
-        total_pages = len(text_parts) if text_parts else 1
-        repeat_threshold = max(4, total_pages // 5)
+        repeat_threshold = 4
         text_counts: Dict[str, int] = {}
         for h in headings:
             text_counts[h["text"]] = text_counts.get(h["text"], 0) + 1
