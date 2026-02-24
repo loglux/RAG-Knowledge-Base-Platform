@@ -216,6 +216,11 @@ class Document(Base):
         Text, nullable=True, comment="Path to original uploaded file on disk"
     )
 
+    # Auto-detected document language (ISO 639-1 code, e.g. "en", "ru")
+    language: Mapped[Optional[str]] = mapped_column(
+        String(10), nullable=True, comment="ISO 639-1 language code"
+    )
+
     # Future: User ownership (nullable for MVP)
     user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), nullable=True, index=True, comment="Owner user ID - nullable for MVP"

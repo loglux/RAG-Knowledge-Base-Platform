@@ -200,6 +200,7 @@ class DocumentResponse(DocumentBase):
     processing_stage: Optional[str] = None
     progress_percentage: int = 0
     chunk_count: int
+    language: Optional[str] = None
     user_id: Optional[UUID] = None
     created_at: datetime
     updated_at: datetime

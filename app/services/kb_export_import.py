@@ -173,6 +173,7 @@ async def export_kbs(
                     "vector_ids": doc.vector_ids,
                     "heading_map_json": doc.heading_map_json,
                     "page_map_json": doc.page_map_json,
+                    "language": doc.language,
                     "user_id": str(doc.user_id) if doc.user_id else None,
                     "created_at": _dt(doc.created_at),
                     "updated_at": _dt(doc.updated_at),
@@ -617,6 +618,7 @@ async def import_kbs(
                 existing.vector_ids = doc.get("vector_ids")
                 existing.heading_map_json = doc.get("heading_map_json")
                 existing.page_map_json = doc.get("page_map_json")
+                existing.language = doc.get("language")
             else:
                 doc_model = DocumentModel(
                     id=doc_id,
@@ -636,6 +638,7 @@ async def import_kbs(
                     vector_ids=doc.get("vector_ids"),
                     heading_map_json=doc.get("heading_map_json"),
                     page_map_json=doc.get("page_map_json"),
+                    language=doc.get("language"),
                 )
                 db.add(doc_model)
 

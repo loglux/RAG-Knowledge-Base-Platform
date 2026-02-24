@@ -93,6 +93,19 @@ class DocumentProcessor:
             document = await self._load_document(document_id, db)
             await self._update_progress(document, "Loading document...", 5, db)
 
+            # 1b. Detect document language (cheap, always-on)
+            if not document.language and document.content:
+                try:
+                    from langdetect import detect as _detect_lang
+
+                    sample = document.content[:3000]
+                    document.language = _detect_lang(sample)
+                    logger.info(
+                        f"Detected language '{document.language}' for document {document_id}"
+                    )
+                except Exception as _lang_exc:
+                    logger.debug(f"Language detection failed: {_lang_exc}")
+
             # 2. Get knowledge base info
             kb = await self._load_knowledge_base(document.knowledge_base_id, db)
 
