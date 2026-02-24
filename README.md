@@ -47,6 +47,8 @@ It can be used as a standalone service or integrated into other products via its
 - **BM25 phrase matching**: adds an exact `match_phrase` clause for strict wording
 - **Windowed retrieval (context expansion)** for neighboring chunk context
 - **Structural Metadata Indexing**: heading structure extracted at upload time (TXT/MD/FB2/DOCX/PDF), stored as `section_heading`, `section_path`, `section_level` in every Qdrant chunk payload for section-aware retrieval
+- **PDF page numbers**: physical (file order) and logical (printed footer number) page numbers tracked per chunk; both are shown in source citations when available
+- **Original file preservation**: uploaded files are stored on disk (`./uploads/`) so that **Reprocess** can re-extract heading and page structure with updated logic — useful when parsing improvements are deployed
 - RAG answers with citations
 - FastAPI backend + React frontend
 - Docker-first dev setup
@@ -418,6 +420,12 @@ When you first enable hybrid search on an existing KB, use **Reindex for BM25** 
 ## KB settings (UI)
 
 KB‑level configuration (chunk size/overlap, batch size, chunking strategy) is set per KB and affects only new or reprocessed documents.
+
+### Reprocess behavior
+
+**Reprocess** deletes old vectors and re-ingests the document. For DOCX and PDF files, it also re-extracts the heading map and page map from the original uploaded file, so improved parsing logic (e.g. better heading detection) takes effect without re-uploading.
+
+Original files are stored at `./uploads/{kb_id}/{doc_id}.{ext}` (bind-mounted into the container). Include this directory in backups alongside the database and Qdrant storage.
 
 ## Repo layout (minimal)
 
