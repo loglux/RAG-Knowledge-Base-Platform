@@ -383,15 +383,16 @@ class PDFFileHandler(FileHandler):
         return content
 
     def _extract_pdf(self, content: bytes):
-        """Single-pass extraction returning (text: str, heading_map: list).
+        """Two-pass extraction returning (text, heading_map, page_map).
 
         Pass 1 – collect font-size distribution to determine body size and
                  build a size→level map for headings.
-        Pass 2 – extract text blocks and simultaneously record heading positions.
+        Pass 2 – extract text blocks, record heading positions, and track
+                 page boundaries so that each chunk can carry a page_number.
 
-        Positions in heading_map correspond to character offsets in the
-        returned text string (before sanitize_text_content, but since parts
-        are already stripped and free of null bytes the offsets are stable).
+        page_map: list of [char_offset, page_number] pairs (1-indexed pages),
+        one entry per page marking where that page's content starts in the
+        extracted text.  Use _get_page_for_char() to look up any offset.
         """
         from collections import Counter
 
@@ -428,9 +429,14 @@ class PDFFileHandler(FileHandler):
         # ── Pass 2: structured text extraction ───────────────────────────
         text_parts: List[str] = []
         headings: List[Dict[str, Any]] = []
+        page_map: List[List[int]] = []  # [[char_offset, page_number], ...]
         current_pos = 0
 
         for page in doc:
+            page_num = page.number + 1  # 1-indexed
+            page_start_pos = current_pos
+            has_content = False
+
             for block in page.get_text("dict")["blocks"]:
                 if block["type"] != 0:
                     continue
@@ -469,6 +475,11 @@ class PDFFileHandler(FileHandler):
 
                 text_parts.append(block_text)
                 current_pos += len(block_text) + 2  # +2 for "\n\n" separator
+                has_content = True
+
+            # Record page boundary only if page had extractable text
+            if has_content:
+                page_map.append([page_start_pos, page_num])
 
         doc.close()
 
@@ -481,27 +492,27 @@ class PDFFileHandler(FileHandler):
                 "This PDF may be a scanned document — OCR is not supported yet."
             )
 
-        return full_text, headings
+        return full_text, headings, page_map
 
     def extract_text(self, content: Union[str, bytes], metadata: Dict[str, Any]) -> str:
         logger.debug("Extracting text from .pdf file")
-        text, _ = self._extract_pdf(self._to_bytes(content))
+        text, _, _ = self._extract_pdf(self._to_bytes(content))
         return text
 
     def extract_heading_map(self, content: Union[str, bytes]) -> List[Dict[str, Any]]:
-        """Extract heading positions from a PDF for structural metadata indexing.
-
-        Uses font-size heuristics: the dominant (most-chars) font size is body
-        text; larger sizes are ranked into heading levels 1–6 by descending size.
-
-        Returns a list of dicts with keys:
-            pos   (int)  – character offset in the extracted text
-            level (int)  – heading level 1-6
-            text  (str)  – heading display text (newlines collapsed to spaces)
-        sorted by position.
-        """
-        _, headings = self._extract_pdf(self._to_bytes(content))
+        """Extract heading positions from a PDF for structural metadata indexing."""
+        _, headings, _ = self._extract_pdf(self._to_bytes(content))
         return headings
+
+    def extract_page_map(self, content: Union[str, bytes]) -> List[List[int]]:
+        """Extract page boundary map: [[char_offset, page_number], ...] (1-indexed).
+
+        Each entry marks the character offset in the extracted text where a new
+        page begins.  Use _get_page_for_char() in document_processor to look up
+        the page number for any chunk by its start_char.
+        """
+        _, _, page_map = self._extract_pdf(self._to_bytes(content))
+        return page_map
 
     def extract_metadata(self, content: Union[str, bytes], filename: str) -> Dict[str, Any]:
         import fitz

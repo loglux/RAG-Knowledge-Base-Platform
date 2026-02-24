@@ -515,6 +515,14 @@ class DocumentProcessor:
         else:
             heading_map = []
 
+        # Pre-load page map for PDF page number lookup
+        page_map: List[List[int]] = []
+        if file_type_str == "pdf" and document.page_map_json:
+            try:
+                page_map = json.loads(document.page_map_json)
+            except Exception:
+                page_map = []
+
         payloads = []
 
         for chunk in chunks:
@@ -544,13 +552,19 @@ class DocumentProcessor:
                 if key not in payload and key not in _skip:
                     payload[key] = value
 
-            # Add section heading from Markdown structure
+            # Add section heading from Markdown/structural metadata
             if heading_map:
                 section = self._get_section_for_chunk(heading_map, chunk.start_char)
                 if section:
                     payload["section_heading"] = section["heading"]
                     payload["section_path"] = section["path"]
                     payload["section_level"] = section["level"]
+
+            # Add PDF page number
+            if page_map:
+                page_number = self._get_page_for_char(page_map, chunk.start_char)
+                if page_number is not None:
+                    payload["page_number"] = page_number
 
             payloads.append(payload)
 
@@ -607,6 +621,22 @@ class DocumentProcessor:
             "path": " > ".join(parts),
             "level": deepest,
         }
+
+    @staticmethod
+    def _get_page_for_char(page_map: List[List[int]], char_pos: int) -> Optional[int]:
+        """Return the 1-indexed PDF page number for a given character position.
+
+        page_map is a list of [char_offset, page_number] pairs sorted ascending
+        by char_offset — the format produced by PDFFileHandler.extract_page_map().
+        """
+        if not page_map:
+            return None
+        page_number = page_map[0][1]
+        for entry in page_map:
+            if entry[0] > char_pos:
+                break
+            page_number = entry[1]
+        return page_number
 
     @staticmethod
     def _build_lexical_chunks(chunks: List[Chunk]) -> List[Dict[str, Any]]:

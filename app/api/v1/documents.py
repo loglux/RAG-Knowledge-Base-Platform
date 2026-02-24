@@ -149,6 +149,7 @@ async def create_document(
     content_bytes = await file.read()
     content: str
     heading_map_json: str | None = None
+    page_map_json: str | None = None
     if file_type in (FileType.DOCX, FileType.FB2, FileType.PDF):
         from app.utils.file_handlers import FileHandlerFactory, process_file
 
@@ -162,14 +163,24 @@ async def create_document(
                 detail=f"Failed to parse {type_label}: {exc}",
             ) from exc
 
+        handler = FileHandlerFactory.get_handler(file_type)
+
         # Extract heading map for structural metadata indexing
         try:
-            handler = FileHandlerFactory.get_handler(file_type)
             headings = handler.extract_heading_map(content_bytes)
             if headings:
                 heading_map_json = json.dumps(headings, ensure_ascii=False)
         except Exception as exc:
             logger.warning(f"Failed to extract {type_label} heading map for '{filename}': {exc}")
+
+        # Extract page map for PDF (char offset → page number)
+        if file_type == FileType.PDF:
+            try:
+                page_map = handler.extract_page_map(content_bytes)
+                if page_map:
+                    page_map_json = json.dumps(page_map)
+            except Exception as exc:
+                logger.warning(f"Failed to extract PDF page map for '{filename}': {exc}")
     else:
         try:
             content = content_bytes.decode("utf-8")
@@ -222,6 +233,7 @@ async def create_document(
         status=DocumentStatus.PENDING,
         user_id=user_id,
         heading_map_json=heading_map_json,
+        page_map_json=page_map_json,
     )
 
     db.add(doc_model)
