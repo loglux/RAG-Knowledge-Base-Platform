@@ -366,10 +366,15 @@ class DocxFileHandler(FileHandler):
 class PDFFileHandler(FileHandler):
     """Handler for PDF files (.pdf).
 
-    Uses pymupdf4llm for Markdown-based text extraction, which correctly
-    handles both bordered and borderless tables. Heading detection works
-    from the Markdown output (# syntax and bold-only lines). Logical page
-    numbers are still extracted from page footers via PyMuPDF directly.
+    Uses PyMuPDF (fitz) directly for text extraction, with find_tables()
+    to detect tables and render them as Markdown (preserving empty cells).
+    Text blocks that overlap with detected table regions are skipped so
+    they are not duplicated. Items are merged in vertical order.
+
+    Heading detection uses font-size relative to the page median: blocks
+    whose maximum span font size is noticeably larger than the median are
+    treated as headings; level is estimated from the relative size.
+
     Scanned (image-only) PDFs are detected and rejected with a clear error.
     """
 
@@ -384,12 +389,7 @@ class PDFFileHandler(FileHandler):
 
     @staticmethod
     def _extract_footer_page_number(page) -> Optional[int]:
-        """Try to extract the printed (logical) page number from a PDF page footer.
-
-        Clips the bottom 5% of the page and looks for the last line that is
-        purely 1-4 digits — that is reliably the printed page number in most
-        typeset PDFs.  Returns None if nothing suitable is found.
-        """
+        """Try to extract the printed (logical) page number from a PDF page footer."""
         import re
 
         rect = page.rect
@@ -403,31 +403,50 @@ class PDFFileHandler(FileHandler):
                 return int(line)
         return None
 
+    @staticmethod
+    def _rows_to_markdown(rows: List[List]) -> str:
+        """Convert a list-of-lists table (from find_tables) to a Markdown table."""
+        if not rows:
+            return ""
+
+        def cell(v: Any) -> str:
+            return str(v).replace("|", "\\|").strip() if v is not None else ""
+
+        header = [cell(c) for c in rows[0]]
+        lines = [
+            "| " + " | ".join(header) + " |",
+            "| " + " | ".join("---" for _ in header) + " |",
+        ]
+        for row in rows[1:]:
+            cells = [cell(c) for c in row]
+            # Pad or trim to match header width
+            while len(cells) < len(header):
+                cells.append("")
+            lines.append("| " + " | ".join(cells[: len(header)]) + " |")
+        return "\n".join(lines)
+
     def _extract_pdf(self, content: bytes):
-        """Extract (text, heading_map, page_map) using pymupdf4llm.
+        """Extract (text, heading_map, page_map).
 
-        pymupdf4llm converts each PDF page to Markdown, handling both
-        bordered and borderless tables correctly.
-
-        Heading detection:
-          1. Lines matching ``^#{1,6} text`` → Markdown headings (level = # count)
-          2. Short lines (< 200 chars) that START with ``**`` → bold section
-             headings (level 2); table rows (``|``) are excluded.
+        For each page:
+          1. Detect tables with find_tables(strategy="lines") → Markdown.
+          2. Extract text blocks via get_text("dict"), skipping blocks that
+             overlap ≥40% with a table region.
+          3. Merge text blocks and table Markdowns sorted by top-y coordinate.
+          4. Detect headings by comparing block font sizes to the page median.
 
         page_map: [[char_offset, physical_page, logical_page_or_null], ...]
-        one entry per page with non-empty content.
         """
         import re
+        import statistics
 
         import fitz
-        import pymupdf4llm
 
         try:
             doc = fitz.open(stream=content, filetype="pdf")
         except Exception as exc:
             raise ValueError(f"Cannot open PDF: {exc}") from exc
 
-        # Quick sanity-check: reject scanned/image-only PDFs early
         has_text = any(page.get_text("text").strip() for page in doc)
         if not has_text:
             doc.close()
@@ -436,60 +455,103 @@ class PDFFileHandler(FileHandler):
                 "It may be a scanned document — OCR is not supported yet."
             )
 
-        try:
-            page_chunks = pymupdf4llm.to_markdown(doc, page_chunks=True)
-        except Exception as exc:
-            doc.close()
-            raise ValueError(f"Failed to extract PDF content: {exc}") from exc
-
         text_parts: List[str] = []
         headings: List[Dict[str, Any]] = []
         page_map: List[List] = []
         current_pos = 0
 
-        for chunk in page_chunks:
-            page_text = chunk.get("text", "")
-            page_num = chunk["metadata"]["page"]  # 1-indexed physical
-
-            if not page_text.strip():
-                continue
-
+        for page in doc:
+            page_num = page.number + 1
             page_start_pos = current_pos
 
-            # ── Heading detection from Markdown output ────────────────────
-            line_offset = 0
-            for line in page_text.splitlines():
-                stripped = line.strip()
-                if stripped and not stripped.startswith("|"):
-                    # 1. Explicit Markdown heading: ## Title
-                    m = re.match(r"^(#{1,6})\s+(.+)$", stripped)
-                    if m:
-                        level = len(m.group(1))
-                        heading_text = re.sub(r"[*_`#]", "", m.group(2)).strip()
-                        if heading_text:
-                            headings.append(
-                                {
-                                    "pos": current_pos + line_offset,
-                                    "level": level,
-                                    "text": heading_text,
-                                }
-                            )
-                    # 2. Bold-only short line: **Word** **Word** ...
-                    elif stripped.startswith("**") and len(stripped) < 200:
-                        heading_text = re.sub(r"[*_`]", "", stripped).strip()
-                        if heading_text:
-                            headings.append(
-                                {
-                                    "pos": current_pos + line_offset,
-                                    "level": 2,
-                                    "text": heading_text,
-                                }
-                            )
-                line_offset += len(line) + 1  # +1 for the \n
+            # ── 1. Detect tables ──────────────────────────────────────────
+            table_rects: List[Any] = []  # fitz.Rect objects
+            table_items: List = []  # (y0, markdown_string)
+            try:
+                tabs = page.find_tables(strategy="lines")
+                for tab in tabs.tables:
+                    rows = tab.extract()
+                    if rows and len(rows) >= 2:
+                        tr = fitz.Rect(tab.bbox)
+                        table_rects.append(tr)
+                        md = self._rows_to_markdown(rows)
+                        table_items.append((tab.bbox[1], md))
+            except Exception:
+                pass
 
-            # ── Logical page number from footer ───────────────────────────
-            logical_num = self._extract_footer_page_number(doc[page_num - 1])
+            # ── 2. Extract text blocks, skipping table regions ────────────
+            text_items: List = []  # (y0, text)
+            all_font_sizes: List[float] = []
+            block_info: List = []  # (y0, text, max_font_size)
 
+            try:
+                block_dict = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)
+                for block in block_dict.get("blocks", []):
+                    if block.get("type") != 0:
+                        continue
+                    brect = fitz.Rect(block["bbox"])
+
+                    # Skip if block overlaps substantially with a table
+                    in_table = False
+                    for trect in table_rects:
+                        inter = brect & trect
+                        if (
+                            not inter.is_empty
+                            and brect.get_area() > 0
+                            and inter.get_area() / brect.get_area() >= 0.4
+                        ):
+                            in_table = True
+                            break
+                    if in_table:
+                        continue
+
+                    lines_text: List[str] = []
+                    max_size = 0.0
+                    for line in block.get("lines", []):
+                        line_text = "".join(s.get("text", "") for s in line.get("spans", []))
+                        if line_text.strip():
+                            lines_text.append(line_text.rstrip())
+                        for span in line.get("spans", []):
+                            sz = span.get("size", 0)
+                            if sz > 0:
+                                all_font_sizes.append(sz)
+                                if sz > max_size:
+                                    max_size = sz
+
+                    if lines_text:
+                        block_text = "\n".join(lines_text)
+                        block_info.append((block["bbox"][1], block_text, max_size))
+            except Exception:
+                fallback = page.get_text("text")
+                if fallback.strip():
+                    text_items.append((0.0, fallback))
+
+            # ── 3. Heading detection via font-size ─────────────────────────
+            median_size = statistics.median(all_font_sizes) if all_font_sizes else 0.0
+
+            for y0, block_text, max_size in block_info:
+                text_items.append((y0, block_text))
+
+                if median_size > 0 and max_size > median_size * 1.15:
+                    ratio = max_size / median_size
+                    if ratio >= 2.0:
+                        level = 1
+                    elif ratio >= 1.5:
+                        level = 2
+                    else:
+                        level = 3
+                    heading_text = re.sub(r"\s+", " ", block_text.strip())
+                    if heading_text and len(heading_text) < 200:
+                        headings.append({"pos": current_pos, "level": level, "text": heading_text})
+
+            # ── 4. Merge items and build page text ────────────────────────
+            all_items = sorted(text_items + table_items, key=lambda x: x[0])
+            page_text = "\n\n".join(item[1] for item in all_items).strip()
+
+            if not page_text:
+                continue
+
+            logical_num = self._extract_footer_page_number(page)
             text_parts.append(page_text)
             page_map.append([page_start_pos, page_num, logical_num])
             current_pos += len(page_text) + 2  # +2 for \n\n page separator
