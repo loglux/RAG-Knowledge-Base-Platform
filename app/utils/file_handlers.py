@@ -117,6 +117,57 @@ class FB2FileHandler(FileHandler):
     def can_handle(self, file_type: FileType) -> bool:
         return file_type == FileType.FB2
 
+    @staticmethod
+    def _parse_body(body_node) -> List[Dict[str, Any]]:
+        """Parse an FB2 <body> element into structured text segments.
+
+        Recursively walks sections, extracting titles and paragraphs while
+        tracking nesting depth for heading level attribution.
+
+        Returns a list of dicts:
+            text       (str)  – stripped text content
+            is_heading (bool) – True for <title> elements inside <section>
+            level      (int)  – 1-6 nesting depth (1 = top-level section)
+        """
+        segments: List[Dict[str, Any]] = []
+
+        def _get_node_text(node) -> str:
+            return " ".join(t.strip() for t in node.itertext() if t.strip())
+
+        def _process(node, section_depth: int) -> None:
+            local = node.tag.split("}")[-1] if "}" in node.tag else node.tag
+
+            if local == "section":
+                for child in node:
+                    _process(child, section_depth + 1)
+            elif local == "title":
+                text = _get_node_text(node)
+                if text:
+                    segments.append(
+                        {"text": text, "is_heading": True, "level": max(1, section_depth)}
+                    )
+            elif local in (
+                "p",
+                "v",
+                "stanza",
+                "subtitle",
+                "text-author",
+                "date",
+                "epigraph",
+                "cite",
+                "annotation",
+                "poem",
+            ):
+                text = _get_node_text(node)
+                if text:
+                    segments.append({"text": text, "is_heading": False, "level": 0})
+            # image, binary, table, etc. — silently skipped (no meaningful text)
+
+        for child in body_node:
+            _process(child, 0)
+
+        return segments
+
     def extract_text(self, content: Union[str, bytes], metadata: Dict[str, Any]) -> str:
         logger.debug("Extracting text from .fb2 file")
         if isinstance(content, bytes):
@@ -124,19 +175,55 @@ class FB2FileHandler(FileHandler):
         try:
             root = ElementTree.fromstring(content)
         except ElementTree.ParseError:
-            # If XML is invalid, fall back to raw text
             return sanitize_text_content(content)
 
-        # Collect text from body
-        texts = []
+        parts: List[str] = []
         for node in root.iter():
             if node.tag.endswith("body"):
-                texts.append(" ".join(node.itertext()))
+                parts.extend(seg["text"] for seg in self._parse_body(node))
 
-        if not texts:
-            texts.append(" ".join(root.itertext()))
+        if not parts:
+            # Fallback: dump all text from document
+            parts.append(" ".join(t for t in root.itertext() if t.strip()))
 
-        return sanitize_text_content("\n\n".join(texts))
+        return sanitize_text_content("\n\n".join(parts))
+
+    def extract_heading_map(self, content: Union[str, bytes]) -> List[Dict[str, Any]]:
+        """Extract heading positions from an FB2 file for structural metadata indexing.
+
+        Uses the same _parse_body traversal as extract_text() so that character
+        positions match offsets in the stored document.content string.
+
+        Returns a list of dicts with keys:
+            pos   (int)  – character offset in the extracted text
+            level (int)  – heading level 1-6 (section nesting depth)
+            text  (str)  – heading text
+        sorted by position.
+        """
+        if isinstance(content, bytes):
+            content = content.decode("utf-8", errors="replace")
+        try:
+            root = ElementTree.fromstring(content)
+        except ElementTree.ParseError:
+            return []
+
+        all_segments: List[Dict[str, Any]] = []
+        for node in root.iter():
+            if node.tag.endswith("body"):
+                all_segments.extend(self._parse_body(node))
+
+        if not all_segments:
+            return []
+
+        headings: List[Dict[str, Any]] = []
+        current_pos = 0
+        for seg in all_segments:
+            if seg["is_heading"] and 1 <= seg["level"] <= 6:
+                headings.append({"pos": current_pos, "level": seg["level"], "text": seg["text"]})
+            # Each segment contributes len(text) + 2 chars ("\n\n" separator)
+            current_pos += len(seg["text"]) + 2
+
+        return headings
 
     def extract_metadata(self, content: Union[str, bytes], filename: str) -> Dict[str, Any]:
         if isinstance(content, bytes):

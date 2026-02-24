@@ -53,11 +53,11 @@ async def _process_document_background(document_id: UUID, detect_duplicates: boo
         # Create a new DB session for background task
         from app.db.session import AsyncSessionLocal
 
-        logger.info(f"[BACKGROUND] Creating DB session...")
+        logger.info("[BACKGROUND] Creating DB session...")
         async with AsyncSessionLocal() as db:
-            logger.info(f"[BACKGROUND] Getting document processor...")
+            logger.info("[BACKGROUND] Getting document processor...")
             processor = get_document_processor()
-            logger.info(f"[BACKGROUND] Calling process_document()...")
+            logger.info("[BACKGROUND] Calling process_document()...")
             result = await processor.process_document(
                 document_id, db, detect_duplicates=detect_duplicates
             )
@@ -147,25 +147,27 @@ async def create_document(
     content_bytes = await file.read()
     content: str
     heading_map_json: str | None = None
-    if file_type == FileType.DOCX:
+    if file_type in (FileType.DOCX, FileType.FB2):
         from app.utils.file_handlers import FileHandlerFactory, process_file
 
+        type_label = file_type.value.upper()
         try:
             processed = process_file(content_bytes, filename, file_type)
             content = processed["text"]
         except Exception as exc:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to parse DOCX: {exc}"
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to parse {type_label}: {exc}",
             ) from exc
 
         # Extract heading map for structural metadata indexing
         try:
-            docx_handler = FileHandlerFactory.get_handler(file_type)
-            headings = docx_handler.extract_heading_map(content_bytes)
+            handler = FileHandlerFactory.get_handler(file_type)
+            headings = handler.extract_heading_map(content_bytes)
             if headings:
                 heading_map_json = json.dumps(headings, ensure_ascii=False)
         except Exception as exc:
-            logger.warning(f"Failed to extract DOCX heading map for '{filename}': {exc}")
+            logger.warning(f"Failed to extract {type_label} heading map for '{filename}': {exc}")
     else:
         try:
             content = content_bytes.decode("utf-8")
