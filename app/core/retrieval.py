@@ -377,6 +377,11 @@ class RetrievalEngine:
                     "indexed_at": payload.get("indexed_at"),
                     "source_type": "dense",
                     "dense_score_raw": float(result.score),
+                    # Structural metadata (populated for enriched documents)
+                    "section_heading": payload.get("section_heading"),
+                    "section_path": payload.get("section_path"),
+                    "section_level": payload.get("section_level"),
+                    "contextual_description": payload.get("contextual_description"),
                 },
             )
 

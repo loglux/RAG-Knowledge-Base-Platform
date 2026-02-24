@@ -502,10 +502,16 @@ class DocumentProcessor:
         Returns:
             List of payload dictionaries
         """
+        # Pre-compute heading map for Markdown documents
+        file_type_str = str(document.file_type).lower().replace("filetype.", "")
+        heading_map = (
+            self._extract_md_heading_map(document.content) if file_type_str == "md" else []
+        )
+
         payloads = []
 
         for chunk in chunks:
-            payload = {
+            payload: Dict[str, Any] = {
                 # Core identifiers
                 "document_id": str(document.id),
                 "knowledge_base_id": str(kb.id),
@@ -524,9 +530,76 @@ class DocumentProcessor:
                 "indexed_at": datetime.utcnow().isoformat(),
             }
 
+            # Merge chunk.metadata (e.g. contextual_description from SemanticChunking)
+            # Skip keys that are already set or that duplicate document-level identifiers
+            _skip = {"document_id", "knowledge_base_id", "document_filename"}
+            for key, value in chunk.metadata.items():
+                if key not in payload and key not in _skip:
+                    payload[key] = value
+
+            # Add section heading from Markdown structure
+            if heading_map:
+                section = self._get_section_for_chunk(heading_map, chunk.start_char)
+                if section:
+                    payload["section_heading"] = section["heading"]
+                    payload["section_path"] = section["path"]
+                    payload["section_level"] = section["level"]
+
             payloads.append(payload)
 
         return payloads
+
+    @staticmethod
+    def _extract_md_heading_map(text: str) -> List[Dict[str, Any]]:
+        """Build a heading position map from Markdown text.
+
+        Returns a list of dicts with keys: pos (int), level (int), text (str),
+        sorted by character position.
+        """
+        import re
+
+        headings = []
+        for match in re.finditer(r"^(#{1,6})\s+(.+)$", text, re.MULTILINE):
+            headings.append(
+                {
+                    "pos": match.start(),
+                    "level": len(match.group(1)),
+                    "text": match.group(2).strip(),
+                }
+            )
+        return headings
+
+    @staticmethod
+    def _get_section_for_chunk(
+        headings: List[Dict[str, Any]], start_char: int
+    ) -> Optional[Dict[str, Any]]:
+        """Find the current section for a chunk based on its start position.
+
+        Returns a dict with heading (str), path (str), level (int), or None.
+        """
+        if not headings:
+            return None
+
+        # Walk headings in order; keep track of the active heading at each level.
+        # When a new heading is encountered clear all deeper levels.
+        active: Dict[int, str] = {}
+        for h in headings:
+            if h["pos"] > start_char:
+                break
+            active[h["level"]] = h["text"]
+            for deeper in range(h["level"] + 1, 7):
+                active.pop(deeper, None)
+
+        if not active:
+            return None
+
+        parts = [active[lvl] for lvl in sorted(active)]
+        deepest = max(active)
+        return {
+            "heading": active[deepest],
+            "path": " > ".join(parts),
+            "level": deepest,
+        }
 
     @staticmethod
     def _build_lexical_chunks(chunks: List[Chunk]) -> List[Dict[str, Any]]:

@@ -22,6 +22,11 @@ export function SourceCard({ source, index, anchorPrefix }: SourceCardProps) {
   const contentPreview = source.text.slice(0, 240)
   const hasMore = source.text.length > 240
   const metadata = source.metadata || {}
+  const sectionPath = typeof metadata.section_path === 'string' ? metadata.section_path : null
+  const contextualDescription =
+    typeof metadata.contextual_description === 'string' && metadata.contextual_description
+      ? metadata.contextual_description
+      : null
   const sourceType = typeof metadata.source_type === 'string' ? metadata.source_type : null
   const denseScoreRaw = typeof metadata.dense_score_raw === 'number' ? metadata.dense_score_raw : null
   const lexicalScoreRaw = typeof metadata.lexical_score_raw === 'number' ? metadata.lexical_score_raw : null
@@ -37,7 +42,7 @@ export function SourceCard({ source, index, anchorPrefix }: SourceCardProps) {
   return (
     <div id={anchorId} className="panel p-3 text-sm scroll-mt-24">
       <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 flex-wrap">
           <span className="text-[11px] text-gray-400 font-mono">
             Source {index + 1}
           </span>
@@ -49,6 +54,19 @@ export function SourceCard({ source, index, anchorPrefix }: SourceCardProps) {
           <span className={`font-mono text-xs ${confidenceColor}`}>{confidencePercent}%</span>
         </div>
       </div>
+
+      {sectionPath && (
+        <div className="mb-2 text-[11px] text-gray-400 flex items-center gap-1 flex-wrap">
+          <span className="text-gray-500">§</span>
+          <span className="text-primary-400">{sectionPath}</span>
+        </div>
+      )}
+
+      {contextualDescription && (
+        <div className="mb-2 text-[11px] text-gray-500 italic border-l-2 border-gray-600 pl-2">
+          {contextualDescription}
+        </div>
+      )}
 
       {(sourceType ||
         denseScoreRaw !== null ||
