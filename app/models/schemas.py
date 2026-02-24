@@ -50,9 +50,6 @@ class KnowledgeBaseBase(BaseModel):
     bm25_analyzer: Optional[str] = Field(
         default=None, description="BM25 analyzer profile: auto, mixed, ru, en"
     )
-    structure_llm_model: Optional[str] = Field(
-        default=None, description="LLM model for document structure (TOC) analysis"
-    )
     use_llm_chat_titles: Optional[bool] = Field(
         default=None, description="Override for LLM-generated chat titles (None = use app default)"
     )
@@ -93,7 +90,6 @@ class KnowledgeBaseCreate(KnowledgeBaseBase):
     bm25_min_should_match: Optional[int] = Field(None, ge=0, le=100)
     bm25_use_phrase: Optional[bool] = None
     bm25_analyzer: Optional[str] = None
-    structure_llm_model: Optional[str] = None
     use_llm_chat_titles: Optional[bool] = None
 
 
@@ -110,7 +106,6 @@ class KnowledgeBaseUpdate(BaseModel):
     bm25_min_should_match: Optional[int] = Field(None, ge=0, le=100)
     bm25_use_phrase: Optional[bool] = None
     bm25_analyzer: Optional[str] = None
-    structure_llm_model: Optional[str] = None
     use_llm_chat_titles: Optional[bool] = None
 
 
@@ -315,7 +310,6 @@ class RetrievalSettingsUpdate(BaseModel):
     hybrid_lexical_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     max_context_chars: Optional[int] = Field(default=None, ge=0)
     score_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    use_structure: Optional[bool] = Field(default=None)
     use_mmr: Optional[bool] = Field(default=None)
     mmr_diversity: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     context_expansion: Optional[List[str]] = Field(default=None)
@@ -342,7 +336,6 @@ class EffectiveRetrievalSettings(BaseModel):
     hybrid_lexical_weight: float = Field(..., ge=0.0, le=1.0)
     max_context_chars: int = Field(..., ge=0)
     score_threshold: float = Field(..., ge=0.0, le=1.0)
-    use_structure: bool = Field(...)
     use_mmr: bool = Field(...)
     mmr_diversity: float = Field(..., ge=0.0, le=1.0)
     context_expansion: Optional[List[str]] = Field(default=None)
@@ -438,7 +431,6 @@ class ConversationSettings(BaseModel):
     score_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     llm_model: Optional[str] = None
     llm_provider: Optional[str] = None
-    use_structure: Optional[bool] = None
     retrieval_mode: Optional[RetrievalMode] = Field(default=None)
     lexical_top_k: Optional[int] = Field(default=None, ge=1, le=200)
     hybrid_dense_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
@@ -498,7 +490,6 @@ class AppSettingsBase(BaseModel):
     top_k: Optional[int] = Field(default=None, ge=1, le=100)
     max_context_chars: Optional[int] = Field(default=None, ge=0)
     score_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    use_structure: Optional[bool] = Field(default=None)
     rerank_enabled: Optional[bool] = Field(default=None)
     rerank_provider: Optional[str] = Field(default=None)
     rerank_model: Optional[str] = Field(default=None)
@@ -516,7 +507,6 @@ class AppSettingsBase(BaseModel):
     use_self_check: Optional[bool] = Field(
         default=None, description="Default self-check validation for all chats"
     )
-    structure_requests_per_minute: Optional[int] = Field(default=None, ge=0, le=120)
     kb_chunk_size: Optional[int] = Field(default=None, ge=100, le=2000)
     kb_chunk_overlap: Optional[int] = Field(default=None, ge=0, le=500)
     kb_upsert_batch_size: Optional[int] = Field(default=None, ge=64, le=1024)
@@ -651,9 +641,6 @@ class ChatRequest(BaseModel):
     llm_provider: Optional[str] = Field(
         default=None, description="LLM provider (openai, anthropic, ollama)"
     )
-    use_structure: bool = Field(
-        default=False, description="Use document structure for search (experimental, default: OFF)"
-    )
     rerank_enabled: Optional[bool] = Field(default=None, description="Enable retrieval reranking")
     rerank_provider: Optional[str] = Field(
         default=None, description="Reranking provider (e.g., openai, voyage)"
@@ -744,46 +731,6 @@ class ChatDeleteResponse(BaseModel):
 
     status: str = Field(..., description="Deletion status")
     deleted_ids: List[UUID] = Field(default_factory=list, description="Deleted message IDs")
-
-
-# ============================================================================
-# Document Structure Schemas
-# ============================================================================
-
-
-class TOCSection(BaseModel):
-    """Section in table of contents."""
-
-    id: str = Field(..., description="Unique section ID")
-    title: str = Field(..., description="Section title")
-    type: str = Field(..., description="Section type (question, section, chapter, etc.)")
-    chunk_start: int = Field(..., description="Starting chunk index")
-    chunk_end: int = Field(..., description="Ending chunk index")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
-    subsections: List["TOCSection"] = Field(default_factory=list, description="Nested subsections")
-
-
-class DocumentStructureAnalysis(BaseModel):
-    """Result of document structure analysis."""
-
-    document_type: str = Field(..., description="Detected document type")
-    description: str = Field(..., description="Brief description of structure")
-    sections: List[TOCSection] = Field(..., description="Table of contents sections")
-    total_sections: int = Field(..., description="Total number of sections")
-
-
-class DocumentStructureResponse(BaseModel):
-    """Schema for document structure response."""
-
-    id: UUID
-    document_id: UUID
-    document_type: Optional[str]
-    sections: List[TOCSection]
-    approved_by_user: bool
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = {"from_attributes": True}
 
 
 # ============================================================================

@@ -91,9 +91,6 @@ export function ChatPage() {
   const [llmProvider, setLlmProvider] = useState(() => {
     return 'openai'
   })
-  const [useStructure, setUseStructure] = useState(() => {
-    return false
-  })
   const [useMmr, setUseMmr] = useState(() => {
     return false
   })
@@ -238,7 +235,6 @@ export function ChatPage() {
         }
         if (settings.llm_model) setLlmModel(settings.llm_model)
         if (settings.llm_provider) setLlmProvider(settings.llm_provider)
-        if (settings.use_structure !== undefined) setUseStructure(settings.use_structure)
         if (settings.use_mmr !== undefined) setUseMmr(settings.use_mmr)
         if (settings.mmr_diversity !== undefined && settings.mmr_diversity !== null) {
           setMmrDiversity(settings.mmr_diversity)
@@ -305,7 +301,6 @@ export function ChatPage() {
         if (data.rerank_min_score !== null) setRerankMinScore(data.rerank_min_score)
         if (data.llm_model) setLlmModel(data.llm_model)
         if (data.llm_provider) setLlmProvider(data.llm_provider)
-        if (data.use_structure !== null) setUseStructure(data.use_structure)
         setSettingsLoaded(true)
       } catch (err) {
         console.error('Failed to load global settings:', err)
@@ -377,7 +372,6 @@ export function ChatPage() {
       }
       if (draft.llm_model) setLlmModel(draft.llm_model)
       if (draft.llm_provider) setLlmProvider(draft.llm_provider)
-      if (draft.use_structure !== undefined) setUseStructure(draft.use_structure)
       if (draft.use_mmr !== undefined) setUseMmr(draft.use_mmr)
       if (draft.mmr_diversity !== undefined && draft.mmr_diversity !== null) setMmrDiversity(draft.mmr_diversity)
       if (draft.use_self_check !== undefined) setUseSelfCheck(draft.use_self_check)
@@ -484,7 +478,6 @@ export function ChatPage() {
       rerank_min_score: rerankMinScore,
       llm_model: llmModel,
       llm_provider: llmProvider,
-      use_structure: useStructure,
       use_mmr: useMmr,
       mmr_diversity: mmrDiversity,
       use_self_check: useSelfCheck,
@@ -499,7 +492,7 @@ export function ChatPage() {
     apiClient.updateConversationSettings(conversationId, payload).catch((err) => {
       console.error('Failed to update conversation settings:', err)
     })
-  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, rerankEnabled, rerankProvider, rerankModel, rerankCandidatePool, rerankTopN, rerankMinScore, llmModel, llmProvider, useStructure, useMmr, mmrDiversity, useSelfCheck, useConversationHistory, conversationHistoryLimit, useDocumentFilter, selectedDocumentIds, contextExpansion, contextWindow])
+  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, rerankEnabled, rerankProvider, rerankModel, rerankCandidatePool, rerankTopN, rerankMinScore, llmModel, llmProvider, useMmr, mmrDiversity, useSelfCheck, useConversationHistory, conversationHistoryLimit, useDocumentFilter, selectedDocumentIds, contextExpansion, contextWindow])
 
   useEffect(() => {
     if (conversationId || !settingsLoaded) return
@@ -527,7 +520,6 @@ export function ChatPage() {
       rerank_min_score: rerankMinScore,
       llm_model: llmModel,
       llm_provider: llmProvider,
-      use_structure: useStructure,
       use_mmr: useMmr,
       mmr_diversity: mmrDiversity,
       use_self_check: useSelfCheck,
@@ -543,7 +535,7 @@ export function ChatPage() {
     } catch (err) {
       console.error('Failed to persist draft chat settings:', err)
     }
-  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, rerankEnabled, rerankProvider, rerankModel, rerankCandidatePool, rerankTopN, rerankMinScore, llmModel, llmProvider, useStructure, useMmr, mmrDiversity, useSelfCheck, useConversationHistory, conversationHistoryLimit, useDocumentFilter, selectedDocumentIds, contextExpansion, contextWindow, settingsDraftKey])
+  }, [conversationId, settingsLoaded, topK, temperature, maxContextChars, scoreThreshold, retrievalMode, lexicalTopK, hybridDenseWeight, hybridLexicalWeight, bm25MatchMode, bm25MinShouldMatch, bm25UsePhrase, bm25Analyzer, rerankEnabled, rerankProvider, rerankModel, rerankCandidatePool, rerankTopN, rerankMinScore, llmModel, llmProvider, useMmr, mmrDiversity, useSelfCheck, useConversationHistory, conversationHistoryLimit, useDocumentFilter, selectedDocumentIds, contextExpansion, contextWindow, settingsDraftKey])
 
   useEffect(() => {
     const fetchKB = async () => {
@@ -709,7 +701,6 @@ export function ChatPage() {
       scoreThreshold,
       llmModel,
       llmProvider,
-      useStructure,
       useMmr,
       mmrDiversity,
       useSelfCheck,
@@ -759,7 +750,6 @@ export function ChatPage() {
       if (data.rerank_min_score !== null) setRerankMinScore(data.rerank_min_score)
       if (data.llm_model) setLlmModel(data.llm_model)
       if (data.llm_provider) setLlmProvider(data.llm_provider)
-      if (data.use_structure !== null) setUseStructure(data.use_structure)
 
       // Reset toggles to default values
       setUseMmr(false)
@@ -907,7 +897,6 @@ export function ChatPage() {
               opensearchAvailable={opensearchAvailable ?? undefined}
               llmModel={llmModel}
               llmProvider={llmProvider}
-              useStructure={useStructure}
               useMmr={useMmr}
               mmrDiversity={mmrDiversity}
               useSelfCheck={useSelfCheck}
@@ -938,7 +927,6 @@ export function ChatPage() {
               onRerankTopNChange={setRerankTopN}
               onRerankMinScoreChange={setRerankMinScore}
               onLLMChange={handleLLMChange}
-              onUseStructureChange={setUseStructure}
               onUseMmrChange={setUseMmr}
               onMmrDiversityChange={setMmrDiversity}
               onUseSelfCheckChange={setUseSelfCheck}

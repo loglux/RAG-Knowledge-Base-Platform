@@ -6,21 +6,17 @@ Combines retrieval and generation for question answering over knowledge bases.
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.llm_base import BaseLLMService, Message
 from app.core.llm_factory import create_llm_service
 from app.core.retrieval import RetrievalEngine, RetrievedChunk, get_retrieval_engine
-from app.models.database import Document as DocumentModel
-from app.services.document_analyzer import get_document_analyzer
 from app.services.prompts import get_active_chat_prompt, get_active_self_check_prompt
-from app.services.query_intent import get_query_intent_extractor
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +108,6 @@ Retrieved Context:
         llm_model: Optional[str] = None,
         llm_provider: Optional[str] = None,
         conversation_history: Optional[List[Dict[str, str]]] = None,
-        use_structure: bool = False,
         rerank_enabled: bool = False,
         rerank_provider: Optional[str] = None,
         rerank_model: Optional[str] = None,
@@ -149,7 +144,6 @@ Retrieved Context:
             llm_model: Override LLM model for this query
             llm_provider: Override LLM provider for this query
             conversation_history: Previous messages for follow-up questions
-            use_structure: Use document structure for structured search (default: False)
             rerank_enabled: Enable reranking stage after retrieval
             rerank_provider: Reranking provider hint
             rerank_model: Reranking model hint
@@ -157,8 +151,6 @@ Retrieved Context:
             rerank_top_n: Number of chunks to keep after reranking
             rerank_min_score: Optional minimum rerank score threshold
             document_ids: Optional list of document IDs to filter retrieval
-            db: Database session for structure lookups (required if use_structure=True)
-            kb_id: Knowledge base ID for document lookup (required if use_structure=True)
 
         Returns:
             RAGResponse with answer and sources
@@ -172,8 +164,7 @@ Retrieved Context:
 
         mode = retrieval_mode.value if hasattr(retrieval_mode, "value") else str(retrieval_mode)
         logger.info(
-            f"RAG query: '{question[:50]}...' "
-            f"(collection={collection_name}, mode={mode}, use_structure={use_structure})"
+            f"RAG query: '{question[:50]}...' " f"(collection={collection_name}, mode={mode})"
         )
 
         # Create LLM service with overrides if provided
@@ -183,56 +174,14 @@ Retrieved Context:
             llm_service = create_llm_service(model=llm_model, provider=llm_provider)
 
         try:
-            # 1. Handle structure-based search if enabled
-            chunk_filters = None
-
+            # 1. Build optional document filter
             document_filter = None
             if document_ids:
                 document_filter = {
                     "document_id": document_ids if len(document_ids) > 1 else document_ids[0]
                 }
 
-            logger.debug(
-                f"RAG query with use_structure={use_structure}, db={db is not None}, kb_id={kb_id}"
-            )
-
-            if use_structure:
-                if not db or not kb_id:
-                    logger.warning(
-                        "use_structure=True but db or kb_id not provided, falling back to semantic search"
-                    )
-                else:
-                    logger.debug("Extracting structure filters...")
-                    chunk_filters = await self._extract_structure_filters(
-                        question=question, kb_id=kb_id, db=db
-                    )
-                    if chunk_filters:
-                        logger.debug(f"Structure-based search: {chunk_filters}")
-                    else:
-                        logger.debug("Structure filters returned None, using semantic search")
-
-            if document_filter and chunk_filters and "document_id" in chunk_filters:
-                if chunk_filters["document_id"] not in document_ids:
-                    logger.warning(
-                        "Document filter excludes structured document. Returning empty result."
-                    )
-                    return RAGResponse(
-                        answer="I couldn't find any relevant information in the knowledge base to answer your question.",
-                        sources=[],
-                        query=question,
-                        context_used="",
-                        model=llm_service.model,
-                    )
-
-            merged_filters = None
-            if chunk_filters and document_filter:
-                merged_filters = {**document_filter, **chunk_filters}
-            elif chunk_filters:
-                merged_filters = chunk_filters
-            elif document_filter:
-                merged_filters = document_filter
-
-            # 2. Retrieve relevant chunks (with optional structure filters)
+            # 2. Retrieve relevant chunks
             if mode == "hybrid":
                 if not kb_id:
                     logger.warning("Hybrid retrieval requires kb_id, falling back to dense search")
@@ -250,7 +199,7 @@ Retrieved Context:
                     top_k=top_k,
                     lexical_top_k=lexical_top_k,
                     score_threshold=score_threshold,
-                    filters=merged_filters,
+                    filters=document_filter,
                     dense_weight=dense_weight,
                     lexical_weight=lexical_weight,
                     bm25_match_mode=bm25_match_mode,
@@ -270,7 +219,7 @@ Retrieved Context:
                     embedding_model=embedding_model,
                     top_k=top_k,
                     score_threshold=score_threshold,
-                    filters=merged_filters,
+                    filters=document_filter,
                     use_mmr=use_mmr,
                     mmr_diversity=mmr_diversity,
                 )
@@ -336,12 +285,6 @@ Retrieved Context:
             # 3. Generate answer with context
             context = self.retrieval._assemble_context(chunks)
             if max_context_chars is not None:
-                context = self.retrieval._assemble_context(
-                    chunks,
-                    max_length=max_context_chars,
-                )
-            elif chunk_filters:
-                # For structured question retrieval, avoid truncating the target section.
                 context = self.retrieval._assemble_context(
                     chunks,
                     max_length=max_context_chars,
@@ -620,244 +563,6 @@ Retrieved Context:
             # On validation failure, return the draft answer rather than failing entirely
             logger.warning("Returning draft answer due to validation failure")
             return draft_answer
-
-    async def _extract_structure_filters(
-        self, question: str, kb_id: UUID, db: AsyncSession
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Extract structure-based filters from query using LLM.
-
-        Uses QueryIntentExtractor to understand queries like "show me question 2"
-        and returns chunk range filters based on document structure (TOC).
-
-        Args:
-            question: User's question
-            kb_id: Knowledge base ID
-            db: Database session
-
-        Returns:
-            Filter dict for chunk_index range, or None for semantic search
-        """
-        try:
-            # 1. Get list of documents in KB for context
-            result = await db.execute(
-                select(DocumentModel).where(
-                    DocumentModel.knowledge_base_id == kb_id, DocumentModel.status == "completed"
-                )
-            )
-            documents = result.scalars().all()
-
-            if not documents:
-                logger.debug("No completed documents in KB")
-                return None
-
-            doc_names = [doc.filename for doc in documents]
-            logger.debug(f"KB documents: {doc_names}")
-
-            # 2. Extract intent using LLM
-            intent_extractor = get_query_intent_extractor()
-            intent = await intent_extractor.extract_intent(
-                query=question, kb_documents=doc_names, use_cache=True  # Use fast pattern fallback
-            )
-
-            logger.debug(
-                f"Intent extracted: type={intent.intent_type}, confidence={intent.confidence}, doc={intent.document_name}, section={intent.section_type} {intent.section_number}"
-            )
-
-            logger.info(
-                f"Extracted intent: type={intent.intent_type}, "
-                f"doc={intent.document_name}, "
-                f"section_type={intent.section_type}, "
-                f"section_num={intent.section_number}, "
-                f"confidence={intent.confidence:.2f}"
-            )
-
-            # 3. If not structured search or low confidence, fall back to semantic
-            if intent.intent_type != "structured_search" or intent.confidence < 0.6:
-                logger.debug("Intent not structured or confidence too low, using semantic search")
-                return None
-
-            # 4. Find document by name if specified
-            target_doc = None
-            preselected_section = None
-            if intent.document_name:
-                for doc in documents:
-                    if intent.document_name.lower() in doc.filename.lower():
-                        target_doc = doc
-                        break
-
-                if not target_doc:
-                    logger.warning(f"Document '{intent.document_name}' not found in KB")
-                    # Fall through to section-based matching across all docs
-            else:
-                # No specific document mentioned - find best matching document
-                if len(documents) == 1:
-                    target_doc = documents[0]
-                    logger.debug(f"Using single document: {target_doc.filename}")
-                else:
-                    # Multiple documents - match document type to query section type
-                    logger.debug(
-                        f"Multiple documents ({len(documents)}), finding best match for section_type={intent.section_type}"
-                    )
-
-                    # Map section types to document types
-                    section_to_doc_type = {
-                        "question": "tma_questions",
-                        "section": "textbook_chapter",
-                        "chapter": "textbook_chapter",
-                    }
-
-                    preferred_doc_type = section_to_doc_type.get(intent.section_type)
-
-                    # First pass: try to find document with matching type AND structure
-                    if preferred_doc_type:
-                        logger.debug(f"Looking for document_type={preferred_doc_type}")
-                        for doc in documents:
-                            analyzer = get_document_analyzer()
-                            structure = await analyzer.get_structure(doc.id, db)
-                            if structure and structure.document_type == preferred_doc_type:
-                                target_doc = doc
-                                logger.debug(
-                                    f"Found matching document: {doc.filename} (type={structure.document_type})"
-                                )
-                                break
-
-                    # Second pass: if no match, take any document with structure
-                    if not target_doc:
-                        logger.debug("No matching type found, trying any document with structure")
-                        for doc in documents:
-                            analyzer = get_document_analyzer()
-                            structure = await analyzer.get_structure(doc.id, db)
-                            if structure and structure.toc_json:
-                                target_doc = doc
-                                logger.debug(f"Found document with structure: {doc.filename}")
-                                break
-
-                    # Last resort: use first document
-                    if not target_doc:
-                        target_doc = documents[0]
-                        logger.debug(
-                            f"No document with structure, using first: {target_doc.filename}"
-                        )
-
-            # If we still don't have a document, try to locate one by section match
-            if (
-                not target_doc
-                and intent.section_type
-                and (intent.section_number is not None or intent.section_id)
-            ):
-                logger.debug("No document selected, scanning for matching section across documents")
-                analyzer = get_document_analyzer()
-                for doc in documents:
-                    structure = await analyzer.get_structure(doc.id, db)
-                    if not structure or not structure.toc_json:
-                        continue
-                    import json
-
-                    toc_sections = json.loads(structure.toc_json)
-                    candidate = self._find_matching_section(
-                        toc_sections, intent.section_type, intent.section_number, intent.section_id
-                    )
-                    if candidate:
-                        target_doc = doc
-                        preselected_section = candidate
-                        logger.debug(f"Found section match in document: {doc.filename}")
-                        break
-
-            if not target_doc:
-                logger.debug("No specific document identified, using semantic search")
-                return None
-
-            # 5. Get document structure
-            analyzer = get_document_analyzer()
-            structure = await analyzer.get_structure(target_doc.id, db)
-
-            if not structure or not structure.toc_json:
-                logger.debug(f"No structure found for document {target_doc.filename}")
-                return None
-
-            # 6. Parse TOC and find matching section
-            import json
-
-            toc_sections = json.loads(structure.toc_json)
-            matching_section = preselected_section or self._find_matching_section(
-                toc_sections, intent.section_type, intent.section_number, intent.section_id
-            )
-
-            if not matching_section:
-                logger.warning(
-                    f"No matching section found for {intent.section_type} "
-                    f"{intent.section_number or intent.section_id}"
-                )
-                return None
-
-            # 7. Create chunk range filter
-            chunk_start = matching_section.get("chunk_start")
-            chunk_end = matching_section.get("chunk_end")
-
-            if chunk_start is None or chunk_end is None:
-                logger.warning("Section found but missing chunk range")
-                return None
-
-            logger.info(
-                f"Found section '{matching_section.get('title')}': "
-                f"chunks {chunk_start}-{chunk_end}"
-            )
-
-            # Return filter for chunk_index range + document_id
-            return {
-                "chunk_index": {"gte": chunk_start, "lte": chunk_end},
-                "document_id": str(target_doc.id),
-            }
-
-        except Exception as e:
-            logger.error(f"Structure filter extraction failed: {e}")
-            return None
-
-    def _find_matching_section(
-        self,
-        sections: List[Dict[str, Any]],
-        section_type: Optional[str],
-        section_number: Optional[int],
-        section_id: Optional[str],
-    ) -> Optional[Dict[str, Any]]:
-        """
-        Find matching section in TOC.
-
-        Recursively searches through sections and subsections.
-
-        Args:
-            sections: List of TOC sections
-            section_type: Type (question, section, chapter)
-            section_number: Number if applicable
-            section_id: ID like "1.2" for hierarchical sections
-
-        Returns:
-            Matching section dict or None
-        """
-        for section in sections:
-            # Match by type and number
-            if section_type and section.get("type") == section_type:
-                # Check for question/chapter number match
-                if section_number is not None:
-                    metadata = section.get("metadata", {})
-                    if metadata.get("question_number") == section_number:
-                        return section
-
-                # Check for section ID match (e.g., "1.2")
-                if section_id and section.get("id") == f"section_{section_id.replace('.', '_')}":
-                    return section
-
-            # Recursively search subsections
-            subsections = section.get("subsections", [])
-            if subsections:
-                match = self._find_matching_section(
-                    subsections, section_type, section_number, section_id
-                )
-                if match:
-                    return match
-
-        return None
 
     async def close(self):
         """Close the LLM service."""

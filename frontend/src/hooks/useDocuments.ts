@@ -46,10 +46,6 @@ export function useDocuments(kbId: string) {
     )
   }, [])
 
-  const analyzeDocument = useCallback(async (id: string) => {
-    return await apiClient.analyzeDocument(id)
-  }, [])
-
   const recomputeDocumentDuplicates = useCallback(async (id: string) => {
     const summary = await apiClient.recomputeDocumentDuplicates(id)
     setDocuments((prev) =>
@@ -71,7 +67,6 @@ export function useDocuments(kbId: string) {
     deleteDocument,
     reprocessDocument,
     updateDocumentStatus,
-    analyzeDocument,
     recomputeDocumentDuplicates,
   }
 }

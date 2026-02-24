@@ -141,30 +141,6 @@ class Settings(BaseSettings):
         description="Comma-separated list of allowed file extensions (MVP: txt,md,fb2,docx)",
     )
 
-    # Structure Analysis (LLM-based document TOC generation)
-    STRUCTURE_ANALYSIS_MAX_CHUNKS: int = Field(
-        default=0, description="Max chunks to send for analysis (0 = all chunks, unlimited)"
-    )
-    STRUCTURE_ANALYSIS_MAX_CHARS_PER_CHUNK: int = Field(
-        default=0, description="Max chars per chunk for analysis (0 = full chunk, no truncation)"
-    )
-    STRUCTURE_ANALYSIS_MAX_TOTAL_CHARS: int = Field(
-        default=0, description="Max total chars for analysis (0 = unlimited, send full document)"
-    )
-    STRUCTURE_ANALYSIS_LLM_MODEL: str = Field(
-        default="claude-haiku-4-5-20251001", description="LLM model for structure analysis"
-    )
-    STRUCTURE_ANALYSIS_REQUESTS_PER_MINUTE: int = Field(
-        default=10, description="Max structure analysis requests per minute (0 = unlimited)"
-    )
-    STRUCTURE_ANALYSIS_LLM_TEMPERATURE: float = Field(
-        default=0.3,
-        description="LLM temperature for structure analysis (lower = more consistent JSON)",
-    )
-    STRUCTURE_ANALYSIS_QDRANT_PAGE_SIZE: int = Field(
-        default=100, description="Qdrant scroll page size when fetching document chunks"
-    )
-
     @field_validator("BM25_MATCH_MODES", "BM25_ANALYZERS", mode="before")
     @classmethod
     def _split_csv_list(cls, v):
@@ -173,12 +149,6 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return [item.strip() for item in v.split(",") if item.strip()]
         return v
-
-    # Query Intent Extraction
-    QUERY_INTENT_LLM_TEMPERATURE: float = Field(
-        default=0.1,
-        description="LLM temperature for query intent extraction (very low = consistent)",
-    )
 
     # Security (prepared for future auth)
     SECRET_KEY: str = Field(

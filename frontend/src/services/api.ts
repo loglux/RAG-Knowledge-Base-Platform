@@ -524,22 +524,6 @@ class APIClient {
     await this.client.delete(`/documents/${id}`)
   }
 
-  // Document Structure
-  async analyzeDocument(id: string): Promise<any> {
-    const response = await this.client.post(`/documents/${id}/analyze`)
-    return response.data
-  }
-
-  async getDocumentStructure(id: string): Promise<any> {
-    const response = await this.client.get(`/documents/${id}/structure`)
-    return response.data
-  }
-
-  async applyDocumentStructure(id: string, analysis: any): Promise<any> {
-    const response = await this.client.post(`/documents/${id}/structure/apply`, analysis)
-    return response.data
-  }
-
   // Chat
   async chat(data: ChatRequest): Promise<ChatResponse> {
     const response = await this.client.post<ChatResponse>('/chat/', data)

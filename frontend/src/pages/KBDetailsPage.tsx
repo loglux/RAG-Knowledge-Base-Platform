@@ -70,7 +70,6 @@ export function KBDetailsPage() {
     chunk_overlap: 200,
     upsert_batch_size: 256,
     chunking_strategy: 'smart' as 'simple' | 'smart' | 'semantic',
-    structure_llm_model: '',
   })
   const [settingsErrors, setSettingsErrors] = useState<Record<string, string>>({})
   const [settingsSaving, setSettingsSaving] = useState(false)
@@ -90,7 +89,6 @@ export function KBDetailsPage() {
   const [retrievalDraft, setRetrievalDraft] = useState<KBRetrievalSettingsStored>({})
   const [retrievalSaving, setRetrievalSaving] = useState(false)
   const [linkHybridWeights, setLinkHybridWeights] = useState(true)
-  const [structureModelOverride, setStructureModelOverride] = useState(false)
   const [reindexing, setReindexing] = useState(false)
   const [reindexMessage, setReindexMessage] = useState<string | null>(null)
   const [detectDuplicatesOnUpload, setDetectDuplicatesOnUpload] = useState(false)
@@ -102,10 +100,6 @@ export function KBDetailsPage() {
   const [bm25MatchModes, setBm25MatchModes] = useState<string[] | null>(null)
   const [bm25Analyzers, setBm25Analyzers] = useState<string[] | null>(null)
   const [appDefaults, setAppDefaults] = useState<AppSettings | null>(null)
-  const [bulkAnalyzing, setBulkAnalyzing] = useState(false)
-  const [bulkSkipAnalyzed, setBulkSkipAnalyzed] = useState(true)
-  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 })
-  const [bulkError, setBulkError] = useState<string | null>(null)
   const [qaRuns, setQaRuns] = useState<QAEvalRun[]>([])
   const [qaRunsLoading, setQaRunsLoading] = useState(false)
   const [qaRunsError, setQaRunsError] = useState<string | null>(null)
@@ -142,7 +136,6 @@ export function KBDetailsPage() {
       chunk_overlap: kbData.chunk_overlap,
       upsert_batch_size: kbData.upsert_batch_size,
       chunking_strategy: kbData.chunking_strategy as 'simple' | 'smart' | 'semantic',
-      structure_llm_model: kbData.structure_llm_model ?? '',
     }
   }
 
@@ -172,7 +165,6 @@ export function KBDetailsPage() {
     reprocessDocument,
     updateDocumentStatus,
     refresh: refreshDocuments,
-    analyzeDocument,
     recomputeDocumentDuplicates,
   } = useDocuments(id!)
 
@@ -368,7 +360,6 @@ export function KBDetailsPage() {
   useEffect(() => {
     if (!kb || isEditingSettings) return
     setSettingsData(buildSettingsData(kb))
-    setStructureModelOverride(Boolean(kb.structure_llm_model))
   }, [kb, isEditingSettings])
 
   useEffect(() => {
@@ -405,13 +396,6 @@ export function KBDetailsPage() {
       newErrors.upsert_batch_size = 'Batch size must be between 64 and 1024'
     }
 
-    if (structureModelOverride && !settingsData.structure_llm_model) {
-      newErrors.structure_llm_model = 'Select a model or disable override'
-    }
-
-    if (settingsData.structure_llm_model && settingsData.structure_llm_model.length > 100) {
-      newErrors.structure_llm_model = 'Model name is too long'
-    }
 
     setSettingsErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -428,7 +412,6 @@ export function KBDetailsPage() {
         chunk_overlap: settingsData.chunk_overlap,
         upsert_batch_size: settingsData.upsert_batch_size,
         chunking_strategy: settingsData.chunking_strategy,
-        structure_llm_model: structureModelOverride ? (settingsData.structure_llm_model || null) : null,
       })
       setKb(updated)
       setIsEditingSettings(false)
@@ -445,7 +428,6 @@ export function KBDetailsPage() {
   const handleCancelSettings = () => {
     if (!kb) return
     setSettingsData(buildSettingsData(kb))
-    setStructureModelOverride(Boolean(kb.structure_llm_model))
     setSettingsErrors({})
     setIsEditingSettings(false)
   }
@@ -566,45 +548,6 @@ export function KBDetailsPage() {
     }
   }
 
-  const handleAnalyzeAll = async () => {
-    if (bulkAnalyzing) return
-    setBulkError(null)
-
-    const candidates = documents.filter((doc) => doc.status === 'completed')
-    if (candidates.length === 0) {
-      setBulkError('No completed documents to analyze.')
-      return
-    }
-
-    setBulkAnalyzing(true)
-    setBulkProgress({ done: 0, total: candidates.length })
-
-    let processed = 0
-    for (const doc of candidates) {
-      let shouldAnalyze = true
-      try {
-        if (bulkSkipAnalyzed) {
-          const structure = await apiClient.getDocumentStructure(doc.id)
-          if (structure?.has_structure) {
-            shouldAnalyze = false
-          }
-        }
-
-        if (shouldAnalyze) {
-          const analysis = await apiClient.analyzeDocument(doc.id)
-          await apiClient.applyDocumentStructure(doc.id, analysis)
-        }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Failed to analyze document'
-        setBulkError(message)
-      } finally {
-        processed += 1
-        setBulkProgress({ done: processed, total: candidates.length })
-      }
-    }
-
-    setBulkAnalyzing(false)
-  }
 
   const handleDelete = async () => {
     if (!kb) return
@@ -780,34 +723,12 @@ export function KBDetailsPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-white">Documents</h2>
             <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 text-xs text-gray-400">
-                <input
-                  type="checkbox"
-                  checked={bulkSkipAnalyzed}
-                  onChange={(e) => setBulkSkipAnalyzed(e.target.checked)}
-                  className="rounded border-gray-600 bg-gray-800"
-                />
-                Skip already analyzed
-              </label>
-              <Button
-                onClick={handleAnalyzeAll}
-                disabled={bulkAnalyzing}
-                size="xs-wide"
-                className="flex items-center gap-1.5 disabled:opacity-60"
-              >
-                🔍 {bulkAnalyzing ? `Analyzing… ${bulkProgress.done}/${bulkProgress.total}` : 'Analyze All'}
-              </Button>
               <Button onClick={refreshDocuments} size="xs-wide" className="flex items-center gap-1.5">
                 ⟳ Refresh
               </Button>
             </div>
           </div>
 
-          {bulkError && (
-            <div className="mb-4 p-3 rounded border border-red-500 bg-red-500/10 text-red-400 text-sm">
-              {bulkError}
-            </div>
-          )}
 
           {/* Upload Area */}
           <div className="mb-6">
@@ -852,7 +773,6 @@ export function KBDetailsPage() {
                   document={doc}
                   onReprocess={(docId) => reprocessDocument(docId, detectDuplicatesOnReindex)}
                   onDelete={deleteDocument}
-                  onAnalyze={analyzeDocument}
                   onRecomputeDuplicates={recomputeDocumentDuplicates}
                 />
               ))}
@@ -1420,38 +1340,6 @@ export function KBDetailsPage() {
                 {settingsErrors.upsert_batch_size && <p className="mt-1 text-sm text-red-500">{settingsErrors.upsert_batch_size}</p>}
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-gray-400">
-                    TOC / Structure model
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-gray-300">
-                    <input
-                      type="checkbox"
-                      checked={structureModelOverride}
-                      onChange={(e) => setStructureModelOverride(e.target.checked)}
-                      className="w-4 h-4 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
-                      disabled={settingsSaving}
-                    />
-                    Override global model
-                  </label>
-                </div>
-                <div className={structureModelOverride ? '' : 'opacity-60 pointer-events-none'}>
-                  <LLMSelector
-                    value={structureModelOverride ? settingsData.structure_llm_model : (appDefaults?.llm_model || '')}
-                    onChange={(model, _provider) => setSettingsData({ ...settingsData, structure_llm_model: model })}
-                  />
-                </div>
-                <p className="text-sm text-gray-500 mt-1">
-                  {structureModelOverride
-                    ? 'Model used for TOC analysis in this KB'
-                    : `Using global default: ${appDefaults?.llm_model || 'not set'}`}
-                </p>
-                {settingsErrors.structure_llm_model && (
-                  <p className="mt-1 text-sm text-red-500">{settingsErrors.structure_llm_model}</p>
-                )}
-              </div>
-
               <div className="text-sm text-gray-500">
                 Changes apply to new or reprocessed documents only. Reindex actions are available in the Documents tab.
               </div>
@@ -1494,12 +1382,6 @@ export function KBDetailsPage() {
               <div>
                 <span className="text-gray-400">Upsert Batch Size:</span>
                 <span className="text-white ml-2 font-medium">{kb.upsert_batch_size}</span>
-              </div>
-              <div>
-                <span className="text-gray-400">TOC / Structure model:</span>
-                <span className="text-white ml-2 font-medium">
-                  {kb.structure_llm_model || 'Default'}
-                </span>
               </div>
               <div className="md:col-span-2">
                 <span className="text-gray-400">Chunking Strategy:</span>
@@ -1596,20 +1478,6 @@ export function KBDetailsPage() {
                         className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm"
                       />
                       <p className="text-sm text-gray-500 mt-1">0 = unlimited</p>
-                    </div>
-                    <div>
-                      <label className="flex items-center gap-2 text-gray-400 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={retrievalDraft.use_structure ?? retrievalEnvelope?.effective.use_structure ?? false}
-                          onChange={(e) => setRetrievalDraft({ ...retrievalDraft, use_structure: e.target.checked })}
-                          className="rounded border-gray-600 bg-gray-900"
-                        />
-                        Use document structure (TOC) for retrieval
-                      </label>
-                      {retrievalDraft.use_structure == null && (
-                        <p className="text-sm text-gray-500 mt-1 ml-5">Using global default</p>
-                      )}
                     </div>
                   </div>
 
@@ -1893,7 +1761,6 @@ export function KBDetailsPage() {
                     <div className="space-y-2 p-3 bg-gray-800 rounded-lg">
                       <div className="text-base text-gray-200 font-semibold">Context Assembly</div>
                       {renderEffectiveRetrievalRow('Max Context Chars', 'max_context_chars', retrievalEnvelope.effective.max_context_chars === 0 ? 'unlimited' : String(retrievalEnvelope.effective.max_context_chars))}
-                      {renderEffectiveRetrievalRow('Use Structure', 'use_structure', retrievalEnvelope.effective.use_structure ? 'yes' : 'no')}
                     </div>
 
                     {(['hybrid', 'lexical'].includes(retrievalEnvelope.effective.retrieval_mode)) && (

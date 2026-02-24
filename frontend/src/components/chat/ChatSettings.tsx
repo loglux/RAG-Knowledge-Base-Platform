@@ -38,7 +38,6 @@ interface ChatSettingsProps {
   opensearchAvailable?: boolean
   llmModel: string
   llmProvider: string
-  useStructure: boolean
   useMmr: boolean
   mmrDiversity: number
   useSelfCheck: boolean
@@ -69,7 +68,6 @@ interface ChatSettingsProps {
   onRerankTopNChange: (value: number) => void
   onRerankMinScoreChange: (value: number) => void
   onLLMChange: (model: string, provider: string) => void
-  onUseStructureChange: (value: boolean) => void
   onUseMmrChange: (value: boolean) => void
   onMmrDiversityChange: (value: number) => void
   onUseSelfCheckChange: (value: boolean) => void
@@ -110,7 +108,6 @@ export function ChatSettings({
   opensearchAvailable,
   llmModel,
   llmProvider: _llmProvider,
-  useStructure,
   useMmr,
   mmrDiversity,
   useSelfCheck,
@@ -141,7 +138,6 @@ export function ChatSettings({
   onRerankTopNChange,
   onRerankMinScoreChange,
   onLLMChange,
-  onUseStructureChange,
   onUseMmrChange,
   onMmrDiversityChange,
   onUseSelfCheckChange,
@@ -234,35 +230,6 @@ export function ChatSettings({
             >
               ✕
             </button>
-          </div>
-        </div>
-
-        {/* Structure */}
-        <div className="mb-8">
-          <h4 className="text-sm font-semibold text-gray-300 mb-3">Structure</h4>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="p-4 bg-gray-900 rounded-lg border border-gray-700">
-              <label className="flex items-center space-x-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useStructure}
-                  onChange={(e) => onUseStructureChange(e.target.checked)}
-                  className="w-5 h-5 rounded border-gray-600 text-primary-500 focus:ring-primary-500 focus:ring-offset-gray-900"
-                />
-                <div className="flex-1">
-                  <span className="text-sm font-medium text-white">
-                    Use Document Structure for Search
-                  </span>
-                  <span className="ml-2 text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded">
-                    Experimental
-                  </span>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Enable AI-powered structure analysis to find specific questions, sections, and chapters.
-                    Works best with queries like "show me question 2" or "section 3.1".
-                  </p>
-                </div>
-              </label>
-            </div>
           </div>
         </div>
 

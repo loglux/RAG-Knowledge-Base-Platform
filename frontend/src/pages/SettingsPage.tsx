@@ -66,8 +66,6 @@ export function SettingsPage() {
   const [rerankCandidatePool, setRerankCandidatePool] = useState(20)
   const [rerankTopN, setRerankTopN] = useState(5)
   const [rerankMinScore, setRerankMinScore] = useState(0)
-  const [useStructure, setUseStructure] = useState(false)
-  const [structureRequestsPerMinute, setStructureRequestsPerMinute] = useState(10)
   const [useLlmChatTitles, setUseLlmChatTitles] = useState(true)
   const [opensearchAvailable, setOpensearchAvailable] = useState<boolean | null>(null)
   const clamp01 = (value: number) => Math.min(1, Math.max(0, value))
@@ -236,7 +234,6 @@ export function SettingsPage() {
       if (appSettings.top_k !== null) setTopK(appSettings.top_k)
       if (appSettings.max_context_chars !== null) setMaxContextChars(appSettings.max_context_chars)
       if (appSettings.score_threshold !== null) setScoreThreshold(appSettings.score_threshold)
-      if (appSettings.use_structure !== null) setUseStructure(appSettings.use_structure)
       if (appSettings.retrieval_mode) setRetrievalMode(appSettings.retrieval_mode)
       if (appSettings.lexical_top_k !== null) setLexicalTopK(appSettings.lexical_top_k)
       if (appSettings.hybrid_dense_weight !== null) setHybridDenseWeight(appSettings.hybrid_dense_weight)
@@ -251,9 +248,6 @@ export function SettingsPage() {
       if (appSettings.rerank_candidate_pool !== null) setRerankCandidatePool(appSettings.rerank_candidate_pool)
       if (appSettings.rerank_top_n !== null) setRerankTopN(appSettings.rerank_top_n)
       if (appSettings.rerank_min_score !== null) setRerankMinScore(appSettings.rerank_min_score)
-      if (appSettings.structure_requests_per_minute !== null) {
-        setStructureRequestsPerMinute(appSettings.structure_requests_per_minute)
-      }
       if (appSettings.use_llm_chat_titles !== null) {
         setUseLlmChatTitles(appSettings.use_llm_chat_titles)
       }
@@ -633,7 +627,6 @@ export function SettingsPage() {
         top_k: topK,
         max_context_chars: maxContextChars,
         score_threshold: scoreThreshold,
-        use_structure: useStructure,
         retrieval_mode: retrievalMode,
         lexical_top_k: lexicalTopK,
         hybrid_dense_weight: hybridDenseWeight,
@@ -648,7 +641,6 @@ export function SettingsPage() {
         rerank_candidate_pool: rerankCandidatePool,
         rerank_top_n: rerankTopN,
         rerank_min_score: rerankMinScore,
-        structure_requests_per_minute: structureRequestsPerMinute,
         use_llm_chat_titles: useLlmChatTitles,
       })
 
@@ -1164,10 +1156,6 @@ export function SettingsPage() {
             rerankProviders={rerankProviders ?? undefined}
             rerankModelsByProvider={rerankModelsByProvider ?? undefined}
             rerankPricingFormula={rerankPricingFormula ?? undefined}
-            useStructure={useStructure}
-            setUseStructure={setUseStructure}
-            structureRequestsPerMinute={structureRequestsPerMinute}
-            setStructureRequestsPerMinute={setStructureRequestsPerMinute}
             useLlmChatTitles={useLlmChatTitles}
             setUseLlmChatTitles={setUseLlmChatTitles}
             opensearchAvailable={opensearchAvailable}
@@ -2261,10 +2249,6 @@ type QueryDefaultsTabProps = {
     }>
   >
   rerankPricingFormula?: string
-  useStructure: boolean
-  setUseStructure: (value: boolean) => void
-  structureRequestsPerMinute: number
-  setStructureRequestsPerMinute: (value: number) => void
   useLlmChatTitles: boolean
   setUseLlmChatTitles: (value: boolean) => void
   opensearchAvailable: boolean | null
@@ -2298,8 +2282,6 @@ function QueryDefaultsTab({
   rerankProviders,
   rerankModelsByProvider,
   rerankPricingFormula,
-  useStructure, setUseStructure,
-  structureRequestsPerMinute, setStructureRequestsPerMinute,
   useLlmChatTitles, setUseLlmChatTitles,
   opensearchAvailable,
   onSave, saving
@@ -2682,39 +2664,6 @@ function QueryDefaultsTab({
           </div>
         </div>
       )}
-
-      {/* Structure Analysis */}
-      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-        <h3 className="text-lg font-semibold text-gray-100 mb-4">Structure Analysis</h3>
-
-        <div className="mb-6">
-          <label className="flex items-center text-sm font-medium text-gray-300">
-            <input
-              type="checkbox"
-              className="mr-2 w-4 h-4 text-primary-500 bg-gray-700 border-gray-600 rounded focus:ring-primary-500"
-              checked={useStructure}
-              onChange={(e) => setUseStructure(e.target.checked)}
-            />
-            Enable Structure-Aware Retrieval
-          </label>
-          <p className="text-xs text-gray-400 mt-1">Use LLM to identify document structure before retrieval</p>
-        </div>
-
-        {useStructure && (
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-300 mb-2">Requests Per Minute</label>
-            <input
-              type="number"
-              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-              value={structureRequestsPerMinute}
-              onChange={(e) => setStructureRequestsPerMinute(parseInt(e.target.value))}
-              min="0"
-              max="100"
-            />
-            <p className="text-xs text-gray-400 mt-1">Rate limit for structure analysis (0 = unlimited)</p>
-          </div>
-        )}
-      </div>
 
       <div className="flex justify-end">
         <Button

@@ -1,10 +1,7 @@
 """Document management endpoints."""
 
-import asyncio
 import hashlib
 import logging
-import time
-from collections import deque
 from typing import Optional
 from uuid import UUID
 
@@ -22,10 +19,8 @@ from fastapi import (
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings as app_settings
 from app.db.session import get_db
 from app.dependencies import get_current_user_id
-from app.models.database import AppSettings as AppSettingsModel
 from app.models.database import Document as DocumentModel
 from app.models.database import KnowledgeBase as KnowledgeBaseModel
 from app.models.enums import DocumentStatus, FileType
@@ -40,23 +35,6 @@ from app.services.duplicate_chunks import compute_duplicate_chunks_for_document,
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-_structure_request_times: deque[float] = deque()
-_structure_request_lock = asyncio.Lock()
-
-
-async def _check_structure_rate_limit(limit: Optional[int]) -> Optional[int]:
-    if not limit or limit <= 0:
-        return None
-    now = time.time()
-    async with _structure_request_lock:
-        while _structure_request_times and now - _structure_request_times[0] >= 60:
-            _structure_request_times.popleft()
-        if len(_structure_request_times) >= limit:
-            retry = int(60 - (now - _structure_request_times[0]))
-            return max(retry, 1)
-        _structure_request_times.append(now)
-    return None
 
 
 async def _process_document_background(document_id: UUID, detect_duplicates: bool = False):
@@ -618,178 +596,3 @@ async def recompute_document_duplicates(
     await db.refresh(doc)
 
     return summary
-
-
-@router.post("/{doc_id}/analyze", response_model=dict)
-async def analyze_document_structure(
-    doc_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    background_tasks: BackgroundTasks = None,
-    user_id: Optional[UUID] = Depends(get_current_user_id),
-):
-    """
-    Analyze document structure using LLM to create table of contents.
-
-    Returns analysis results with suggested metadata and TOC sections.
-    """
-    from app.models.database import KnowledgeBase
-    from app.services.document_analyzer import get_document_analyzer
-
-    # Get document
-    doc_query = select(DocumentModel).where(
-        DocumentModel.id == doc_id,
-        DocumentModel.is_deleted == False,
-    )
-    doc_result = await db.execute(doc_query)
-    doc = doc_result.scalar_one_or_none()
-
-    if not doc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=f"Document {doc_id} not found"
-        )
-
-    # Get KB collection name
-    kb_query = select(KnowledgeBase).where(KnowledgeBase.id == doc.knowledge_base_id)
-    kb_result = await db.execute(kb_query)
-    kb = kb_result.scalar_one_or_none()
-
-    if not kb:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Knowledge base not found"
-        )
-
-    try:
-        settings_result = await db.execute(
-            select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1)
-        )
-        settings_row = settings_result.scalar_one_or_none()
-        rpm_limit = (
-            settings_row.structure_requests_per_minute
-            if settings_row and settings_row.structure_requests_per_minute is not None
-            else app_settings.STRUCTURE_ANALYSIS_REQUESTS_PER_MINUTE
-        )
-        retry_after = await _check_structure_rate_limit(rpm_limit)
-        if retry_after is not None:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=f"Rate limit exceeded. Retry in {retry_after} seconds.",
-            )
-
-        analyzer = get_document_analyzer()
-        analysis = await analyzer.analyze_document(
-            document_id=doc_id,
-            db=db,
-            collection_name=kb.collection_name,
-            llm_model=kb.structure_llm_model or None,
-        )
-
-        return {
-            "document_id": str(doc_id),
-            "filename": doc.filename,
-            "document_type": analysis.document_type,
-            "description": analysis.description,
-            "total_sections": analysis.total_sections,
-            "sections": [section.model_dump() for section in analysis.sections],
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to analyze document {doc_id}: {e}")
-
-        # Check for rate limit errors from Anthropic API
-        error_msg = str(e)
-        if "rate_limit_error" in error_msg or "Error code: 429" in error_msg:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Analysis failed: Rate limit exceeded. Please wait and try again.",
-            )
-
-        # Check for other API errors that should be passed through
-        if "Error code:" in error_msg:
-            # Extract error code if possible
-            import re
-
-            match = re.search(r"Error code: (\d+)", error_msg)
-            if match:
-                error_code = int(match.group(1))
-                raise HTTPException(
-                    status_code=error_code, detail="Analysis failed by upstream provider"
-                )
-
-        # Generic server error for unexpected issues
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Analysis failed"
-        )
-
-
-@router.post("/{doc_id}/structure/apply")
-async def apply_document_structure(
-    doc_id: UUID,
-    analysis: dict,
-    db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
-):
-    """
-    Apply approved structure analysis to document.
-
-    Saves the TOC to database and updates chunk metadata in Qdrant.
-    """
-    from app.models.schemas import DocumentStructureAnalysis, TOCSection
-    from app.services.document_analyzer import get_document_analyzer
-
-    try:
-        # Parse analysis
-        sections = [TOCSection(**s) for s in analysis.get("sections", [])]
-        structure_analysis = DocumentStructureAnalysis(
-            document_type=analysis["document_type"],
-            description=analysis["description"],
-            sections=sections,
-            total_sections=len(sections),
-        )
-
-        # Save to database
-        analyzer = get_document_analyzer()
-        structure = await analyzer.save_structure(
-            document_id=doc_id, analysis=structure_analysis, db=db, approved=True
-        )
-
-        return {
-            "status": "success",
-            "structure_id": str(structure.id),
-            "sections_saved": len(sections),
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to apply structure for document {doc_id}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to apply structure",
-        )
-
-
-@router.get("/{doc_id}/structure")
-async def get_document_structure(
-    doc_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
-):
-    """Get document structure (TOC) if it exists."""
-    import json
-
-    from app.services.document_analyzer import get_document_analyzer
-
-    analyzer = get_document_analyzer()
-    structure = await analyzer.get_structure(doc_id, db)
-
-    if not structure:
-        return {"has_structure": False}
-
-    sections = json.loads(structure.toc_json)
-
-    return {
-        "has_structure": True,
-        "structure_id": str(structure.id),
-        "document_type": structure.document_type,
-        "sections": sections,
-        "approved_by_user": structure.approved_by_user,
-        "created_at": structure.created_at.isoformat(),
-    }

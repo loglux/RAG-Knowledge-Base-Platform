@@ -81,36 +81,7 @@ async def retrieve_only(
             "document_id": document_ids if len(document_ids) > 1 else document_ids[0]
         }
 
-    chunk_filters = None
-    if effective.get("use_structure"):
-        try:
-            chunk_filters = await rag_service._extract_structure_filters(
-                question=request.query,
-                kb_id=request.knowledge_base_id,
-                db=db,
-            )
-        except Exception as exc:
-            logger.warning("Structure filter extraction failed: %s", exc)
-            chunk_filters = None
-
-    if document_filter and chunk_filters and "document_id" in chunk_filters:
-        if chunk_filters["document_id"] not in document_ids:
-            return RetrieveResponse(
-                query=request.query,
-                knowledge_base_id=request.knowledge_base_id,
-                total_found=0,
-                chunks=[],
-                context="",
-                settings=EffectiveRetrievalSettings(**effective),
-            )
-
-    merged_filters = None
-    if chunk_filters and document_filter:
-        merged_filters = {**document_filter, **chunk_filters}
-    elif chunk_filters:
-        merged_filters = chunk_filters
-    elif document_filter:
-        merged_filters = document_filter
+    merged_filters = document_filter
 
     retrieval_engine = get_retrieval_engine()
 
@@ -201,7 +172,6 @@ async def retrieve_only(
             "embedding_model": kb.embedding_model,
             "filters": merged_filters,
             "document_filter": document_filter,
-            "structure_filters": chunk_filters,
             "context_chars": len(context),
             "chunks_before_expansion": len(retrieval_result.chunks),
             "chunks_after_expansion": len(chunks),

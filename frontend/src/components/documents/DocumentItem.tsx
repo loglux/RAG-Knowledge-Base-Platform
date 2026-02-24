@@ -1,39 +1,15 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import type { Document } from '../../types/index'
-import { apiClient } from '../../services/api'
-import { StructureAnalysisModal } from './StructureAnalysisModal'
 
 interface DocumentItemProps {
   document: Document
   onReprocess?: (id: string) => void
   onDelete?: (id: string) => void
-  onAnalyze?: (id: string) => Promise<any>
   onRecomputeDuplicates?: (id: string) => Promise<any>
 }
 
-export function DocumentItem({ document, onReprocess, onDelete, onAnalyze, onRecomputeDuplicates }: DocumentItemProps) {
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
+export function DocumentItem({ document, onReprocess, onDelete, onRecomputeDuplicates }: DocumentItemProps) {
   const [isRecomputingDup, setIsRecomputingDup] = useState(false)
-  const [hasStructure, setHasStructure] = useState(false)
-  const [showModal, setShowModal] = useState(false)
-  const [analysisResult, setAnalysisResult] = useState<any>(null)
-
-  // Check if document already has structure
-  useEffect(() => {
-    const checkStructure = async () => {
-      if (document.status === 'completed') {
-        try {
-          const structure = await apiClient.getDocumentStructure(document.id)
-          if (structure.has_structure) {
-            setHasStructure(true)
-          }
-        } catch {
-          // Structure doesn't exist yet
-        }
-      }
-    }
-    checkStructure()
-  }, [document.id, document.status])
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`
@@ -116,64 +92,6 @@ export function DocumentItem({ document, onReprocess, onDelete, onAnalyze, onRec
   const handleDelete = () => {
     if (onDelete && confirm(`Delete "${document.filename}"?`)) {
       onDelete(document.id)
-    }
-  }
-
-  const handleAnalyze = async () => {
-    if (!onAnalyze) return
-
-    setIsAnalyzing(true)
-    try {
-      const result = await onAnalyze(document.id)
-      console.log('Analysis result:', result)
-      setAnalysisResult(result)
-      setShowModal(true)
-    } catch (error) {
-      console.error('Analysis failed:', error)
-      alert(error instanceof Error ? error.message : 'Analysis failed')
-    } finally {
-      setIsAnalyzing(false)
-    }
-  }
-
-  const handleApplyStructure = async (analysis: any) => {
-    try {
-      await apiClient.applyDocumentStructure(document.id, analysis)
-      setHasStructure(true)
-      setAnalysisResult(analysis) // Save for viewing later
-      alert('Structure applied successfully!')
-    } catch (error) {
-      console.error('Failed to apply structure:', error)
-      alert(error instanceof Error ? error.message : 'Failed to apply structure')
-    }
-  }
-
-  const handleViewStructure = async () => {
-    if (analysisResult) {
-      // Already have it in memory
-      setShowModal(true)
-      return
-    }
-
-    // Load from backend
-    try {
-      const structure = await apiClient.getDocumentStructure(document.id)
-      if (structure.has_structure) {
-        // Convert to analysis format
-        const analysis = {
-          document_id: document.id,
-          filename: document.filename,
-          document_type: structure.document_type || 'unknown',
-          description: 'Saved structure',
-          total_sections: structure.sections.length,
-          sections: structure.sections,
-        }
-        setAnalysisResult(analysis)
-        setShowModal(true)
-      }
-    } catch (error) {
-      console.error('Failed to load structure:', error)
-      alert('Failed to load structure')
     }
   }
 
@@ -282,28 +200,6 @@ export function DocumentItem({ document, onReprocess, onDelete, onAnalyze, onRec
         </div>
 
         <div className="flex items-center space-x-2 ml-4">
-          {hasStructure && (
-            <button
-              onClick={handleViewStructure}
-              className="text-yellow-400 hover:text-yellow-300 transition-colors"
-              title="View structure (click to see)"
-            >
-              ✨
-            </button>
-          )}
-
-          {document.status === 'completed' && onAnalyze && (
-            <button
-              onClick={handleAnalyze}
-              disabled={isAnalyzing}
-              className="text-gray-400 hover:text-blue-400 p-2 rounded transition-colors disabled:opacity-50"
-              aria-label="Analyze structure"
-              title={isAnalyzing ? "Analyzing..." : "Analyze structure"}
-            >
-              {isAnalyzing ? '⏳' : '🔍'}
-            </button>
-          )}
-
           {document.status === 'completed' && onRecomputeDuplicates && (
             <button
               onClick={handleRecomputeDuplicates}
@@ -351,13 +247,6 @@ export function DocumentItem({ document, onReprocess, onDelete, onAnalyze, onRec
         </div>
       </div>
 
-      <StructureAnalysisModal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        analysis={analysisResult}
-        onApply={handleApplyStructure}
-        isApplied={hasStructure}
-      />
     </div>
   )
 }

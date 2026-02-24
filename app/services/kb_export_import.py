@@ -23,7 +23,6 @@ from app.core.vector_store import get_vector_store
 from app.models.database import ChatMessage as ChatMessageModel
 from app.models.database import Conversation as ConversationModel
 from app.models.database import Document as DocumentModel
-from app.models.database import DocumentStructure as DocumentStructureModel
 from app.models.database import KnowledgeBase as KnowledgeBaseModel
 from app.models.enums import ChunkingStrategy, DocumentStatus, FileType
 from app.models.schemas import KBExportInclude, KBImportOptions
@@ -131,7 +130,6 @@ async def export_kbs(
                 "bm25_min_should_match": kb.bm25_min_should_match,
                 "bm25_use_phrase": kb.bm25_use_phrase,
                 "bm25_analyzer": kb.bm25_analyzer,
-                "structure_llm_model": kb.structure_llm_model,
                 "use_llm_chat_titles": kb.use_llm_chat_titles,
                 "retrieval_settings_json": kb.retrieval_settings_json,
                 "document_count": kb.document_count,
@@ -181,32 +179,6 @@ async def export_kbs(
                 }
             )
     _write_jsonl(os.path.join(db_dir, "documents.jsonl"), documents)
-
-    structures = []
-    if include.documents:
-        doc_ids = [doc.id for doc in doc_rows]
-        if doc_ids:
-            struct_query = select(DocumentStructureModel).where(
-                DocumentStructureModel.document_id.in_(doc_ids)
-            )
-            struct_result = await db.execute(struct_query)
-            struct_rows = struct_result.scalars().all()
-        else:
-            struct_rows = []
-
-        for struct in struct_rows:
-            structures.append(
-                {
-                    "id": str(struct.id),
-                    "document_id": str(struct.document_id),
-                    "toc_json": struct.toc_json,
-                    "document_type": struct.document_type,
-                    "approved_by_user": struct.approved_by_user,
-                    "created_at": _dt(struct.created_at),
-                    "updated_at": _dt(struct.updated_at),
-                }
-            )
-    _write_jsonl(os.path.join(db_dir, "document_structures.jsonl"), structures)
 
     conversations = []
     messages = []
@@ -483,7 +455,6 @@ async def import_kbs(
         db_dir = os.path.join(root, "db")
         kb_rows = _read_jsonl(os.path.join(db_dir, "knowledge_bases.jsonl"))
         doc_rows = _read_jsonl(os.path.join(db_dir, "documents.jsonl"))
-        struct_rows = _read_jsonl(os.path.join(db_dir, "document_structures.jsonl"))
         convo_path = os.path.join(db_dir, "conversations.jsonl")
         msg_path = os.path.join(db_dir, "chat_messages.jsonl")
         if include.chats and (not os.path.exists(convo_path) or not os.path.exists(msg_path)):
@@ -493,7 +464,6 @@ async def import_kbs(
 
         if not include.documents:
             doc_rows = []
-            struct_rows = []
             convo_rows = []
             msg_rows = []
 
@@ -574,7 +544,6 @@ async def import_kbs(
                 existing.bm25_min_should_match = kb.get("bm25_min_should_match")
                 existing.bm25_use_phrase = kb.get("bm25_use_phrase")
                 existing.bm25_analyzer = kb.get("bm25_analyzer")
-                existing.structure_llm_model = kb.get("structure_llm_model")
                 existing.use_llm_chat_titles = kb.get("use_llm_chat_titles")
                 existing.retrieval_settings_json = kb.get("retrieval_settings_json")
                 existing.document_count = kb.get("document_count", 0)
@@ -601,7 +570,6 @@ async def import_kbs(
                     bm25_min_should_match=kb.get("bm25_min_should_match"),
                     bm25_use_phrase=kb.get("bm25_use_phrase"),
                     bm25_analyzer=kb.get("bm25_analyzer"),
-                    structure_llm_model=kb.get("structure_llm_model"),
                     use_llm_chat_titles=kb.get("use_llm_chat_titles"),
                     retrieval_settings_json=kb.get("retrieval_settings_json"),
                     document_count=kb.get("document_count", 0),
@@ -664,33 +632,6 @@ async def import_kbs(
                     vector_ids=doc.get("vector_ids"),
                 )
                 db.add(doc_model)
-
-        for struct in struct_rows:
-            doc_id = UUID(doc_id_map[struct["document_id"]])
-            if options.mode == "merge" and not options.remap_ids:
-                existing_result = await db.execute(
-                    select(DocumentStructureModel).where(
-                        DocumentStructureModel.document_id == doc_id
-                    )
-                )
-                existing = existing_result.scalar_one_or_none()
-            else:
-                existing = None
-
-            if existing:
-                existing.toc_json = struct["toc_json"]
-                existing.document_type = struct.get("document_type")
-                existing.approved_by_user = struct.get("approved_by_user", False)
-            else:
-                struct_id = uuid4() if options.remap_ids else UUID(struct["id"])
-                model = DocumentStructureModel(
-                    id=struct_id,
-                    document_id=doc_id,
-                    toc_json=struct["toc_json"],
-                    document_type=struct.get("document_type"),
-                    approved_by_user=struct.get("approved_by_user", False),
-                )
-                db.add(model)
 
         convo_id_map: Dict[str, str] = {}
         if include.chats and convo_rows:

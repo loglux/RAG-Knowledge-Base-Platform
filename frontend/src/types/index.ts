@@ -11,7 +11,6 @@ export interface KnowledgeBase {
   bm25_min_should_match?: number | null
   bm25_use_phrase?: boolean | null
   bm25_analyzer?: string | null
-  structure_llm_model?: string | null
   use_llm_chat_titles?: boolean | null
   llm_model?: string | null
   llm_provider?: string | null
@@ -41,7 +40,6 @@ export interface CreateKBRequest {
   bm25_min_should_match?: number | null
   bm25_use_phrase?: boolean | null
   bm25_analyzer?: string | null
-  structure_llm_model?: string | null
   use_llm_chat_titles?: boolean | null
   llm_model?: string | null
   llm_provider?: string | null
@@ -287,7 +285,6 @@ export interface ChatRequest {
   score_threshold?: number
   llm_model?: string
   llm_provider?: string
-  use_structure?: boolean
   use_mmr?: boolean
   mmr_diversity?: number
   use_self_check?: boolean
@@ -328,7 +325,6 @@ export interface ConversationSettings {
   score_threshold?: number
   llm_model?: string
   llm_provider?: string
-  use_structure?: boolean
   retrieval_mode?: 'dense' | 'hybrid'
   lexical_top_k?: number
   hybrid_dense_weight?: number
@@ -387,7 +383,6 @@ export interface AppSettings {
   top_k: number | null
   max_context_chars: number | null
   score_threshold: number | null
-  use_structure: boolean | null
   retrieval_mode: 'dense' | 'hybrid' | null
   lexical_top_k: number | null
   hybrid_dense_weight: number | null
@@ -402,7 +397,6 @@ export interface AppSettings {
   rerank_candidate_pool: number | null
   rerank_top_n: number | null
   rerank_min_score: number | null
-  structure_requests_per_minute: number | null
   kb_chunk_size: number | null
   kb_chunk_overlap: number | null
   kb_upsert_batch_size: number | null
@@ -421,7 +415,6 @@ export interface AppSettingsUpdate {
   top_k?: number | null
   max_context_chars?: number | null
   score_threshold?: number | null
-  use_structure?: boolean | null
   retrieval_mode?: 'dense' | 'hybrid' | null
   lexical_top_k?: number | null
   hybrid_dense_weight?: number | null
@@ -436,7 +429,6 @@ export interface AppSettingsUpdate {
   rerank_candidate_pool?: number | null
   rerank_top_n?: number | null
   rerank_min_score?: number | null
-  structure_requests_per_minute?: number | null
   kb_chunk_size?: number | null
   kb_chunk_overlap?: number | null
   kb_upsert_batch_size?: number | null
@@ -563,7 +555,6 @@ export interface KBRetrievalSettingsStored {
   hybrid_lexical_weight?: number | null
   max_context_chars?: number | null
   score_threshold?: number | null
-  use_structure?: boolean | null
   rerank_enabled?: boolean | null
   rerank_provider?: string | null
   rerank_model?: string | null
@@ -584,7 +575,6 @@ export interface KBRetrievalSettingsEffective {
   hybrid_lexical_weight: number
   max_context_chars: number
   score_threshold: number
-  use_structure: boolean
   rerank_enabled: boolean
   rerank_provider: string | null
   rerank_model: string | null

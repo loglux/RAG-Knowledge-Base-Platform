@@ -74,9 +74,6 @@ class KnowledgeBase(Base):
     bm25_analyzer: Mapped[Optional[str]] = mapped_column(
         String(20), nullable=True, comment="BM25 analyzer profile: auto, mixed, ru, en"
     )
-    structure_llm_model: Mapped[Optional[str]] = mapped_column(
-        String(100), nullable=True, comment="LLM model for document structure (TOC) analysis"
-    )
     use_llm_chat_titles: Mapped[Optional[bool]] = mapped_column(
         Boolean,
         nullable=True,
@@ -237,49 +234,6 @@ class Document(Base):
             return None
 
 
-class DocumentStructure(Base):
-    """AI-analyzed document structure (table of contents)."""
-
-    __tablename__ = "document_structures"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False
-    )
-
-    # Document relationship
-    document_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("documents.id", ondelete="CASCADE"),
-        nullable=False,
-        unique=True,
-        index=True,
-    )
-
-    # Table of contents as JSON
-    toc_json: Mapped[str] = mapped_column(
-        Text, nullable=False, comment="Hierarchical table of contents in JSON format"
-    )
-
-    # Analysis metadata
-    document_type: Mapped[Optional[str]] = mapped_column(
-        String(100),
-        nullable=True,
-        comment="Document type detected by LLM (e.g., tma_questions, textbook)",
-    )
-
-    # User approval
-    approved_by_user: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-
-    # Timestamps
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
-
-    def __repr__(self) -> str:
-        return f"<DocumentStructure(id={self.id}, document_id={self.document_id})>"
-
-
 class Conversation(Base):
     """Conversation model - represents a chat thread for a knowledge base."""
 
@@ -415,7 +369,6 @@ class AppSettings(Base):
     top_k: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     max_context_chars: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     score_threshold: Mapped[Optional[float]] = mapped_column(sa.Float, nullable=True)
-    use_structure: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     rerank_enabled: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     rerank_provider: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     rerank_model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -431,7 +384,6 @@ class AppSettings(Base):
     bm25_use_phrase: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     bm25_analyzer: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     use_self_check: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
-    structure_requests_per_minute: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     kb_chunk_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     kb_chunk_overlap: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     kb_upsert_batch_size: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)

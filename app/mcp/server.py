@@ -136,7 +136,6 @@ def build_mcp_app() -> FastMCP:
                 score_threshold=effective.get("score_threshold"),
                 llm_model=effective.get("llm_model"),
                 llm_provider=effective.get("llm_provider"),
-                use_structure=effective.get("use_structure", False),
                 rerank_enabled=effective.get("rerank_enabled", False),
                 rerank_provider=effective.get("rerank_provider"),
                 rerank_model=effective.get("rerank_model"),
@@ -411,7 +410,6 @@ def build_mcp_app() -> FastMCP:
                         else str(kb.chunking_strategy)
                     ),
                     "upsert_batch_size": kb.upsert_batch_size,
-                    "structure_llm_model": kb.structure_llm_model,
                     "use_llm_chat_titles": kb.use_llm_chat_titles,
                     "document_count": kb.document_count,
                     "total_chunks": kb.total_chunks,
@@ -429,7 +427,6 @@ def build_mcp_app() -> FastMCP:
                         "top_k": app_settings.top_k,
                         "max_context_chars": app_settings.max_context_chars,
                         "score_threshold": app_settings.score_threshold,
-                        "use_structure": app_settings.use_structure,
                         "rerank_enabled": app_settings.rerank_enabled,
                         "rerank_provider": app_settings.rerank_provider,
                         "rerank_model": app_settings.rerank_model,
