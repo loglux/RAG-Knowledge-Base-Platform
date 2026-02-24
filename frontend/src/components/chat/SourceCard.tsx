@@ -112,7 +112,7 @@ export function SourceCard({ source, index, anchorPrefix }: SourceCardProps) {
               bm25: {lexicalScoreRaw.toFixed(3)}
             </span>
           )}
-          {combinedScore !== null && (
+          {combinedScore !== null && preRerankScore === null && (
             <span className="rounded border border-gray-600 px-2 py-0.5">
               combined: {combinedScore.toFixed(3)}
             </span>
