@@ -500,8 +500,12 @@ class PDFFileHandler(FileHandler):
                         continue
                     brect = fitz.Rect(block["bbox"])
 
-                    # Skip running-header and footer strips
-                    if brect.y1 <= header_cutoff or brect.y0 >= footer_cutoff:
+                    # Skip running-header and footer strips.
+                    # Use y0 (block start) for the header zone so blocks that
+                    # start inside the strip are filtered even if they extend
+                    # slightly below the cutoff (e.g. running headers with y1
+                    # just above the 4 % threshold).
+                    if brect.y0 < header_cutoff or brect.y0 >= footer_cutoff:
                         continue
 
                     # Skip if block overlaps substantially with a table
