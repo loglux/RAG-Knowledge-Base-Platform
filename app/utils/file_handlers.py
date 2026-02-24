@@ -341,6 +341,168 @@ class DocxFileHandler(FileHandler):
         return headings
 
 
+class PDFFileHandler(FileHandler):
+    """Handler for PDF files (.pdf).
+
+    Extracts text from text-based PDFs using PyMuPDF.
+    Scanned (image-only) PDFs are detected and rejected with a clear error.
+    Heading detection uses font-size heuristics: the dominant font size is
+    treated as body text; larger sizes are ranked into heading levels 1-6.
+    """
+
+    def can_handle(self, file_type: FileType) -> bool:
+        return file_type == FileType.PDF
+
+    @staticmethod
+    def _to_bytes(content: Union[str, bytes]) -> bytes:
+        if isinstance(content, str):
+            # Should not happen for PDFs, but guard anyway
+            return content.encode("utf-8")
+        return content
+
+    def _extract_pdf(self, content: bytes):
+        """Single-pass extraction returning (text: str, heading_map: list).
+
+        Pass 1 – collect font-size distribution to determine body size and
+                 build a size→level map for headings.
+        Pass 2 – extract text blocks and simultaneously record heading positions.
+
+        Positions in heading_map correspond to character offsets in the
+        returned text string (before sanitize_text_content, but since parts
+        are already stripped and free of null bytes the offsets are stable).
+        """
+        from collections import Counter
+
+        import fitz
+
+        try:
+            doc = fitz.open(stream=content, filetype="pdf")
+        except Exception as exc:
+            raise ValueError(f"Cannot open PDF: {exc}") from exc
+
+        # ── Pass 1: font-size distribution ───────────────────────────────
+        size_chars: Counter = Counter()
+        for page in doc:
+            for block in page.get_text("dict")["blocks"]:
+                if block["type"] == 0:
+                    for line in block["lines"]:
+                        for span in line["spans"]:
+                            t = span["text"].strip()
+                            if t:
+                                size_chars[round(span["size"], 1)] += len(t)
+
+        if not size_chars:
+            doc.close()
+            raise ValueError(
+                "No text could be extracted from this PDF. "
+                "It may be a scanned document — OCR is not supported yet."
+            )
+
+        body_size = size_chars.most_common(1)[0][0]
+        # Sizes meaningfully larger than body text (≥5% bigger) are headings
+        heading_sizes = sorted([s for s in size_chars if s > body_size * 1.05], reverse=True)
+        size_to_level = {s: min(i + 1, 6) for i, s in enumerate(heading_sizes)}
+
+        # ── Pass 2: structured text extraction ───────────────────────────
+        text_parts: List[str] = []
+        headings: List[Dict[str, Any]] = []
+        current_pos = 0
+
+        for page in doc:
+            for block in page.get_text("dict")["blocks"]:
+                if block["type"] != 0:
+                    continue
+
+                block_lines: List[str] = []
+                block_size_chars: Counter = Counter()
+
+                for line in block["lines"]:
+                    line_text = "".join(s["text"] for s in line["spans"]).strip()
+                    if line_text:
+                        block_lines.append(line_text)
+                        for span in line["spans"]:
+                            if span["text"].strip():
+                                block_size_chars[round(span["size"], 1)] += len(
+                                    span["text"].strip()
+                                )
+
+                if not block_lines:
+                    continue
+
+                block_text = "\n".join(block_lines)
+
+                # Heading detection: dominant font size + reasonable length
+                if block_size_chars:
+                    dom_size = block_size_chars.most_common(1)[0][0]
+                    level = size_to_level.get(dom_size)
+                    if level is not None and len(block_text) < 200:
+                        headings.append(
+                            {
+                                "pos": current_pos,
+                                "level": level,
+                                # Display text: collapse internal newlines to space
+                                "text": block_text.replace("\n", " "),
+                            }
+                        )
+
+                text_parts.append(block_text)
+                current_pos += len(block_text) + 2  # +2 for "\n\n" separator
+
+        doc.close()
+
+        full_text = sanitize_text_content("\n\n".join(text_parts))
+
+        # Sanity-check: very little text likely means a scanned PDF
+        if len(full_text.strip()) < 100:
+            raise ValueError(
+                "Extracted text is too short (< 100 chars). "
+                "This PDF may be a scanned document — OCR is not supported yet."
+            )
+
+        return full_text, headings
+
+    def extract_text(self, content: Union[str, bytes], metadata: Dict[str, Any]) -> str:
+        logger.debug("Extracting text from .pdf file")
+        text, _ = self._extract_pdf(self._to_bytes(content))
+        return text
+
+    def extract_heading_map(self, content: Union[str, bytes]) -> List[Dict[str, Any]]:
+        """Extract heading positions from a PDF for structural metadata indexing.
+
+        Uses font-size heuristics: the dominant (most-chars) font size is body
+        text; larger sizes are ranked into heading levels 1–6 by descending size.
+
+        Returns a list of dicts with keys:
+            pos   (int)  – character offset in the extracted text
+            level (int)  – heading level 1-6
+            text  (str)  – heading display text (newlines collapsed to spaces)
+        sorted by position.
+        """
+        _, headings = self._extract_pdf(self._to_bytes(content))
+        return headings
+
+    def extract_metadata(self, content: Union[str, bytes], filename: str) -> Dict[str, Any]:
+        import fitz
+
+        try:
+            doc = fitz.open(stream=self._to_bytes(content), filetype="pdf")
+        except Exception:
+            return {"file_type": "pdf", "filename": filename}
+
+        meta = doc.metadata or {}
+        page_count = doc.page_count
+        doc.close()
+
+        return {
+            "file_type": "pdf",
+            "filename": filename,
+            "page_count": page_count,
+            "title": meta.get("title") or None,
+            "author": meta.get("author") or None,
+            "creator": meta.get("creator") or None,
+        }
+
+
 class FileHandlerFactory:
     """
     Factory for creating appropriate file handlers.
@@ -355,6 +517,7 @@ class FileHandlerFactory:
         MarkdownFileHandler(),
         FB2FileHandler(),
         DocxFileHandler(),
+        PDFFileHandler(),
     ]
 
     @classmethod

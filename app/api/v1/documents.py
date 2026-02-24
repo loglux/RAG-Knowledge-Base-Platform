@@ -137,17 +137,19 @@ async def create_document(
         file_type = FileType.FB2
     elif extension == "docx":
         file_type = FileType.DOCX
+    elif extension == "pdf":
+        file_type = FileType.PDF
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported file type: {extension}. Supported: txt, md, fb2, docx",
+            detail=f"Unsupported file type: {extension}. Supported: txt, md, fb2, docx, pdf",
         )
 
     # Read file content
     content_bytes = await file.read()
     content: str
     heading_map_json: str | None = None
-    if file_type in (FileType.DOCX, FileType.FB2):
+    if file_type in (FileType.DOCX, FileType.FB2, FileType.PDF):
         from app.utils.file_handlers import FileHandlerFactory, process_file
 
         type_label = file_type.value.upper()

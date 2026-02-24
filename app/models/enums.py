@@ -32,8 +32,8 @@ class FileType(str, Enum):
     MD = "md"
     FB2 = "fb2"
     DOCX = "docx"
+    PDF = "pdf"
     # Future formats (Phase 2+)
-    # PDF = "pdf"
     # HTML = "html"
     # CSV = "csv"
     # JSON = "json"

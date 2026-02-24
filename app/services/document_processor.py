@@ -507,7 +507,7 @@ class DocumentProcessor:
         file_type_str = str(document.file_type).lower().replace("filetype.", "")
         if file_type_str == "md":
             heading_map = self._extract_md_heading_map(document.content)
-        elif file_type_str in ("docx", "fb2") and document.heading_map_json:
+        elif file_type_str in ("docx", "fb2", "pdf") and document.heading_map_json:
             try:
                 heading_map = json.loads(document.heading_map_json)
             except Exception:
