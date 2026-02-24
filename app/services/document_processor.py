@@ -382,10 +382,19 @@ class DocumentProcessor:
 
                 _file_path = Path(document.file_path)
                 if _file_path.exists():
-                    logger.info(f"Re-extracting structure maps from {_file_path}")
+                    logger.info(f"Re-extracting content and structure maps from {_file_path}")
                     try:
                         file_bytes = _file_path.read_bytes()
                         handler = FileHandlerFactory.get_handler(document.file_type)
+                        # Re-extract full text content so fixes to extraction
+                        # logic (e.g. table detection) take effect on reprocess
+                        try:
+                            new_content = handler.extract_text(file_bytes, {})
+                            if new_content and new_content.strip():
+                                document.content = new_content
+                                logger.info(f"Re-extracted content: {len(new_content)} chars")
+                        except Exception as exc:
+                            logger.warning(f"Failed to re-extract content: {exc}")
                         try:
                             headings = handler.extract_heading_map(file_bytes)
                             document.heading_map_json = (
