@@ -1,6 +1,8 @@
 """File type handlers for document processing."""
 
 import io
+import statistics
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
 from xml.etree import ElementTree
 
@@ -363,6 +365,27 @@ class DocxFileHandler(FileHandler):
         return headings
 
 
+@dataclass
+class PDFExtractionProfile:
+    """Per-document extraction parameters derived by _profile_document()."""
+
+    # y0 threshold as fraction of page height — blocks starting above this are headers
+    header_zone_fraction: float = 0.04
+    # y0 threshold as fraction of page height — blocks starting here or below are footers
+    footer_zone_fraction: float = 0.95
+    # Normalised texts of confirmed running headers — excluded from text and headings
+    running_header_texts: frozenset = field(default_factory=frozenset)
+    # Font size ratio above which a block qualifies as a size-based heading
+    size_ratio_threshold: float = 1.15
+    # First-line bold fraction to qualify as a bold heading
+    bold_fraction_threshold: float = 0.85
+    # First-line length range [min, max) for bold headings
+    bold_min_chars: int = 5
+    bold_max_chars: int = 120
+    # Heading texts appearing >= this many times kept only at first occurrence
+    repeat_threshold: int = 4
+
+
 class PDFFileHandler(FileHandler):
     """Handler for PDF files (.pdf).
 
@@ -386,6 +409,94 @@ class PDFFileHandler(FileHandler):
         if isinstance(content, str):
             return content.encode("utf-8")
         return content
+
+    @staticmethod
+    def _normalize_block_text(block) -> str:
+        """Return normalised single-line text for a PyMuPDF dict block.
+
+        Concatenates span texts with no separator (matching PyMuPDF's own
+        layout where word spacing is embedded inside span text), then collapses
+        whitespace.  Used identically in _profile_document() and _extract_pdf()
+        so that running-header lookup keys are guaranteed to match.
+        """
+        import re as _re
+
+        raw = "".join(
+            s.get("text", "") for ln in block.get("lines", []) for s in ln.get("spans", [])
+        )
+        return _re.sub(r"\s+", " ", raw).strip()
+
+    @staticmethod
+    def _profile_document(doc) -> "PDFExtractionProfile":
+        """Scan document structure to derive per-document extraction parameters.
+
+        Detects running headers/footers (text appearing on ≥30% of pages) and
+        derives zone fractions that cleanly exclude them from extraction.
+        """
+        from collections import defaultdict
+
+        import fitz
+
+        page_count = len(doc)
+        if page_count == 0:
+            return PDFExtractionProfile()
+
+        SCAN_ZONE = 0.10  # fraction of page height to scan for headers/footers
+        REPEAT_FRAC = 0.30  # text on >= this fraction of pages → running element
+        MARGIN_PT = 4.0  # extra clearance added to derived cutoff
+
+        top_blocks: dict = defaultdict(list)  # normalised_text → [(y0, y1), …]
+        bottom_blocks: dict = defaultdict(list)
+        page_heights: list = []
+
+        for page in doc:
+            h = page.rect.height
+            page_heights.append(h)
+            top_cut = h * SCAN_ZONE
+            bottom_cut = h * (1.0 - SCAN_ZONE)
+
+            for b in page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE).get("blocks", []):
+                if b.get("type") != 0:
+                    continue
+                y0, y1 = b["bbox"][1], b["bbox"][3]
+                text = PDFFileHandler._normalize_block_text(b)
+                if not text:
+                    continue
+                if y0 < top_cut:
+                    top_blocks[text].append((y0, y1))
+                if y1 > bottom_cut:
+                    bottom_blocks[text].append((y0, y1))
+
+        repeat_threshold = max(3, page_count * REPEAT_FRAC)
+        median_h = statistics.median(page_heights) if page_heights else 800.0
+
+        # Derive header zone from confirmed running headers
+        running_header_texts: set = set()
+        header_y1_max = 0.0
+        for text, coords in top_blocks.items():
+            if len(coords) >= repeat_threshold:
+                running_header_texts.add(text)
+                header_y1_max = max(header_y1_max, max(y1 for _, y1 in coords))
+
+        header_zone_fraction = (
+            min((header_y1_max + MARGIN_PT) / median_h, 0.10) if running_header_texts else 0.04
+        )
+
+        # Derive footer zone from confirmed running footers
+        footer_y0_min = median_h
+        for text, coords in bottom_blocks.items():
+            if len(coords) >= repeat_threshold:
+                footer_y0_min = min(footer_y0_min, min(y0 for y0, _ in coords))
+
+        footer_zone_fraction = (
+            max((footer_y0_min - MARGIN_PT) / median_h, 0.85) if footer_y0_min < median_h else 0.95
+        )
+
+        return PDFExtractionProfile(
+            header_zone_fraction=header_zone_fraction,
+            footer_zone_fraction=footer_zone_fraction,
+            running_header_texts=frozenset(running_header_texts),
+        )
 
     @staticmethod
     def _extract_footer_page_number(page) -> Optional[int]:
@@ -438,7 +549,6 @@ class PDFFileHandler(FileHandler):
         page_map: [[char_offset, physical_page, logical_page_or_null], ...]
         """
         import re
-        import statistics
 
         import fitz
 
@@ -454,6 +564,14 @@ class PDFFileHandler(FileHandler):
                 "No text could be extracted from this PDF. "
                 "It may be a scanned document — OCR is not supported yet."
             )
+
+        profile = self._profile_document(doc)
+        logger.info(
+            "PDF profile: header_zone=%.3f footer_zone=%.3f running_headers=%d",
+            profile.header_zone_fraction,
+            profile.footer_zone_fraction,
+            len(profile.running_header_texts),
+        )
 
         text_parts: List[str] = []
         headings: List[Dict[str, Any]] = []
@@ -487,11 +605,8 @@ class PDFFileHandler(FileHandler):
             block_info: List = []
 
             page_h = page.rect.height
-            # Running headers sit at the very top (< 4%) and footer page
-            # numbers at the very bottom (> 95%).  Skip those blocks entirely
-            # to avoid polluting both the text content and heading map.
-            header_cutoff = page_h * 0.04
-            footer_cutoff = page_h * 0.95
+            header_cutoff = page_h * profile.header_zone_fraction
+            footer_cutoff = page_h * profile.footer_zone_fraction
 
             try:
                 block_dict = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)
@@ -503,10 +618,14 @@ class PDFFileHandler(FileHandler):
                     # Skip running-header and footer strips.
                     # Use y0 (block start) for the header zone so blocks that
                     # start inside the strip are filtered even if they extend
-                    # slightly below the cutoff (e.g. running headers with y1
-                    # just above the 4 % threshold).
+                    # slightly below the cutoff.
                     if brect.y0 < header_cutoff or brect.y0 >= footer_cutoff:
                         continue
+
+                    # Skip blocks whose normalised text is a confirmed running header
+                    if profile.running_header_texts:
+                        if self._normalize_block_text(block) in profile.running_header_texts:
+                            continue
 
                     # Skip if block overlaps substantially with a table
                     in_table = False
@@ -570,12 +689,17 @@ class PDFFileHandler(FileHandler):
                 text_items.append((y0, block_text))
 
                 # Size-based: any font in block noticeably larger than median
-                is_size_heading = median_size > 0 and max_size > median_size * 1.15
+                is_size_heading = (
+                    median_size > 0 and max_size > median_size * profile.size_ratio_threshold
+                )
 
-                # Bold-based: first non-empty line of block is ≥85% bold and
-                # short enough to be a heading (not a paragraph opening)
+                # Bold-based: first non-empty line of block is sufficiently bold
+                # and short enough to be a heading (not a paragraph opening)
                 fl_bold_fraction = fl_bold / fl_total if fl_total > 0 else 0.0
-                is_bold_heading = fl_bold_fraction >= 0.85 and 5 <= len(first_line_text) < 120
+                is_bold_heading = (
+                    fl_bold_fraction >= profile.bold_fraction_threshold
+                    and profile.bold_min_chars <= len(first_line_text) < profile.bold_max_chars
+                )
 
                 if is_size_heading:
                     ratio = max_size / median_size
@@ -613,7 +737,7 @@ class PDFFileHandler(FileHandler):
         # Heading texts that repeat on many pages are running headers (e.g.
         # "Unit 9", chapter titles in the margin).  Keep the first occurrence
         # and drop the rest so they don't pollute section_path in every chunk.
-        repeat_threshold = 4
+        repeat_threshold = profile.repeat_threshold
         text_counts: Dict[str, int] = {}
         for h in headings:
             text_counts[h["text"]] = text_counts.get(h["text"], 0) + 1

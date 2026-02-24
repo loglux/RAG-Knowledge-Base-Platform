@@ -1400,6 +1400,13 @@ export function KBDetailsPage() {
                 </div>
               </div>
               <div>
+                <span className="text-gray-400">Embedding Model:</span>
+                <span className="text-white ml-2 font-medium">{kb.embedding_model}</span>
+                <span className="text-gray-500 ml-2 text-xs">
+                  {kb.embedding_provider} · {kb.embedding_dimension}d
+                </span>
+              </div>
+              <div>
                 <span className="text-gray-400">Collection:</span>
                 <span className="text-white ml-2 font-mono text-sm">{kb.collection_name}</span>
               </div>
