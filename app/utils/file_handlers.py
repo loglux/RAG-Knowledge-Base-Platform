@@ -118,6 +118,31 @@ class FB2FileHandler(FileHandler):
         return file_type == FileType.FB2
 
     @staticmethod
+    def _parse_xml(content: str):
+        """Parse FB2 XML with lxml recovery fallback.
+
+        Tries stdlib ElementTree first (strict); if that fails, falls back to
+        lxml with recover=True which silently fixes mismatched tags and similar
+        structural errors common in downloaded FB2 files.
+        """
+        try:
+            return ElementTree.fromstring(content)
+        except ElementTree.ParseError:
+            pass
+        try:
+            from lxml import etree
+
+            root_lxml = etree.fromstring(
+                content.encode("utf-8") if isinstance(content, str) else content,
+                parser=etree.XMLParser(recover=True, encoding="utf-8"),
+            )
+            # Convert lxml tree to stdlib ElementTree via serialization
+            reparsed = ElementTree.fromstring(etree.tostring(root_lxml))
+            return reparsed
+        except Exception:
+            return None
+
+    @staticmethod
     def _parse_body(body_node) -> List[Dict[str, Any]]:
         """Parse an FB2 <body> element into structured text segments.
 
@@ -172,9 +197,8 @@ class FB2FileHandler(FileHandler):
         logger.debug("Extracting text from .fb2 file")
         if isinstance(content, bytes):
             content = content.decode("utf-8", errors="replace")
-        try:
-            root = ElementTree.fromstring(content)
-        except ElementTree.ParseError:
+        root = self._parse_xml(content)
+        if root is None:
             return sanitize_text_content(content)
 
         parts: List[str] = []
@@ -202,9 +226,8 @@ class FB2FileHandler(FileHandler):
         """
         if isinstance(content, bytes):
             content = content.decode("utf-8", errors="replace")
-        try:
-            root = ElementTree.fromstring(content)
-        except ElementTree.ParseError:
+        root = self._parse_xml(content)
+        if root is None:
             return []
 
         all_segments: List[Dict[str, Any]] = []
@@ -228,9 +251,8 @@ class FB2FileHandler(FileHandler):
     def extract_metadata(self, content: Union[str, bytes], filename: str) -> Dict[str, Any]:
         if isinstance(content, bytes):
             content = content.decode("utf-8", errors="replace")
-        try:
-            root = ElementTree.fromstring(content)
-        except ElementTree.ParseError:
+        root = self._parse_xml(content)
+        if root is None:
             return {
                 "file_type": "fb2",
                 "filename": filename,

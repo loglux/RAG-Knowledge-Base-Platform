@@ -732,7 +732,7 @@ export function KBDetailsPage() {
 
           {/* Upload Area */}
           <div className="mb-6">
-            <FileUpload onUpload={handleUpload} accept=".txt,.md,.fb2,.docx" maxSize={50} multiple />
+            <FileUpload onUpload={handleUpload} accept=".txt,.md,.fb2,.docx,.pdf" maxSize={50} multiple />
             <label className="mt-2 flex items-center gap-2 text-sm text-gray-400">
               <input
                 type="checkbox"
