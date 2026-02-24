@@ -482,7 +482,9 @@ class PDFFileHandler(FileHandler):
             # ── 2. Extract text blocks, skipping table regions ────────────
             text_items: List = []  # (y0, text)
             all_font_sizes: List[float] = []
-            block_info: List = []  # (y0, text, max_font_size)
+            # (y0, block_text, max_font_size, first_line_text,
+            #  first_line_bold_chars, first_line_total_chars)
+            block_info: List = []
 
             try:
                 block_dict = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)
@@ -507,42 +509,71 @@ class PDFFileHandler(FileHandler):
 
                     lines_text: List[str] = []
                     max_size = 0.0
+                    first_line_text = ""
+                    first_line_bold = 0
+                    first_line_total = 0
                     for line in block.get("lines", []):
                         line_text = "".join(s.get("text", "") for s in line.get("spans", []))
+                        is_first = not first_line_text and line_text.strip()
                         if line_text.strip():
                             lines_text.append(line_text.rstrip())
+                            if is_first:
+                                first_line_text = line_text.strip()
                         for span in line.get("spans", []):
                             sz = span.get("size", 0)
                             if sz > 0:
                                 all_font_sizes.append(sz)
                                 if sz > max_size:
                                     max_size = sz
+                            if is_first:
+                                n = len(span.get("text", ""))
+                                first_line_total += n
+                                if span.get("flags", 0) & 0b10000:  # bold bit
+                                    first_line_bold += n
 
                     if lines_text:
                         block_text = "\n".join(lines_text)
-                        block_info.append((block["bbox"][1], block_text, max_size))
+                        block_info.append(
+                            (
+                                block["bbox"][1],
+                                block_text,
+                                max_size,
+                                first_line_text,
+                                first_line_bold,
+                                first_line_total,
+                            )
+                        )
             except Exception:
                 fallback = page.get_text("text")
                 if fallback.strip():
                     text_items.append((0.0, fallback))
 
-            # ── 3. Heading detection via font-size ─────────────────────────
+            # ── 3. Heading detection: font-size or bold first line ─────────
             median_size = statistics.median(all_font_sizes) if all_font_sizes else 0.0
 
-            for y0, block_text, max_size in block_info:
+            for y0, block_text, max_size, first_line_text, fl_bold, fl_total in block_info:
                 text_items.append((y0, block_text))
 
-                if median_size > 0 and max_size > median_size * 1.15:
+                # Size-based: any font in block noticeably larger than median
+                is_size_heading = median_size > 0 and max_size > median_size * 1.15
+
+                # Bold-based: first non-empty line of block is ≥85% bold and
+                # short enough to be a heading (not a paragraph opening)
+                fl_bold_fraction = fl_bold / fl_total if fl_total > 0 else 0.0
+                is_bold_heading = fl_bold_fraction >= 0.85 and len(first_line_text) < 120
+
+                if is_size_heading:
                     ratio = max_size / median_size
-                    if ratio >= 2.0:
-                        level = 1
-                    elif ratio >= 1.5:
-                        level = 2
-                    else:
-                        level = 3
+                    level = 1 if ratio >= 2.0 else (2 if ratio >= 1.5 else 3)
                     heading_text = re.sub(r"\s+", " ", block_text.strip())
                     if heading_text and len(heading_text) < 200:
                         headings.append({"pos": current_pos, "level": level, "text": heading_text})
+                elif is_bold_heading:
+                    # Bold first line, normal size — level 2 (matches old
+                    # pymupdf4llm **bold short line** heuristic)
+                    heading_text = re.sub(r"\s+", " ", first_line_text)
+                    if heading_text:
+                        headings.append({"pos": current_pos, "level": 2, "text": heading_text})
 
             # ── 4. Merge items and build page text ────────────────────────
             all_items = sorted(text_items + table_items, key=lambda x: x[0])
