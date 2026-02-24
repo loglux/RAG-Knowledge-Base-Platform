@@ -486,12 +486,23 @@ class PDFFileHandler(FileHandler):
             #  first_line_bold_chars, first_line_total_chars)
             block_info: List = []
 
+            page_h = page.rect.height
+            # Running headers sit at the very top (< 4%) and footer page
+            # numbers at the very bottom (> 95%).  Skip those blocks entirely
+            # to avoid polluting both the text content and heading map.
+            header_cutoff = page_h * 0.04
+            footer_cutoff = page_h * 0.95
+
             try:
                 block_dict = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)
                 for block in block_dict.get("blocks", []):
                     if block.get("type") != 0:
                         continue
                     brect = fitz.Rect(block["bbox"])
+
+                    # Skip running-header and footer strips
+                    if brect.y1 <= header_cutoff or brect.y0 >= footer_cutoff:
+                        continue
 
                     # Skip if block overlaps substantially with a table
                     in_table = False
@@ -566,13 +577,18 @@ class PDFFileHandler(FileHandler):
                     ratio = max_size / median_size
                     level = 1 if ratio >= 2.0 else (2 if ratio >= 1.5 else 3)
                     heading_text = re.sub(r"\s+", " ", block_text.strip())
-                    if heading_text and len(heading_text) < 200:
+                    if (
+                        heading_text
+                        and len(heading_text) < 200
+                        and not re.fullmatch(r"\d+", heading_text)
+                    ):
                         headings.append({"pos": current_pos, "level": level, "text": heading_text})
                 elif is_bold_heading:
-                    # Bold first line, normal size — level 2 (matches old
-                    # pymupdf4llm **bold short line** heuristic)
                     heading_text = re.sub(r"\s+", " ", first_line_text)
-                    if heading_text:
+                    # Skip pure-number headings (page numbers, margin section
+                    # numbers like "1", "2", "85" that weren't caught by the
+                    # header/footer zone filter)
+                    if heading_text and not re.fullmatch(r"\d+", heading_text):
                         headings.append({"pos": current_pos, "level": 2, "text": heading_text})
 
             # ── 4. Merge items and build page text ────────────────────────
@@ -588,6 +604,27 @@ class PDFFileHandler(FileHandler):
             current_pos += len(page_text) + 2  # +2 for \n\n page separator
 
         doc.close()
+
+        # ── Deduplicate running headers ───────────────────────────────────
+        # Heading texts that repeat on many pages are running headers (e.g.
+        # "Unit 9", chapter titles in the margin).  Keep the first occurrence
+        # and drop the rest so they don't pollute section_path in every chunk.
+        total_pages = len(text_parts) if text_parts else 1
+        repeat_threshold = max(4, total_pages // 5)
+        text_counts: Dict[str, int] = {}
+        for h in headings:
+            text_counts[h["text"]] = text_counts.get(h["text"], 0) + 1
+        seen: set = set()
+        filtered: List[Dict[str, Any]] = []
+        for h in headings:
+            t = h["text"]
+            if text_counts[t] >= repeat_threshold:
+                if t not in seen:
+                    seen.add(t)
+                    filtered.append(h)  # keep only first occurrence
+            else:
+                filtered.append(h)
+        headings = filtered
 
         full_text = sanitize_text_content("\n\n".join(text_parts))
 
