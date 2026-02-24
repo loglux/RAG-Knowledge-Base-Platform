@@ -23,6 +23,8 @@ export function SourceCard({ source, index, anchorPrefix }: SourceCardProps) {
   const hasMore = source.text.length > 240
   const metadata = source.metadata || {}
   const pageNumber = typeof metadata.page_number === 'number' ? metadata.page_number : null
+  const pageNumberPhysical =
+    typeof metadata.page_number_physical === 'number' ? metadata.page_number_physical : null
   const sectionPath = typeof metadata.section_path === 'string' ? metadata.section_path : null
   const contextualDescription =
     typeof metadata.contextual_description === 'string' && metadata.contextual_description
@@ -51,7 +53,12 @@ export function SourceCard({ source, index, anchorPrefix }: SourceCardProps) {
           <span className="text-white font-medium">{source.filename}</span>
           <span className="text-gray-500 text-xs">Chunk #{source.chunk_index}</span>
           {pageNumber !== null && (
-            <span className="text-gray-500 text-xs">p. {pageNumber}</span>
+            <span className="text-gray-500 text-xs">
+              p.&nbsp;{pageNumber}
+              {pageNumberPhysical !== null && pageNumberPhysical !== pageNumber && (
+                <span className="text-gray-600"> (phys.&nbsp;{pageNumberPhysical})</span>
+              )}
+            </span>
           )}
         </div>
         <div className="flex items-center space-x-2">

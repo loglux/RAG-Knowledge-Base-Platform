@@ -12,7 +12,7 @@ Handles the complete pipeline of document ingestion:
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -560,11 +560,11 @@ class DocumentProcessor:
                     payload["section_path"] = section["path"]
                     payload["section_level"] = section["level"]
 
-            # Add PDF page number
+            # Add PDF page numbers (physical always; logical from footer when available)
             if page_map:
-                page_number = self._get_page_for_char(page_map, chunk.start_char)
-                if page_number is not None:
-                    payload["page_number"] = page_number
+                phys, logical = self._get_page_for_char(page_map, chunk.start_char)
+                payload["page_number_physical"] = phys
+                payload["page_number"] = logical if logical is not None else phys
 
             payloads.append(payload)
 
@@ -623,20 +623,23 @@ class DocumentProcessor:
         }
 
     @staticmethod
-    def _get_page_for_char(page_map: List[List[int]], char_pos: int) -> Optional[int]:
-        """Return the 1-indexed PDF page number for a given character position.
+    def _get_page_for_char(page_map: List[List], char_pos: int) -> Tuple[int, Optional[int]]:
+        """Return (physical_page, logical_page) for the given character position.
 
-        page_map is a list of [char_offset, page_number] pairs sorted ascending
-        by char_offset — the format produced by PDFFileHandler.extract_page_map().
+        page_map entries: [char_offset, physical_page, logical_page_or_null]
+        physical_page is always returned (1-indexed PDF file page).
+        logical_page is the printed number from the footer, or None if unavailable.
         """
         if not page_map:
-            return None
-        page_number = page_map[0][1]
+            return 1, None
+        phys: int = page_map[0][1]
+        logical: Optional[int] = page_map[0][2] if len(page_map[0]) > 2 else None
         for entry in page_map:
             if entry[0] > char_pos:
                 break
-            page_number = entry[1]
-        return page_number
+            phys = entry[1]
+            logical = entry[2] if len(entry) > 2 else None
+        return phys, logical
 
     @staticmethod
     def _build_lexical_chunks(chunks: List[Chunk]) -> List[Dict[str, Any]]:

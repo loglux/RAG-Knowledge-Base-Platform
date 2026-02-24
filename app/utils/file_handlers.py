@@ -1,7 +1,7 @@
 """File type handlers for document processing."""
 
 import io
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 from xml.etree import ElementTree
 
 from docx import Document as DocxDocument
@@ -382,6 +382,27 @@ class PDFFileHandler(FileHandler):
             return content.encode("utf-8")
         return content
 
+    @staticmethod
+    def _extract_footer_page_number(page) -> Optional[int]:
+        """Try to extract the printed (logical) page number from a PDF page footer.
+
+        Clips the bottom 5% of the page and looks for the last line that is
+        purely 1-4 digits — that is reliably the printed page number in most
+        typeset PDFs.  Returns None if nothing suitable is found.
+        """
+        import re
+
+        rect = page.rect
+        footer_rect = type(rect)(0, rect.height * 0.95, rect.width, rect.height)
+        text = page.get_text("text", clip=footer_rect).strip()
+        if not text:
+            return None
+        for line in reversed(text.splitlines()):
+            line = line.strip()
+            if re.fullmatch(r"\d{1,4}", line):
+                return int(line)
+        return None
+
     def _extract_pdf(self, content: bytes):
         """Two-pass extraction returning (text, heading_map, page_map).
 
@@ -429,11 +450,14 @@ class PDFFileHandler(FileHandler):
         # ── Pass 2: structured text extraction ───────────────────────────
         text_parts: List[str] = []
         headings: List[Dict[str, Any]] = []
-        page_map: List[List[int]] = []  # [[char_offset, page_number], ...]
+        # page_map entries: [char_offset, physical_page, logical_page_or_null]
+        # logical_page is the printed number extracted from the footer (may be None)
+        page_map: List[List] = []
         current_pos = 0
 
         for page in doc:
-            page_num = page.number + 1  # 1-indexed
+            page_num = page.number + 1  # 1-indexed physical
+            logical_num = self._extract_footer_page_number(page)
             page_start_pos = current_pos
             has_content = False
 
@@ -479,7 +503,7 @@ class PDFFileHandler(FileHandler):
 
             # Record page boundary only if page had extractable text
             if has_content:
-                page_map.append([page_start_pos, page_num])
+                page_map.append([page_start_pos, page_num, logical_num])
 
         doc.close()
 

@@ -384,6 +384,7 @@ class RetrievalEngine:
                     "contextual_description": payload.get("contextual_description"),
                     # PDF page tracking
                     "page_number": payload.get("page_number"),
+                    "page_number_physical": payload.get("page_number_physical"),
                 },
             )
 
