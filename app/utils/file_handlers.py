@@ -403,13 +403,118 @@ class PDFFileHandler(FileHandler):
                 return int(line)
         return None
 
+    @staticmethod
+    def _table_to_markdown(rows: List[List]) -> str:
+        """Convert PyMuPDF table.extract() rows to a Markdown table string.
+
+        Cells that are None (merged/empty) are rendered as empty strings.
+        Multi-line cell content is collapsed to a single line.
+        """
+        if not rows:
+            return ""
+
+        def _clean(cell) -> str:
+            if cell is None:
+                return ""
+            return str(cell).replace("\n", " ").strip()
+
+        normalized = [[_clean(c) for c in row] for row in rows]
+        col_count = max(len(row) for row in normalized)
+        # Pad rows to the same width
+        normalized = [row + [""] * (col_count - len(row)) for row in normalized]
+
+        header = normalized[0]
+        sep = ["---"] * col_count
+        lines = [
+            "| " + " | ".join(header) + " |",
+            "| " + " | ".join(sep) + " |",
+        ]
+        for row in normalized[1:]:
+            lines.append("| " + " | ".join(row) + " |")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _rect_overlaps(a, b) -> bool:
+        """Return True if two bounding boxes (x0,y0,x1,y1) overlap at all."""
+        return not (a[2] <= b[0] or a[0] >= b[2] or a[3] <= b[1] or a[1] >= b[3])
+
+    @staticmethod
+    def _process_block(
+        block: Dict[str, Any],
+        body_size: float,
+        size_to_level: Dict[float, int],
+        heading_sizes: List[float],
+        page_height: float,
+    ):
+        """Extract text and optional heading level from a PyMuPDF block dict.
+
+        Returns (block_text, level) where level is None for body text.
+        Returns (None, None) if the block has no visible text.
+        """
+        import re as _re
+        from collections import Counter
+
+        block_lines: List[str] = []
+        block_size_chars: Counter = Counter()
+        total_span_chars = 0
+        bold_span_chars = 0
+
+        for line in block["lines"]:
+            line_text = "".join(s["text"] for s in line["spans"]).strip()
+            if line_text:
+                block_lines.append(line_text)
+                for span in line["spans"]:
+                    t = span["text"].strip()
+                    if t:
+                        block_size_chars[round(span["size"], 1)] += len(t)
+                        total_span_chars += len(t)
+                        # bit 4 (0x10) is the bold flag in PyMuPDF
+                        if span["flags"] & 0x10:
+                            bold_span_chars += len(t)
+
+        if not block_lines:
+            return None, None
+
+        block_text = "\n".join(block_lines)
+
+        # Heading detection: dominant font size + reasonable length
+        level = None
+        if block_size_chars:
+            dom_size = block_size_chars.most_common(1)[0][0]
+            if dom_size in size_to_level and len(block_text) < 200:
+                level = size_to_level[dom_size]
+
+        # Fallback: bold-majority short block not caught by size heuristic.
+        # Requires ≥50% of characters to be bold.
+        # Excludes list items starting with "(", purely numeric blocks,
+        # blocks shorter than 3 chars, and running page headers (top 3%).
+        if level is None and total_span_chars >= 3:
+            bold_ratio = bold_span_chars / total_span_chars
+            stripped = block_text.strip()
+            is_numeric = bool(_re.fullmatch(r"[\d\s]+", stripped))
+            in_page_header = block["bbox"][1] < page_height * 0.03
+            if (
+                bold_ratio >= 0.5
+                and len(stripped) < 150
+                and not stripped.startswith("(")
+                and not is_numeric
+                and not in_page_header
+            ):
+                # Place bold headings one level below the deepest size-based heading
+                level = min(len(heading_sizes) + 1, 6)
+
+        return block_text, level
+
     def _extract_pdf(self, content: bytes):
         """Two-pass extraction returning (text, heading_map, page_map).
 
         Pass 1 – collect font-size distribution to determine body size and
                  build a size→level map for headings.
-        Pass 2 – extract text blocks, record heading positions, and track
-                 page boundaries so that each chunk can carry a page_number.
+        Pass 2 – for each page:
+                   • detect tables via page.find_tables() and convert to Markdown;
+                   • extract text blocks, skipping regions covered by tables;
+                   • merge both in Y-coordinate order (top→bottom reading order);
+                   • record heading positions and page boundaries.
 
         page_map: list of [char_offset, page_number] pairs (1-indexed pages),
         one entry per page marking where that page's content starts in the
@@ -451,7 +556,6 @@ class PDFFileHandler(FileHandler):
         text_parts: List[str] = []
         headings: List[Dict[str, Any]] = []
         # page_map entries: [char_offset, physical_page, logical_page_or_null]
-        # logical_page is the printed number extracted from the footer (may be None)
         page_map: List[List] = []
         current_pos = 0
 
@@ -461,78 +565,58 @@ class PDFFileHandler(FileHandler):
             page_start_pos = current_pos
             has_content = False
 
+            # ── Table detection ───────────────────────────────────────────
+            # Collect (y0, markdown_text) for each table found on the page.
+            # Also store bounding boxes so overlapping text blocks can be skipped.
+            table_rects: List[tuple] = []
+            table_items: List[tuple] = []  # (y0, markdown_text)
+            try:
+                finder = page.find_tables()
+                for table in finder.tables:
+                    rows = table.extract()
+                    if not rows:
+                        continue
+                    md = self._table_to_markdown(rows)
+                    if md:
+                        table_rects.append(tuple(table.bbox))
+                        table_items.append((table.bbox[1], md))
+            except Exception as exc:
+                logger.debug(f"Table detection skipped on page {page_num}: {exc}")
+
+            # ── Collect content items with Y positions ────────────────────
+            # Each item: (y0, item_type, text, heading_level_or_None)
+            content_items: List[tuple] = []
+
+            for y0, md in table_items:
+                content_items.append((y0, "table", md, None))
+
             for block in page.get_text("dict")["blocks"]:
                 if block["type"] != 0:
                     continue
-
-                block_lines: List[str] = []
-                block_size_chars: Counter = Counter()
-                total_span_chars = 0
-                bold_span_chars = 0
-
-                for line in block["lines"]:
-                    line_text = "".join(s["text"] for s in line["spans"]).strip()
-                    if line_text:
-                        block_lines.append(line_text)
-                        for span in line["spans"]:
-                            t = span["text"].strip()
-                            if t:
-                                block_size_chars[round(span["size"], 1)] += len(t)
-                                total_span_chars += len(t)
-                                # bit 4 (0x10) is the bold flag in PyMuPDF
-                                if span["flags"] & 0x10:
-                                    bold_span_chars += len(t)
-
-                if not block_lines:
+                # Skip text blocks whose bbox overlaps with a detected table
+                if any(self._rect_overlaps(block["bbox"], tr) for tr in table_rects):
                     continue
+                block_text, level = self._process_block(
+                    block, body_size, size_to_level, heading_sizes, page.rect.height
+                )
+                if block_text:
+                    content_items.append((block["bbox"][1], "block", block_text, level))
 
-                block_text = "\n".join(block_lines)
+            # Sort by top Y coordinate → correct top-to-bottom reading order
+            content_items.sort(key=lambda x: x[0])
 
-                # Heading detection: dominant font size + reasonable length
-                level = None
-                if block_size_chars:
-                    dom_size = block_size_chars.most_common(1)[0][0]
-                    if dom_size in size_to_level and len(block_text) < 200:
-                        level = size_to_level[dom_size]
-
-                # Fallback: bold-majority short block not caught by size heuristic.
-                # Requires ≥50% of characters to be bold (handles "Question 1 – 5 marks"
-                # where only the label is bold but the rest is plain).
-                # Excludes:
-                #   - list items starting with "("
-                #   - purely numeric blocks (running-header page numbers)
-                #   - blocks shorter than 3 chars
-                #   - blocks in the top 8% of the page (running page headers)
-                if level is None and total_span_chars >= 3:
-                    bold_ratio = bold_span_chars / total_span_chars
-                    stripped = block_text.strip()
-                    import re as _re
-
-                    is_numeric = bool(_re.fullmatch(r"[\d\s]+", stripped))
-                    block_top_y = block["bbox"][1]
-                    in_page_header = block_top_y < page.rect.height * 0.03
-                    if (
-                        bold_ratio >= 0.5
-                        and len(stripped) < 150
-                        and not stripped.startswith("(")
-                        and not is_numeric
-                        and not in_page_header
-                    ):
-                        # Place bold headings one level below the deepest size-based heading
-                        level = min(len(heading_sizes) + 1, 6)
-
+            # ── Emit in reading order ─────────────────────────────────────
+            for _, item_type, item_text, level in content_items:
                 if level is not None:
                     headings.append(
                         {
                             "pos": current_pos,
                             "level": level,
-                            # Display text: collapse internal newlines to space
-                            "text": block_text.replace("\n", " "),
+                            "text": item_text.replace("\n", " "),
                         }
                     )
-
-                text_parts.append(block_text)
-                current_pos += len(block_text) + 2  # +2 for "\n\n" separator
+                text_parts.append(item_text)
+                current_pos += len(item_text) + 2  # +2 for "\n\n" separator
                 has_content = True
 
             # Record page boundary only if page had extractable text
