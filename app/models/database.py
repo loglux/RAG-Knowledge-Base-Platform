@@ -201,6 +201,11 @@ class Document(Base):
         Text, nullable=True, comment="JSON with duplicate chunk analysis summary"
     )
 
+    # Structural metadata: heading map extracted at upload time (DOCX)
+    heading_map_json: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True, comment="JSON-encoded heading map for structural metadata indexing"
+    )
+
     # Future: User ownership (nullable for MVP)
     user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), nullable=True, index=True, comment="Owner user ID - nullable for MVP"
@@ -230,6 +235,15 @@ class Document(Base):
             return None
         try:
             return json.loads(self.duplicate_chunks_json)
+        except Exception:
+            return None
+
+    @property
+    def heading_map(self):
+        if not self.heading_map_json:
+            return None
+        try:
+            return json.loads(self.heading_map_json)
         except Exception:
             return None
 

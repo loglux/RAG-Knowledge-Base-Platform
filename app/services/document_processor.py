@@ -9,6 +9,7 @@ Handles the complete pipeline of document ingestion:
 5. Update document status
 """
 
+import json
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -502,11 +503,17 @@ class DocumentProcessor:
         Returns:
             List of payload dictionaries
         """
-        # Pre-compute heading map for Markdown documents
+        # Pre-compute heading map for structural metadata
         file_type_str = str(document.file_type).lower().replace("filetype.", "")
-        heading_map = (
-            self._extract_md_heading_map(document.content) if file_type_str == "md" else []
-        )
+        if file_type_str == "md":
+            heading_map = self._extract_md_heading_map(document.content)
+        elif file_type_str == "docx" and document.heading_map_json:
+            try:
+                heading_map = json.loads(document.heading_map_json)
+            except Exception:
+                heading_map = []
+        else:
+            heading_map = []
 
         payloads = []
 

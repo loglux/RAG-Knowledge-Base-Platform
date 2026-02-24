@@ -1,6 +1,7 @@
 """Document management endpoints."""
 
 import hashlib
+import json
 import logging
 from typing import Optional
 from uuid import UUID
@@ -145,8 +146,9 @@ async def create_document(
     # Read file content
     content_bytes = await file.read()
     content: str
+    heading_map_json: str | None = None
     if file_type == FileType.DOCX:
-        from app.utils.file_handlers import process_file
+        from app.utils.file_handlers import FileHandlerFactory, process_file
 
         try:
             processed = process_file(content_bytes, filename, file_type)
@@ -155,6 +157,15 @@ async def create_document(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to parse DOCX: {exc}"
             ) from exc
+
+        # Extract heading map for structural metadata indexing
+        try:
+            docx_handler = FileHandlerFactory.get_handler(file_type)
+            headings = docx_handler.extract_heading_map(content_bytes)
+            if headings:
+                heading_map_json = json.dumps(headings, ensure_ascii=False)
+        except Exception as exc:
+            logger.warning(f"Failed to extract DOCX heading map for '{filename}': {exc}")
     else:
         try:
             content = content_bytes.decode("utf-8")
@@ -206,6 +217,7 @@ async def create_document(
         content_hash=content_hash,
         status=DocumentStatus.PENDING,
         user_id=user_id,
+        heading_map_json=heading_map_json,
     )
 
     db.add(doc_model)
