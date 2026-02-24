@@ -467,16 +467,21 @@ class PDFFileHandler(FileHandler):
 
                 block_lines: List[str] = []
                 block_size_chars: Counter = Counter()
+                total_span_chars = 0
+                bold_span_chars = 0
 
                 for line in block["lines"]:
                     line_text = "".join(s["text"] for s in line["spans"]).strip()
                     if line_text:
                         block_lines.append(line_text)
                         for span in line["spans"]:
-                            if span["text"].strip():
-                                block_size_chars[round(span["size"], 1)] += len(
-                                    span["text"].strip()
-                                )
+                            t = span["text"].strip()
+                            if t:
+                                block_size_chars[round(span["size"], 1)] += len(t)
+                                total_span_chars += len(t)
+                                # bit 4 (0x10) is the bold flag in PyMuPDF
+                                if span["flags"] & 0x10:
+                                    bold_span_chars += len(t)
 
                 if not block_lines:
                     continue
@@ -484,18 +489,47 @@ class PDFFileHandler(FileHandler):
                 block_text = "\n".join(block_lines)
 
                 # Heading detection: dominant font size + reasonable length
+                level = None
                 if block_size_chars:
                     dom_size = block_size_chars.most_common(1)[0][0]
-                    level = size_to_level.get(dom_size)
-                    if level is not None and len(block_text) < 200:
-                        headings.append(
-                            {
-                                "pos": current_pos,
-                                "level": level,
-                                # Display text: collapse internal newlines to space
-                                "text": block_text.replace("\n", " "),
-                            }
-                        )
+                    if dom_size in size_to_level and len(block_text) < 200:
+                        level = size_to_level[dom_size]
+
+                # Fallback: bold-majority short block not caught by size heuristic.
+                # Requires ≥50% of characters to be bold (handles "Question 1 – 5 marks"
+                # where only the label is bold but the rest is plain).
+                # Excludes:
+                #   - list items starting with "("
+                #   - purely numeric blocks (running-header page numbers)
+                #   - blocks shorter than 3 chars
+                #   - blocks in the top 8% of the page (running page headers)
+                if level is None and total_span_chars >= 3:
+                    bold_ratio = bold_span_chars / total_span_chars
+                    stripped = block_text.strip()
+                    import re as _re
+
+                    is_numeric = bool(_re.fullmatch(r"[\d\s]+", stripped))
+                    block_top_y = block["bbox"][1]
+                    in_page_header = block_top_y < page.rect.height * 0.03
+                    if (
+                        bold_ratio >= 0.5
+                        and len(stripped) < 150
+                        and not stripped.startswith("(")
+                        and not is_numeric
+                        and not in_page_header
+                    ):
+                        # Place bold headings one level below the deepest size-based heading
+                        level = min(len(heading_sizes) + 1, 6)
+
+                if level is not None:
+                    headings.append(
+                        {
+                            "pos": current_pos,
+                            "level": level,
+                            # Display text: collapse internal newlines to space
+                            "text": block_text.replace("\n", " "),
+                        }
+                    )
 
                 text_parts.append(block_text)
                 current_pos += len(block_text) + 2  # +2 for "\n\n" separator
