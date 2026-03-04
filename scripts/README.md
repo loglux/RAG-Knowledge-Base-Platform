@@ -25,6 +25,26 @@ Checks included:
 - basic secret pattern scan
 - `pytest` (full mode)
 
+### check_mcp_smoke.sh
+Runtime smoke checks for MCP endpoint safety.
+
+```bash
+# Option 1: use existing MCP bearer token directly
+MCP_BEARER_TOKEN="..." ./scripts/check_mcp_smoke.sh
+
+# Option 2: auto-mint temporary MCP token from admin credentials (bearer mode)
+ADMIN_USERNAME="..." ADMIN_PASSWORD="..." ./scripts/check_mcp_smoke.sh
+```
+
+What it verifies:
+- unauthenticated `GET /mcp` returns `401`
+- `GET /.well-known/oauth-protected-resource/mcp` returns `200`
+- authenticated MCP tool-call (`list_knowledge_bases`) succeeds
+
+Notes:
+- default API base URL: `http://127.0.0.1:8004` (override with `API_BASE_URL`)
+- when admin credentials are used, a temporary MCP token is created and purged automatically
+
 ## 🔄 Data Management
 
 ### backup.sh

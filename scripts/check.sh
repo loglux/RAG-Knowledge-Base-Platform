@@ -4,6 +4,7 @@ set -eu
 MODE="full"
 FIX_MODE="false"
 RUN_TESTS="true"
+RUN_MCP_SMOKE="false"
 
 usage() {
   cat <<'EOF'
@@ -13,6 +14,7 @@ Options:
   --staged      Run checks only on staged Python files (fast path)
   --fix         Auto-fix formatting/import order (black + isort)
   --no-tests    Skip pytest (applies to full mode)
+  --mcp-smoke   Run MCP runtime smoke checks (requires token or admin creds)
   -h, --help    Show help
 EOF
 }
@@ -27,6 +29,9 @@ while [ $# -gt 0 ]; do
       ;;
     --no-tests)
       RUN_TESTS="false"
+      ;;
+    --mcp-smoke)
+      RUN_MCP_SMOKE="true"
       ;;
     -h|--help)
       usage
@@ -152,10 +157,23 @@ run_pytest() {
   pytest -q
 }
 
+run_mcp_smoke() {
+  if [ "$RUN_MCP_SMOKE" != "true" ] || [ "$MODE" = "staged" ]; then
+    return
+  fi
+  if [ ! -x "./scripts/check_mcp_smoke.sh" ]; then
+    echo "[check] MCP smoke script not found: ./scripts/check_mcp_smoke.sh"
+    exit 1
+  fi
+  echo "[check] MCP smoke"
+  ./scripts/check_mcp_smoke.sh
+}
+
 run_black
 run_isort
 run_flake8
 run_secrets_scan
 run_pytest
+run_mcp_smoke
 
 echo "[check] OK"

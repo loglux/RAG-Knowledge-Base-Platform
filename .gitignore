@@ -160,6 +160,7 @@ scripts/*
 !scripts/deploy_backend.sh
 !scripts/deploy_frontend.sh
 !scripts/check.sh
+!scripts/check_mcp_smoke.sh
 !scripts/README.md
 tests/
 frontend/_local/
