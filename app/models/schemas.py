@@ -65,6 +65,10 @@ class KnowledgeBaseBase(BaseModel):
     use_self_check: Optional[bool] = Field(
         default=None, description="KB-level self-check validation override"
     )
+    contextual_description_enabled: Optional[bool] = Field(
+        default=None,
+        description="KB-level override for contextual description generation during ingestion",
+    )
 
     @field_validator("chunk_overlap")
     @classmethod
@@ -91,6 +95,7 @@ class KnowledgeBaseCreate(KnowledgeBaseBase):
     bm25_use_phrase: Optional[bool] = None
     bm25_analyzer: Optional[str] = None
     use_llm_chat_titles: Optional[bool] = None
+    contextual_description_enabled: Optional[bool] = None
 
 
 class KnowledgeBaseUpdate(BaseModel):
@@ -107,6 +112,7 @@ class KnowledgeBaseUpdate(BaseModel):
     bm25_use_phrase: Optional[bool] = None
     bm25_analyzer: Optional[str] = None
     use_llm_chat_titles: Optional[bool] = None
+    contextual_description_enabled: Optional[bool] = None
 
 
 class KnowledgeBaseResponse(KnowledgeBaseBase):
@@ -516,6 +522,10 @@ class AppSettingsBase(BaseModel):
     active_prompt_version_id: Optional[UUID] = Field(default=None)
     active_self_check_prompt_version_id: Optional[UUID] = Field(default=None)
     show_prompt_versions: Optional[bool] = Field(default=None)
+    contextual_description_enabled: Optional[bool] = Field(
+        default=None,
+        description="Global default for contextual description generation during ingestion",
+    )
 
 
 class AppSettingsResponse(AppSettingsBase):

@@ -127,6 +127,7 @@ async def create_knowledge_base(
             if kb.use_llm_chat_titles is not None
             else default_use_llm_chat_titles
         ),
+        contextual_description_enabled=kb.contextual_description_enabled,
         user_id=user_id,
     )
 
@@ -690,6 +691,12 @@ async def reprocess_knowledge_base(
     detect_duplicates: bool = Query(
         False, description="Compute duplicate chunks after reprocessing"
     ),
+    contextual_description_enabled: Optional[bool] = Query(
+        None,
+        description=(
+            "Optional per-request override for contextual description generation during reprocessing"
+        ),
+    ),
     db: AsyncSession = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_current_user_id),
 ):
@@ -734,6 +741,7 @@ async def reprocess_knowledge_base(
             _reprocess_document_background,
             document_id=doc.id,
             detect_duplicates=detect_duplicates,
+            contextual_description_enabled_override=contextual_description_enabled,
         )
         queued += 1
 

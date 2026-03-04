@@ -67,6 +67,7 @@ export function SettingsPage() {
   const [rerankTopN, setRerankTopN] = useState(5)
   const [rerankMinScore, setRerankMinScore] = useState(0)
   const [useLlmChatTitles, setUseLlmChatTitles] = useState(true)
+  const [contextualDescriptionEnabled, setContextualDescriptionEnabled] = useState(false)
   const [opensearchAvailable, setOpensearchAvailable] = useState<boolean | null>(null)
   const clamp01 = (value: number) => Math.min(1, Math.max(0, value))
   const handleDenseWeightChange = (value: number) => {
@@ -250,6 +251,9 @@ export function SettingsPage() {
       if (appSettings.rerank_min_score !== null) setRerankMinScore(appSettings.rerank_min_score)
       if (appSettings.use_llm_chat_titles !== null) {
         setUseLlmChatTitles(appSettings.use_llm_chat_titles)
+      }
+      if (appSettings.contextual_description_enabled !== null) {
+        setContextualDescriptionEnabled(appSettings.contextual_description_enabled)
       }
       if (appSettings.active_prompt_version_id) {
         setActivePromptVersionId(appSettings.active_prompt_version_id)
@@ -642,6 +646,7 @@ export function SettingsPage() {
         rerank_top_n: rerankTopN,
         rerank_min_score: rerankMinScore,
         use_llm_chat_titles: useLlmChatTitles,
+        contextual_description_enabled: contextualDescriptionEnabled,
       })
 
       setSuccess('Query defaults saved successfully!')
@@ -1158,6 +1163,8 @@ export function SettingsPage() {
             rerankPricingFormula={rerankPricingFormula ?? undefined}
             useLlmChatTitles={useLlmChatTitles}
             setUseLlmChatTitles={setUseLlmChatTitles}
+            contextualDescriptionEnabled={contextualDescriptionEnabled}
+            setContextualDescriptionEnabled={setContextualDescriptionEnabled}
             opensearchAvailable={opensearchAvailable}
             onSave={handleSaveQueryDefaults}
             saving={saving}
@@ -2251,6 +2258,8 @@ type QueryDefaultsTabProps = {
   rerankPricingFormula?: string
   useLlmChatTitles: boolean
   setUseLlmChatTitles: (value: boolean) => void
+  contextualDescriptionEnabled: boolean
+  setContextualDescriptionEnabled: (value: boolean) => void
   opensearchAvailable: boolean | null
   onSave: () => void
   saving: boolean
@@ -2283,6 +2292,7 @@ function QueryDefaultsTab({
   rerankModelsByProvider,
   rerankPricingFormula,
   useLlmChatTitles, setUseLlmChatTitles,
+  contextualDescriptionEnabled, setContextualDescriptionEnabled,
   opensearchAvailable,
   onSave, saving
 }: QueryDefaultsTabProps) {
@@ -2401,6 +2411,29 @@ function QueryDefaultsTab({
         <p className="text-xs text-gray-400 mt-2">
           When enabled, new chat titles are generated from the first Q&amp;A. Otherwise, the
           title falls back to the first user question.
+        </p>
+      </div>
+
+      {/* Ingestion Enrichment */}
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-100 mb-4">Ingestion Enrichment</h3>
+        <div className="flex items-center gap-3">
+          <input
+            id="contextual-description-enabled"
+            type="checkbox"
+            checked={contextualDescriptionEnabled}
+            onChange={(e) => setContextualDescriptionEnabled(e.target.checked)}
+            className="rounded border-gray-600 bg-gray-800"
+          />
+          <label htmlFor="contextual-description-enabled" className="text-sm text-gray-300">
+            Enable contextual descriptions by default
+          </label>
+        </div>
+        <p className="text-xs text-gray-400 mt-2">
+          Adds LLM-generated chunk context during document ingestion. Applies as global default and can be overridden per KB.
+        </p>
+        <p className="text-xs text-gray-500 mt-2">
+          Enable when retrieval quality is critical for long/complex documents. Disable when ingestion speed and cost are higher priority.
         </p>
       </div>
 

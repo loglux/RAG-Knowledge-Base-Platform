@@ -692,8 +692,15 @@ class SemanticChunking(ChunkingStrategy):
             f"[SemanticChunking] Step 5 complete: balanced to {len(balanced_chunks)} chunks"
         )
 
-        # Step 6: Skip contextual descriptions for now (requires async LLM calls)
-        logger.info(f"[SemanticChunking] Step 6: Skipping contextual embeddings in sync mode")
+        # Step 6: Add contextual descriptions (if enabled)
+        if self.use_contextual_embeddings:
+            logger.info(
+                f"[SemanticChunking] Step 6: Adding contextual descriptions for {len(balanced_chunks)} chunks (sync)..."
+            )
+            balanced_chunks = self._add_contextual_descriptions_sync(balanced_chunks, text)
+            logger.info(f"[SemanticChunking] Step 6 complete: contextual descriptions added")
+        else:
+            logger.info(f"[SemanticChunking] Step 6: Contextual embeddings disabled, skipping")
 
         # Step 7: Convert to Chunk objects
         logger.info(f"[SemanticChunking] Step 7: Converting to Chunk objects...")
@@ -961,6 +968,16 @@ class SemanticChunking(ChunkingStrategy):
     async def _add_contextual_descriptions(
         self, chunks: List[dict], original_text: str
     ) -> List[dict]:
+        """Async wrapper for contextual description generation."""
+        import asyncio
+
+        return await asyncio.to_thread(
+            self._add_contextual_descriptions_sync, chunks, original_text
+        )
+
+    def _add_contextual_descriptions_sync(
+        self, chunks: List[dict], original_text: str
+    ) -> List[dict]:
         """
         Add contextual descriptions to chunks using the configured LLM client.
 
@@ -1128,6 +1145,7 @@ def get_chunking_service(
     strategy_name: str = "simple",
     llm_model: Optional[str] = None,
     llm_provider: Optional[str] = None,
+    use_contextual_embeddings: bool = True,
 ) -> ChunkingService:
     """
     Get a chunking service instance with specified strategy.
@@ -1138,6 +1156,7 @@ def get_chunking_service(
         strategy_name: Chunking strategy ("simple", "smart", "semantic")
         llm_model: Optional LLM model for contextual embeddings (semantic chunking)
         llm_provider: Optional LLM provider (semantic chunking)
+        use_contextual_embeddings: Enable contextual description generation (semantic only)
 
     Returns:
         ChunkingService instance
@@ -1178,6 +1197,7 @@ def get_chunking_service(
             chunk_overlap=chunk_overlap,
             llm_model=llm_model,
             llm_provider=llm_provider,
+            use_contextual_embeddings=use_contextual_embeddings,
         )
     else:
         strategy = strategy_class(

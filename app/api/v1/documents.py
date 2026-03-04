@@ -39,7 +39,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def _process_document_background(document_id: UUID, detect_duplicates: bool = False):
+async def _process_document_background(
+    document_id: UUID,
+    detect_duplicates: bool = False,
+    contextual_description_enabled_override: Optional[bool] = None,
+):
     """
     Background task to process a document.
 
@@ -60,7 +64,10 @@ async def _process_document_background(document_id: UUID, detect_duplicates: boo
             processor = get_document_processor()
             logger.info("[BACKGROUND] Calling process_document()...")
             result = await processor.process_document(
-                document_id, db, detect_duplicates=detect_duplicates
+                document_id,
+                db,
+                detect_duplicates=detect_duplicates,
+                contextual_description_enabled_override=contextual_description_enabled_override,
             )
             logger.info(f"[BACKGROUND] Background processing completed: {result}")
 
@@ -96,6 +103,12 @@ async def create_document(
     file: UploadFile = File(...),
     knowledge_base_id: UUID = Form(...),
     detect_duplicates: bool = Form(False),
+    contextual_description_enabled: Optional[bool] = Form(
+        None,
+        description=(
+            "Optional per-request override for contextual description generation during ingestion"
+        ),
+    ),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: AsyncSession = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_current_user_id),
@@ -266,6 +279,7 @@ async def create_document(
         _process_document_background,
         document_id=doc_model.id,
         detect_duplicates=detect_duplicates,
+        contextual_description_enabled_override=contextual_description_enabled,
     )
     logger.info(f"[UPLOAD] Background task added successfully for document {doc_model.id}")
 
@@ -432,6 +446,12 @@ async def reprocess_document(
     detect_duplicates: bool = Query(
         False, description="Compute duplicate chunks after reprocessing"
     ),
+    contextual_description_enabled: Optional[bool] = Query(
+        None,
+        description=(
+            "Optional per-request override for contextual description generation during reprocessing"
+        ),
+    ),
     db: AsyncSession = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_current_user_id),
 ):
@@ -477,6 +497,7 @@ async def reprocess_document(
         _reprocess_document_background,
         document_id=doc_id,
         detect_duplicates=detect_duplicates,
+        contextual_description_enabled_override=contextual_description_enabled,
     )
 
     logger.info(f"Document {doc_id} queued for reprocessing")
@@ -484,7 +505,11 @@ async def reprocess_document(
     return doc
 
 
-async def _reprocess_document_background(document_id: UUID, detect_duplicates: bool = False):
+async def _reprocess_document_background(
+    document_id: UUID,
+    detect_duplicates: bool = False,
+    contextual_description_enabled_override: Optional[bool] = None,
+):
     """
     Background task to reprocess a document.
 
@@ -497,7 +522,10 @@ async def _reprocess_document_background(document_id: UUID, detect_duplicates: b
         async with AsyncSessionLocal() as db:
             processor = get_document_processor()
             result = await processor.reprocess_document(
-                document_id, db, detect_duplicates=detect_duplicates
+                document_id,
+                db,
+                detect_duplicates=detect_duplicates,
+                contextual_description_enabled_override=contextual_description_enabled_override,
             )
             logger.info(f"Background reprocessing completed: {result}")
 

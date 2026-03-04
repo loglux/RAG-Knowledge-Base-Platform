@@ -20,21 +20,40 @@ export function useDocuments(kbId: string) {
     }
   }, [kbId])
 
-  const uploadDocument = useCallback(async (file: File, detectDuplicates = false): Promise<Document> => {
-    const newDoc = await apiClient.uploadDocument(kbId, file, detectDuplicates)
-    setDocuments((prev) => [newDoc, ...prev])
-    return newDoc
-  }, [kbId])
+  const uploadDocument = useCallback(
+    async (
+      file: File,
+      detectDuplicates = false,
+      contextualDescriptionEnabled: boolean | null = null
+    ): Promise<Document> => {
+      const newDoc = await apiClient.uploadDocument(
+        kbId,
+        file,
+        detectDuplicates,
+        contextualDescriptionEnabled
+      )
+      setDocuments((prev) => [newDoc, ...prev])
+      return newDoc
+    },
+    [kbId]
+  )
 
   const deleteDocument = useCallback(async (id: string) => {
     await apiClient.deleteDocument(id)
     setDocuments((prev) => prev.filter((doc) => doc.id !== id))
   }, [])
 
-  const reprocessDocument = useCallback(async (id: string, detectDuplicates = false) => {
-    const updated = await apiClient.reprocessDocument(id, detectDuplicates)
-    setDocuments((prev) => prev.map((doc) => (doc.id === id ? updated : doc)))
-  }, [])
+  const reprocessDocument = useCallback(
+    async (id: string, detectDuplicates = false, contextualDescriptionEnabled: boolean | null = null) => {
+      const updated = await apiClient.reprocessDocument(
+        id,
+        detectDuplicates,
+        contextualDescriptionEnabled
+      )
+      setDocuments((prev) => prev.map((doc) => (doc.id === id ? updated : doc)))
+    },
+    []
+  )
 
   const updateDocumentStatus = useCallback((id: string, status: DocumentStatusResponse) => {
     setDocuments((prev) =>

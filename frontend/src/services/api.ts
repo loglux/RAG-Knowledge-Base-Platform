@@ -418,11 +418,19 @@ class APIClient {
     await this.client.delete(`/knowledge-bases/${id}/purge`)
   }
 
-  async reprocessKnowledgeBase(id: string, detectDuplicates = false): Promise<{ queued: number; knowledge_base_id: string }> {
+  async reprocessKnowledgeBase(
+    id: string,
+    detectDuplicates = false,
+    contextualDescriptionEnabled: boolean | null = null
+  ): Promise<{ queued: number; knowledge_base_id: string }> {
+    const params: Record<string, unknown> = { detect_duplicates: detectDuplicates }
+    if (contextualDescriptionEnabled !== null) {
+      params.contextual_description_enabled = contextualDescriptionEnabled
+    }
     const response = await this.client.post<{ queued: number; knowledge_base_id: string }>(
       `/knowledge-bases/${id}/reprocess`,
       null,
-      { params: { detect_duplicates: detectDuplicates } }
+      { params }
     )
     return response.data
   }
@@ -494,11 +502,19 @@ class APIClient {
     return response.data
   }
 
-  async uploadDocument(kbId: string, file: File, detectDuplicates = false): Promise<Document> {
+  async uploadDocument(
+    kbId: string,
+    file: File,
+    detectDuplicates = false,
+    contextualDescriptionEnabled: boolean | null = null
+  ): Promise<Document> {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('knowledge_base_id', kbId)
     formData.append('detect_duplicates', String(detectDuplicates))
+    if (contextualDescriptionEnabled !== null) {
+      formData.append('contextual_description_enabled', String(contextualDescriptionEnabled))
+    }
 
     const response = await this.client.post<Document>('/documents/', formData, {
       headers: {
@@ -508,9 +524,17 @@ class APIClient {
     return response.data
   }
 
-  async reprocessDocument(id: string, detectDuplicates = false): Promise<Document> {
+  async reprocessDocument(
+    id: string,
+    detectDuplicates = false,
+    contextualDescriptionEnabled: boolean | null = null
+  ): Promise<Document> {
+    const params: Record<string, unknown> = { detect_duplicates: detectDuplicates }
+    if (contextualDescriptionEnabled !== null) {
+      params.contextual_description_enabled = contextualDescriptionEnabled
+    }
     const response = await this.client.post<Document>(`/documents/${id}/reprocess`, null, {
-      params: { detect_duplicates: detectDuplicates },
+      params,
     })
     return response.data
   }

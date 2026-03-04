@@ -72,6 +72,7 @@ class DocumentProcessor:
         document_id: UUID,
         db: AsyncSession,
         detect_duplicates: bool = False,
+        contextual_description_enabled_override: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """
         Process a document through the complete ingestion pipeline.
@@ -130,6 +131,11 @@ class DocumentProcessor:
                 select(AppSettings).order_by(AppSettings.id).limit(1)
             )
             app_settings = settings_result.scalar_one_or_none()
+            contextual_description_enabled = self._resolve_contextual_description_enabled(
+                kb=kb,
+                app_settings=app_settings,
+                override=contextual_description_enabled_override,
+            )
 
             # 7. Create chunking service with KB-specific settings
             from app.services.chunking import get_chunking_service
@@ -146,6 +152,7 @@ class DocumentProcessor:
                 ),
                 llm_model=app_settings.llm_model if app_settings else None,
                 llm_provider=app_settings.llm_provider if app_settings else None,
+                use_contextual_embeddings=contextual_description_enabled,
             )
 
             # 8. Split document into chunks
@@ -337,6 +344,7 @@ class DocumentProcessor:
         document_id: UUID,
         db: AsyncSession,
         detect_duplicates: bool = False,
+        contextual_description_enabled_override: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """
         Reprocess an existing document.
@@ -417,7 +425,12 @@ class DocumentProcessor:
                     )
 
             # Process document
-            return await self.process_document(document_id, db, detect_duplicates=detect_duplicates)
+            return await self.process_document(
+                document_id,
+                db,
+                detect_duplicates=detect_duplicates,
+                contextual_description_enabled_override=contextual_description_enabled_override,
+            )
 
         except Exception as e:
             logger.error(f"Failed to reprocess document {document_id}: {e}")
@@ -626,6 +639,25 @@ class DocumentProcessor:
             payloads.append(payload)
 
         return payloads
+
+    @staticmethod
+    def _resolve_contextual_description_enabled(
+        *,
+        kb: KnowledgeBase,
+        app_settings: Optional[AppSettings],
+        override: Optional[bool],
+    ) -> bool:
+        """Resolve ingestion-time contextual description toggle.
+
+        Precedence: request override -> KB override -> app settings -> False.
+        """
+        if override is not None:
+            return bool(override)
+        if kb.contextual_description_enabled is not None:
+            return bool(kb.contextual_description_enabled)
+        if app_settings and app_settings.contextual_description_enabled is not None:
+            return bool(app_settings.contextual_description_enabled)
+        return False
 
     @staticmethod
     def _extract_md_heading_map(text: str) -> List[Dict[str, Any]]:

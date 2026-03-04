@@ -70,6 +70,7 @@ export function KBDetailsPage() {
     chunk_overlap: 200,
     upsert_batch_size: 256,
     chunking_strategy: 'smart' as 'simple' | 'smart' | 'semantic',
+    contextual_description_mode: 'default' as 'default' | 'enabled' | 'disabled',
   })
   const [settingsErrors, setSettingsErrors] = useState<Record<string, string>>({})
   const [settingsSaving, setSettingsSaving] = useState(false)
@@ -93,6 +94,9 @@ export function KBDetailsPage() {
   const [reindexMessage, setReindexMessage] = useState<string | null>(null)
   const [detectDuplicatesOnUpload, setDetectDuplicatesOnUpload] = useState(false)
   const [detectDuplicatesOnReindex, setDetectDuplicatesOnReindex] = useState(false)
+  const [contextualDescriptionRequestMode, setContextualDescriptionRequestMode] = useState<
+    'inherit' | 'enabled' | 'disabled'
+  >('inherit')
   const [regenTitlesLoading, setRegenTitlesLoading] = useState(false)
   const [regenTitlesMessage, setRegenTitlesMessage] = useState<string | null>(null)
   const [regenIncludeExisting, setRegenIncludeExisting] = useState(false)
@@ -136,6 +140,12 @@ export function KBDetailsPage() {
       chunk_overlap: kbData.chunk_overlap,
       upsert_batch_size: kbData.upsert_batch_size,
       chunking_strategy: kbData.chunking_strategy as 'simple' | 'smart' | 'semantic',
+      contextual_description_mode:
+        kbData.contextual_description_enabled == null
+          ? 'default'
+          : kbData.contextual_description_enabled
+          ? 'enabled'
+          : 'disabled',
     }
   }
 
@@ -412,6 +422,10 @@ export function KBDetailsPage() {
         chunk_overlap: settingsData.chunk_overlap,
         upsert_batch_size: settingsData.upsert_batch_size,
         chunking_strategy: settingsData.chunking_strategy,
+        contextual_description_enabled:
+          settingsData.contextual_description_mode === 'default'
+            ? null
+            : settingsData.contextual_description_mode === 'enabled',
       })
       setKb(updated)
       setIsEditingSettings(false)
@@ -443,7 +457,15 @@ export function KBDetailsPage() {
       setRegenTitlesMessage(null)
       setReindexing(true)
       setReindexMessage(null)
-      const result = await apiClient.reprocessKnowledgeBase(kb.id, detectDuplicatesOnReindex)
+      const contextualOverride =
+        contextualDescriptionRequestMode === 'inherit'
+          ? null
+          : contextualDescriptionRequestMode === 'enabled'
+      const result = await apiClient.reprocessKnowledgeBase(
+        kb.id,
+        detectDuplicatesOnReindex,
+        contextualOverride
+      )
       setReindexMessage(`Queued ${result.queued} documents for reprocessing.`)
     } catch (error) {
       setReindexMessage(error instanceof Error ? error.message : 'Failed to reprocess documents')
@@ -492,7 +514,15 @@ export function KBDetailsPage() {
     try {
       setReindexing(true)
       setReindexMessage(null)
-      const result = await apiClient.reprocessKnowledgeBase(kb.id, detectDuplicatesOnReindex)
+      const contextualOverride =
+        contextualDescriptionRequestMode === 'inherit'
+          ? null
+          : contextualDescriptionRequestMode === 'enabled'
+      const result = await apiClient.reprocessKnowledgeBase(
+        kb.id,
+        detectDuplicatesOnReindex,
+        contextualOverride
+      )
       setReindexMessage(`Queued ${result.queued} documents for reprocessing with ${strategyLabel} strategy.`)
     } catch (error) {
       setReindexMessage(error instanceof Error ? error.message : 'Failed to reprocess documents')
@@ -538,9 +568,13 @@ export function KBDetailsPage() {
   }
 
   const handleUpload = async (files: File[]) => {
+    const contextualOverride =
+      contextualDescriptionRequestMode === 'inherit'
+        ? null
+        : contextualDescriptionRequestMode === 'enabled'
     for (const file of files) {
       try {
-        await uploadDocument(file, detectDuplicatesOnUpload)
+        await uploadDocument(file, detectDuplicatesOnUpload, contextualOverride)
       } catch (error) {
         console.error(`Failed to upload ${file.name}:`, error)
         throw error
@@ -742,6 +776,31 @@ export function KBDetailsPage() {
               />
               Compute duplicate chunks on upload
             </label>
+            <div className="mt-3">
+              <label className="block text-sm text-gray-400 mb-1">
+                Contextual description for upload/reprocess operations
+              </label>
+              <select
+                value={contextualDescriptionRequestMode}
+                onChange={(e) =>
+                  setContextualDescriptionRequestMode(
+                    e.target.value as 'inherit' | 'enabled' | 'disabled'
+                  )
+                }
+                className="w-full max-w-md bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm"
+              >
+                <option value="inherit">Inherit KB/global settings</option>
+                <option value="enabled">Force enabled for this operation</option>
+                <option value="disabled">Force disabled for this operation</option>
+              </select>
+              <p className="mt-1 text-xs text-gray-500">
+                Applies to uploads and reprocess/reindex actions from this tab.
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                Use <strong>Force enabled</strong> for one-time quality-focused reindex.
+                Use <strong>Force disabled</strong> for faster, lower-cost bulk operations.
+              </p>
+            </div>
             <p className="mt-2 text-sm text-gray-500">
               Reindex/reprocess actions on this tab rebuild both vector and BM25 indexes for existing documents.
               Use this after changing chunking settings or BM25 analyzer.
@@ -771,7 +830,15 @@ export function KBDetailsPage() {
                 <DocumentItem
                   key={doc.id}
                   document={doc}
-                  onReprocess={(docId) => reprocessDocument(docId, detectDuplicatesOnReindex)}
+                  onReprocess={(docId) =>
+                    reprocessDocument(
+                      docId,
+                      detectDuplicatesOnReindex,
+                      contextualDescriptionRequestMode === 'inherit'
+                        ? null
+                        : contextualDescriptionRequestMode === 'enabled'
+                    )
+                  }
                   onDelete={deleteDocument}
                   onRecomputeDuplicates={recomputeDocumentDuplicates}
                 />
@@ -1319,6 +1386,39 @@ export function KBDetailsPage() {
               )}
 
               <div>
+                <label htmlFor="kb-contextual-description-mode" className="block text-gray-400 mb-2">
+                  Contextual Description (Ingestion)
+                </label>
+                <select
+                  id="kb-contextual-description-mode"
+                  value={settingsData.contextual_description_mode}
+                  onChange={(e) =>
+                    setSettingsData({
+                      ...settingsData,
+                      contextual_description_mode: e.target.value as
+                        | 'default'
+                        | 'enabled'
+                        | 'disabled',
+                    })
+                  }
+                  className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100"
+                  disabled={settingsSaving}
+                >
+                  <option value="default">
+                    Inherit global default ({appDefaults?.contextual_description_enabled ? 'enabled' : 'disabled'})
+                  </option>
+                  <option value="enabled">Enabled for this KB</option>
+                  <option value="disabled">Disabled for this KB</option>
+                </select>
+                <p className="mt-2 text-sm text-gray-500">
+                  Controls LLM-generated contextual descriptions during upload/reprocess for this KB.
+                </p>
+                <p className="mt-1 text-xs text-gray-500">
+                  Enable for quality-focused KBs with long/complex documents; disable for fast or cost-sensitive ingestion.
+                </p>
+              </div>
+
+              <div>
                 <label htmlFor="kb-upsert-batch-size" className="block text-gray-400 mb-2">
                   Upsert Batch Size: <span className="text-white font-medium">{settingsData.upsert_batch_size}</span>
                 </label>
@@ -1382,6 +1482,16 @@ export function KBDetailsPage() {
               <div>
                 <span className="text-gray-400">Upsert Batch Size:</span>
                 <span className="text-white ml-2 font-medium">{kb.upsert_batch_size}</span>
+              </div>
+              <div>
+                <span className="text-gray-400">Contextual Description:</span>
+                <span className="text-white ml-2 font-medium">
+                  {kb.contextual_description_enabled == null
+                    ? `Inherit global (${appDefaults?.contextual_description_enabled ? 'enabled' : 'disabled'})`
+                    : kb.contextual_description_enabled
+                    ? 'Enabled'
+                    : 'Disabled'}
+                </span>
               </div>
               <div className="md:col-span-2">
                 <span className="text-gray-400">Chunking Strategy:</span>

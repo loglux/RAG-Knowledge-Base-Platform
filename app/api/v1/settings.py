@@ -79,6 +79,7 @@ def _default_app_settings() -> dict:
         "kb_chunk_overlap": 200,
         "kb_upsert_batch_size": 256,
         "use_llm_chat_titles": True,
+        "contextual_description_enabled": False,
         "show_prompt_versions": False,
     }
 
@@ -151,6 +152,7 @@ async def get_app_settings(db: AsyncSession = Depends(get_db)):
         active_prompt_version_id=row.active_prompt_version_id,
         active_self_check_prompt_version_id=row.active_self_check_prompt_version_id,
         show_prompt_versions=row.show_prompt_versions,
+        contextual_description_enabled=row.contextual_description_enabled,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -218,6 +220,7 @@ async def update_app_settings(
         active_prompt_version_id=row.active_prompt_version_id,
         active_self_check_prompt_version_id=row.active_self_check_prompt_version_id,
         show_prompt_versions=row.show_prompt_versions,
+        contextual_description_enabled=row.contextual_description_enabled,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -283,6 +286,7 @@ async def reset_app_settings(db: AsyncSession = Depends(get_db)):
         active_prompt_version_id=row.active_prompt_version_id,
         active_self_check_prompt_version_id=row.active_self_check_prompt_version_id,
         show_prompt_versions=row.show_prompt_versions,
+        contextual_description_enabled=row.contextual_description_enabled,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )

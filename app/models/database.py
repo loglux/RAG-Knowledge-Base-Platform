@@ -94,6 +94,11 @@ class KnowledgeBase(Base):
     use_self_check: Mapped[Optional[bool]] = mapped_column(
         Boolean, nullable=True, comment="KB-level self-check validation override"
     )
+    contextual_description_enabled: Mapped[Optional[bool]] = mapped_column(
+        Boolean,
+        nullable=True,
+        comment="KB-level toggle for contextual description generation during ingestion",
+    )
 
     # Statistics
     document_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -440,6 +445,11 @@ class AppSettings(Base):
     )
     show_prompt_versions: Mapped[Optional[bool]] = mapped_column(
         Boolean, nullable=True, comment="Whether to display prompt version in chat responses"
+    )
+    contextual_description_enabled: Mapped[Optional[bool]] = mapped_column(
+        Boolean,
+        nullable=True,
+        comment="Global default for contextual description generation during ingestion",
     )
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

@@ -16,6 +16,7 @@ export interface KnowledgeBase {
   llm_provider?: string | null
   temperature?: number | null
   use_self_check?: boolean | null
+  contextual_description_enabled?: boolean | null
   collection_name: string
   document_count: number
   total_chunks: number
@@ -45,6 +46,7 @@ export interface CreateKBRequest {
   llm_provider?: string | null
   temperature?: number | null
   use_self_check?: boolean | null
+  contextual_description_enabled?: boolean | null
 }
 
 export interface EmbeddingModel {
@@ -405,6 +407,7 @@ export interface AppSettings {
   active_prompt_version_id: string | null
   active_self_check_prompt_version_id: string | null
   show_prompt_versions: boolean | null
+  contextual_description_enabled: boolean | null
   created_at: string
   updated_at: string
 }
@@ -437,6 +440,7 @@ export interface AppSettingsUpdate {
   active_prompt_version_id?: string | null
   active_self_check_prompt_version_id?: string | null
   show_prompt_versions?: boolean | null
+  contextual_description_enabled?: boolean | null
 }
 
 export interface PromptVersionSummary {
