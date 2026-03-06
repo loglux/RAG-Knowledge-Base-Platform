@@ -82,6 +82,21 @@ def _format_sources(sources: List[Dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def _parse_document_ids(value: Any) -> Optional[List[str]]:
+    """Parse optional document_ids option into a normalized list of UUID strings."""
+    if value is None:
+        return None
+
+    values = value if isinstance(value, list) else [value]
+    parsed: List[str] = []
+    for item in values:
+        try:
+            parsed.append(str(UUID(str(item))))
+        except Exception:
+            continue
+    return parsed or None
+
+
 def build_mcp_app() -> FastMCP:
     mcp = FastMCP("RAG MCP Server")
 
@@ -111,7 +126,9 @@ def build_mcp_app() -> FastMCP:
             )
             app_settings = settings_result.scalar_one_or_none()
 
-            overrides = options or {}
+            options_payload = options or {}
+            overrides = dict(options_payload)
+            document_ids = _parse_document_ids(overrides.pop("document_ids", None))
             effective = resolve_retrieval_settings(
                 kb=kb, app_settings=app_settings, overrides=overrides
             )
@@ -144,7 +161,7 @@ def build_mcp_app() -> FastMCP:
                 rerank_min_score=effective.get("rerank_min_score"),
                 use_mmr=effective.get("use_mmr", False),
                 mmr_diversity=effective.get("mmr_diversity", 0.5),
-                document_ids=effective.get("document_ids"),
+                document_ids=document_ids,
                 context_expansion=effective.get("context_expansion"),
                 context_window=effective.get("context_window"),
                 db=db,
@@ -236,10 +253,17 @@ def build_mcp_app() -> FastMCP:
             )
             app_settings = settings_result.scalar_one_or_none()
 
-            overrides = options or {}
+            options_payload = options or {}
+            overrides = dict(options_payload)
+            document_ids = _parse_document_ids(overrides.pop("document_ids", None))
             effective = resolve_retrieval_settings(
                 kb=kb, app_settings=app_settings, overrides=overrides
             )
+            document_filter = None
+            if document_ids:
+                document_filter = {
+                    "document_id": document_ids if len(document_ids) > 1 else document_ids[0]
+                }
 
             retrieval_engine = get_retrieval_engine()
             mode = effective.get("retrieval_mode")
@@ -255,6 +279,7 @@ def build_mcp_app() -> FastMCP:
                     top_k=effective.get("top_k", 5),
                     lexical_top_k=effective.get("lexical_top_k"),
                     score_threshold=effective.get("score_threshold"),
+                    filters=document_filter,
                     dense_weight=effective.get("hybrid_dense_weight", 0.6),
                     lexical_weight=effective.get("hybrid_lexical_weight", 0.4),
                     bm25_match_mode=effective.get("bm25_match_mode"),
@@ -271,6 +296,7 @@ def build_mcp_app() -> FastMCP:
                     embedding_model=kb.embedding_model,
                     top_k=effective.get("top_k", 5),
                     score_threshold=effective.get("score_threshold"),
+                    filters=document_filter,
                     use_mmr=effective.get("use_mmr", False),
                     mmr_diversity=effective.get("mmr_diversity", 0.5),
                 )

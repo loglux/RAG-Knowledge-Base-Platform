@@ -94,6 +94,8 @@ If you need **retrieval without LLM generation** (for tools like MCP `search`/`r
 
 This returns chunks + assembled context **without** creating chat conversations or messages.
 
+`/api/v1/retrieve/` also supports optional `document_ids` filtering, so automation/MCP can limit retrieval to specific documents inside one KB.
+
 You can also set **KB-level retrieval defaults** (e.g., `top_k`, `retrieval_mode`, BM25 settings):
 
 - `GET /api/v1/knowledge-bases/{kb_id}/retrieval-settings`
@@ -218,9 +220,12 @@ curl -X POST http://localhost:8004/api/v1/retrieve/ \
   -d '{
     "query": "What is this document about?",
     "knowledge_base_id": "your-kb-id",
-    "top_k": 5
+    "top_k": 5,
+    "document_ids": ["doc-uuid-1", "doc-uuid-2"]
   }'
 ```
+
+MCP tools (`rag_query`, `retrieve_chunks`) support the same filter via `options.document_ids` (UUID or UUID list).
 
 Pagination note: list endpoints accept `page` and `page_size` (default 10, max 100).
 
