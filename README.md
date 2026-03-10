@@ -428,8 +428,6 @@ Query: *"Tell me about rounding methods"*
 
 When you first enable hybrid search on an existing KB, use **Reindex for BM25** to populate the lexical index.
 
-![Chat settings](chat_settings.png)
-
 ## KB settings (UI)
 
 KB‑level configuration (chunk size/overlap, batch size, chunking strategy, and enrichment toggles) is set per KB and affects only new or reprocessed documents.
