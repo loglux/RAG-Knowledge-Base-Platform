@@ -19,6 +19,8 @@ Knowledge Base Platform is a production-ready RAG backend with a clean API and a
 
 It can be used as a standalone service or integrated into other products via its API (plugin-style: you bring the data, it provides retrieval, citations, and answers).
 
+![Create knowledge base UI](docs/assets/screenshots/create-kb.png)
+
 ## Why it is useful
 
 - **High-signal retrieval**: Vector search with Qdrant and configurable chunking.
@@ -85,6 +87,8 @@ Vectorization turns unstructured text into numeric vectors that capture meaning,
 The system performs **semantic retrieval**: it embeds the user query, finds the closest chunk vectors, and assembles them into a context window for the LLM. You can also enable **hybrid retrieval** (BM25 + vectors), which boosts exact keyword matches while preserving semantic recall. Because the answer is grounded in retrieved chunks, we can return **citations** (source snippets) alongside the response.
 
 For structured documents, an optional **Structure‑Aware Retrieval** step builds a TOC and section metadata. This enables section‑targeted queries (e.g., "show Question 2"), returning full, verbatim excerpts rather than a generic summary.
+
+![Chat answer with grounded source citations](docs/assets/screenshots/chat-sources.png)
 
 ### Retrieve-only (MCP-friendly)
 
@@ -335,6 +339,8 @@ The chat UI exposes retrieval controls to tune answer quality:
   - `rerank_candidate_pool` (how many retrieved chunks are sent to reranker)
   - `rerank_top_n` (how many chunks are kept after rerank)
   - `rerank_min_score` (drop low relevance rerank results)
+
+![Chat retrieval settings](docs/assets/screenshots/chat-settings-retrieval.png)
 
 ### Reranking behavior
 
