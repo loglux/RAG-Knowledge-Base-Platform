@@ -1,6 +1,6 @@
 import React from 'react'
 
-type ButtonVariant = 'primary' | 'secondary'
+type ButtonVariant = 'primary' | 'secondary' | 'inline-secondary'
 type ButtonSize = 'md' | 'sm' | 'xs' | 'xs-wide'
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -21,7 +21,11 @@ export function Button({
   className,
   ...rest
 }: ButtonProps) {
-  const baseClass = variant === 'primary' ? 'btn-primary' : 'btn-secondary'
+  const baseClass = variant === 'primary'
+    ? 'btn-primary'
+    : variant === 'inline-secondary'
+      ? 'btn-inline-secondary'
+      : 'btn-secondary'
   const sizeClass = sizeClassMap[size]
   const classes = [baseClass, sizeClass, className].filter(Boolean).join(' ')
 

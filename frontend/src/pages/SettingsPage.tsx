@@ -1011,18 +1011,20 @@ export function SettingsPage() {
         <div className="flex items-center justify-between mb-2">
           <h1 className="text-3xl font-bold text-white">Settings</h1>
           <div className="flex items-center gap-3">
-            <button
+            <Button
+              variant="inline-secondary"
+              className="text-sm"
               onClick={() => navigate('/')}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm"
             >
               ← Back to Dashboard
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="inline-secondary"
+              className="text-sm"
               onClick={handleLogout}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors text-sm"
             >
               Logout
-            </button>
+            </Button>
           </div>
         </div>
         <p className="text-gray-400">Configure system settings and defaults</p>
@@ -2846,20 +2848,20 @@ function AIProvidersTab(props: any) {
               value={openaiApiKey}
               onChange={(e) => setOpenaiApiKey(e.target.value)}
             />
-            <button
+            <Button
               type="button"
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              variant="inline-secondary"
               onClick={() => setShowOpenaiKey(!showOpenaiKey)}
             >
               {showOpenaiKey ? 'Hide' : 'Show'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              variant="inline-secondary"
               onClick={() => onTestProvider('openai', openaiApiKey)}
             >
               Test
-            </button>
+            </Button>
           </div>
           <div className="mt-1 flex items-center gap-2">
             <p className="text-xs text-gray-400">Used for embeddings and chat (GPT models)</p>
@@ -2877,20 +2879,20 @@ function AIProvidersTab(props: any) {
               value={voyageApiKey}
               onChange={(e) => setVoyageApiKey(e.target.value)}
             />
-            <button
+            <Button
               type="button"
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              variant="inline-secondary"
               onClick={() => setShowVoyageKey(!showVoyageKey)}
             >
               {showVoyageKey ? 'Hide' : 'Show'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              variant="inline-secondary"
               onClick={() => onTestProvider('voyage', voyageApiKey)}
             >
               Test
-            </button>
+            </Button>
           </div>
           <div className="mt-1 flex items-center gap-2">
             <p className="text-xs text-gray-400">Alternative embedding provider</p>
@@ -2908,20 +2910,20 @@ function AIProvidersTab(props: any) {
               value={anthropicApiKey}
               onChange={(e) => setAnthropicApiKey(e.target.value)}
             />
-            <button
+            <Button
               type="button"
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              variant="inline-secondary"
               onClick={() => setShowAnthropicKey(!showAnthropicKey)}
             >
               {showAnthropicKey ? 'Hide' : 'Show'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              variant="inline-secondary"
               onClick={() => onTestProvider('anthropic', anthropicApiKey)}
             >
               Test
-            </button>
+            </Button>
           </div>
           <div className="mt-1 flex items-center gap-2">
             <p className="text-xs text-gray-400">Used for Claude models</p>
@@ -2939,20 +2941,20 @@ function AIProvidersTab(props: any) {
               value={deepseekApiKey}
               onChange={(e) => setDeepseekApiKey(e.target.value)}
             />
-            <button
+            <Button
               type="button"
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              variant="inline-secondary"
               onClick={() => setShowDeepseekKey(!showDeepseekKey)}
             >
               {showDeepseekKey ? 'Hide' : 'Show'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              variant="inline-secondary"
               onClick={() => onTestProvider('deepseek', deepseekApiKey)}
             >
               Test
-            </button>
+            </Button>
           </div>
           <div className="mt-1 flex items-center gap-2">
             <p className="text-xs text-gray-400">Used for DeepSeek chat and reasoner models</p>
@@ -2976,13 +2978,13 @@ function AIProvidersTab(props: any) {
               value={ollamaBaseUrl}
               onChange={(e) => setOllamaBaseUrl(e.target.value)}
             />
-            <button
+            <Button
               type="button"
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              variant="inline-secondary"
               onClick={() => onTestProvider('ollama', undefined, ollamaBaseUrl)}
             >
               Test
-            </button>
+            </Button>
           </div>
           <div className="mt-1 flex items-center gap-2">
             <p className="text-xs text-gray-400">Ollama server URL (local or cloud-hosted)</p>
@@ -3414,13 +3416,13 @@ function DatabasesTab(props: any) {
               value={qdrantApiKey}
               onChange={(e) => setQdrantApiKey(e.target.value)}
             />
-            <button
+            <Button
               type="button"
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              variant="inline-secondary"
               onClick={() => setShowQdrantKey(!showQdrantKey)}
             >
               {showQdrantKey ? 'Hide' : 'Show'}
-            </button>
+            </Button>
           </div>
         </Field>
       </div>
@@ -3460,13 +3462,13 @@ function DatabasesTab(props: any) {
               value={opensearchPassword}
               onChange={(e) => setOpensearchPassword(e.target.value)}
             />
-            <button
+            <Button
               type="button"
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              variant="inline-secondary"
               onClick={() => setShowOpensearchPassword(!showOpensearchPassword)}
             >
               {showOpensearchPassword ? 'Hide' : 'Show'}
-            </button>
+            </Button>
           </div>
         </Field>
       </div>
