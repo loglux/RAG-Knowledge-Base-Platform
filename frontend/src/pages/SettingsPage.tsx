@@ -4,6 +4,10 @@ import { useAuth } from '../context/AuthContext'
 import { apiClient } from '../services/api'
 import { LLMSelector } from '../components/chat/LLMSelector'
 import { Button } from '../components/common/Button'
+import { Field } from '../components/common/Field'
+import { Input } from '../components/common/Input'
+import { Select } from '../components/common/Select'
+import { Textarea } from '../components/common/Textarea'
 import type {
   AppSettings,
   KnowledgeBase,
@@ -1595,41 +1599,34 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
           <span className="text-gray-200">Enable MCP endpoint</span>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">MCP Endpoint Path</label>
-          <input
+        <Field label="MCP Endpoint Path" hint="Changing this requires server restart">
+          <Input
             type="text"
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             value={mcpPath}
             onChange={(e) => setMcpPath(e.target.value)}
           />
-          <p className="text-xs text-gray-400 mt-1">Changing this requires server restart</p>
-        </div>
+        </Field>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">Public API Base URL</label>
-          <input
+        <Field
+          label="Public API Base URL"
+          hint="Used for OAuth metadata and endpoint display. Leave empty to rely on proxy URL."
+        >
+          <Input
             type="text"
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             placeholder="https://rag.example.com"
             value={mcpPublicBaseUrl}
             onChange={(e) => setMcpPublicBaseUrl(e.target.value)}
           />
-          <p className="text-xs text-gray-400 mt-1">
-            Used for OAuth metadata and endpoint display. Leave empty to rely on proxy URL.
-          </p>
-        </div>
+        </Field>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">Default KB ID (Optional)</label>
-          <input
+        <Field label="Default KB ID (Optional)">
+          <Input
             type="text"
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             placeholder="UUID"
             value={mcpDefaultKbId}
             onChange={(e) => setMcpDefaultKbId(e.target.value)}
           />
-        </div>
+        </Field>
 
         <div className="text-sm text-gray-300 space-y-1">
           {normalizedBaseUrl && (
@@ -1769,44 +1766,40 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Access TTL (minutes)</label>
-            <input
+          <Field label="Access TTL (minutes)">
+            <Input
               type="number"
               min={1}
-              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
               placeholder="e.g. 30"
               value={mcpAccessTokenTtlMinutes}
               onChange={(e) => setMcpAccessTokenTtlMinutes(e.target.value === '' ? '' : Number(e.target.value))}
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Refresh TTL (days)</label>
-            <input
+          </Field>
+          <Field label="Refresh TTL (days)">
+            <Input
               type="number"
               min={1}
-              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
               placeholder="e.g. 30"
               value={mcpRefreshTokenTtlDays}
               onChange={(e) => setMcpRefreshTokenTtlDays(e.target.value === '' ? '' : Number(e.target.value))}
             />
-          </div>
+          </Field>
         </div>
         <p className="text-xs text-gray-400">
           Applies to newly issued OAuth tokens. Save with <span className="text-gray-200">Save MCP Settings</span> above.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <input
+          <Input
             type="text"
-            className="px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            fullWidth={false}
             placeholder="Admin username"
             value={mcpOAuthUsername}
             onChange={(e) => setMcpOAuthUsername(e.target.value)}
           />
-          <input
+          <Input
             type="password"
-            className="px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            fullWidth={false}
             placeholder="Admin password"
             value={mcpOAuthPassword}
             onChange={(e) => setMcpOAuthPassword(e.target.value)}
@@ -1902,10 +1895,9 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
             <p className="text-sm text-gray-400">Last successful OAuth activity.</p>
           </div>
           <div className="flex flex-wrap gap-3 items-end">
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Filter</label>
-              <select
-                className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+            <Field label="Filter">
+              <Select
+                className="px-3"
                 value={mcpOAuthEventsFilter}
                 onChange={(e) => setMcpOAuthEventsFilter(e.target.value)}
               >
@@ -1913,12 +1905,11 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
                 <option value="authorize">authorize</option>
                 <option value="token">token</option>
                 <option value="refresh">refresh</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Limit</label>
-              <select
-                className="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+              </Select>
+            </Field>
+            <Field label="Limit">
+              <Select
+                className="px-3"
                 value={mcpOAuthEventsLimit}
                 onChange={(e) => setMcpOAuthEventsLimit(Number(e.target.value))}
               >
@@ -1926,8 +1917,8 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
                 <option value={20}>20</option>
                 <option value={50}>50</option>
                 <option value={100}>100</option>
-              </select>
-            </div>
+              </Select>
+            </Field>
             <Button variant="secondary" onClick={onRefreshOAuthEvents}>
               Refresh
             </Button>
@@ -2845,12 +2836,12 @@ function AIProvidersTab(props: any) {
       <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
         <h3 className="text-lg font-semibold text-gray-100 mb-4">Cloud AI Services</h3>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-300 mb-2">OpenAI API Key</label>
+        <Field className="mb-6" label="OpenAI API Key">
           <div className="flex gap-2">
-            <input
+            <Input
               type={showOpenaiKey ? 'text' : 'password'}
-              className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+              fullWidth={false}
+              className="flex-1"
               placeholder="sk-proj-..."
               value={openaiApiKey}
               onChange={(e) => setOpenaiApiKey(e.target.value)}
@@ -2874,14 +2865,14 @@ function AIProvidersTab(props: any) {
             <p className="text-xs text-gray-400">Used for embeddings and chat (GPT models)</p>
             {renderTestStatus('openai')}
           </div>
-        </div>
+        </Field>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-300 mb-2">VoyageAI API Key (Optional)</label>
+        <Field className="mb-6" label="VoyageAI API Key (Optional)">
           <div className="flex gap-2">
-            <input
+            <Input
               type={showVoyageKey ? 'text' : 'password'}
-              className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+              fullWidth={false}
+              className="flex-1"
               placeholder="pa-..."
               value={voyageApiKey}
               onChange={(e) => setVoyageApiKey(e.target.value)}
@@ -2905,14 +2896,14 @@ function AIProvidersTab(props: any) {
             <p className="text-xs text-gray-400">Alternative embedding provider</p>
             {renderTestStatus('voyage')}
           </div>
-        </div>
+        </Field>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-300 mb-2">Anthropic API Key (Optional)</label>
+        <Field className="mb-6" label="Anthropic API Key (Optional)">
           <div className="flex gap-2">
-            <input
+            <Input
               type={showAnthropicKey ? 'text' : 'password'}
-              className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+              fullWidth={false}
+              className="flex-1"
               placeholder="sk-ant-..."
               value={anthropicApiKey}
               onChange={(e) => setAnthropicApiKey(e.target.value)}
@@ -2936,14 +2927,14 @@ function AIProvidersTab(props: any) {
             <p className="text-xs text-gray-400">Used for Claude models</p>
             {renderTestStatus('anthropic')}
           </div>
-        </div>
+        </Field>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-300 mb-2">DeepSeek API Key (Optional)</label>
+        <Field className="mb-6" label="DeepSeek API Key (Optional)">
           <div className="flex gap-2">
-            <input
+            <Input
               type={showDeepseekKey ? 'text' : 'password'}
-              className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+              fullWidth={false}
+              className="flex-1"
               placeholder="sk-..."
               value={deepseekApiKey}
               onChange={(e) => setDeepseekApiKey(e.target.value)}
@@ -2967,7 +2958,7 @@ function AIProvidersTab(props: any) {
             <p className="text-xs text-gray-400">Used for DeepSeek chat and reasoner models</p>
             {renderTestStatus('deepseek')}
           </div>
-        </div>
+        </Field>
 
       </div>
 
@@ -2975,12 +2966,12 @@ function AIProvidersTab(props: any) {
       <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
         <h3 className="text-lg font-semibold text-gray-100 mb-4">Local / Self-Hosted LLM</h3>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-300 mb-2">Ollama API URL (Optional)</label>
+        <Field className="mb-6" label="Ollama API URL (Optional)">
           <div className="flex gap-2">
-            <input
+            <Input
               type="text"
-              className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+              fullWidth={false}
+              className="flex-1"
               placeholder="http://localhost:11434 or https://your-cloud-ollama.com"
               value={ollamaBaseUrl}
               onChange={(e) => setOllamaBaseUrl(e.target.value)}
@@ -2997,37 +2988,31 @@ function AIProvidersTab(props: any) {
             <p className="text-xs text-gray-400">Ollama server URL (local or cloud-hosted)</p>
             {renderTestStatus('ollama')}
           </div>
-        </div>
+        </Field>
       </div>
 
       {/* System Settings */}
       <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
         <h3 className="text-lg font-semibold text-gray-100 mb-4">System Settings</h3>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-300 mb-2">System Name</label>
-          <input
+        <Field className="mb-6" label="System Name" hint="Displayed in UI">
+          <Input
             type="text"
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             placeholder="Knowledge Base Platform"
             value={systemName}
             onChange={(e) => setSystemName(e.target.value)}
           />
-          <p className="text-xs text-gray-400 mt-1">Displayed in UI</p>
-        </div>
+        </Field>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-300 mb-2">Max File Size (MB)</label>
-          <input
+        <Field className="mb-6" label="Max File Size (MB)" hint="Maximum upload file size">
+          <Input
             type="number"
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             value={maxFileSizeMb}
             onChange={(e) => setMaxFileSizeMb(parseInt(e.target.value))}
             min="1"
             max="500"
           />
-          <p className="text-xs text-gray-400 mt-1">Maximum upload file size</p>
-        </div>
+        </Field>
       </div>
 
       <div className="flex justify-end">
@@ -3094,25 +3079,22 @@ function PromptsTab(props: any) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <h3 className="text-lg font-semibold text-gray-100 mb-4">Chat Prompt Version</h3>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
-            <input
+          <Field className="mb-4" label="Title">
+            <Input
               type="text"
-              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
               value={promptDraftName}
               onChange={(e) => setPromptDraftName(e.target.value)}
               placeholder="Auto-generated if empty (e.g., KB Chat Prompt — 2026-02-05 14:32 UTC)"
             />
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-300 mb-2">System Prompt</label>
-            <textarea
-              className="w-full min-h-[240px] px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+          </Field>
+          <Field className="mb-4" label="System Prompt">
+            <Textarea
+              className="min-h-[240px]"
               value={promptDraftSystemContent}
               onChange={(e) => setPromptDraftSystemContent(e.target.value)}
               placeholder="Enter the system prompt..."
             />
-          </div>
+          </Field>
           <p className="text-xs text-gray-400 mt-2">
             User template is fixed in code for safety and consistency.
           </p>
@@ -3234,25 +3216,22 @@ function PromptsTab(props: any) {
           <p className="text-xs text-gray-400 mb-4">
             Used only when self-check is enabled. It validates and can rewrite the draft answer.
           </p>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
-            <input
+          <Field className="mb-4" label="Title">
+            <Input
               type="text"
-              className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
               value={selfCheckPromptDraftName}
               onChange={(e) => setSelfCheckPromptDraftName(e.target.value)}
               placeholder="Auto-generated if empty (e.g., Self-Check Prompt — 2026-02-05 14:32 UTC)"
             />
-          </div>
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-300 mb-2">System Prompt</label>
-            <textarea
-              className="w-full min-h-[200px] px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+          </Field>
+          <Field className="mb-4" label="System Prompt">
+            <Textarea
+              className="min-h-[200px]"
               value={selfCheckPromptDraftSystemContent}
               onChange={(e) => setSelfCheckPromptDraftSystemContent(e.target.value)}
               placeholder="Enter the system prompt..."
             />
-          </div>
+          </Field>
           <p className="text-xs text-gray-400 mt-2">
             User template is fixed in code for safety and consistency.
           </p>
@@ -3414,26 +3393,23 @@ function DatabasesTab(props: any) {
       <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
         <h3 className="text-lg font-semibold text-gray-100 mb-4">Qdrant (Vector Database)</h3>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-300 mb-2">Qdrant URL</label>
-          <input
+        <Field className="mb-6" label="Qdrant URL" hint="Qdrant HTTP API URL">
+          <Input
             type="text"
             autoComplete="off"
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             placeholder="http://qdrant:6333"
             value={qdrantUrl}
             onChange={(e) => setQdrantUrl(e.target.value)}
           />
-          <p className="text-xs text-gray-400 mt-1">Qdrant HTTP API URL</p>
-        </div>
+        </Field>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-300 mb-2">Qdrant API Key (Optional)</label>
+        <Field className="mb-6" label="Qdrant API Key (Optional)">
           <div className="flex gap-2">
-            <input
+            <Input
               type={showQdrantKey ? 'text' : 'password'}
               autoComplete="off"
-              className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+              fullWidth={false}
+              className="flex-1"
               placeholder="Optional for local deployments"
               value={qdrantApiKey}
               onChange={(e) => setQdrantApiKey(e.target.value)}
@@ -3446,45 +3422,40 @@ function DatabasesTab(props: any) {
               {showQdrantKey ? 'Hide' : 'Show'}
             </button>
           </div>
-        </div>
+        </Field>
       </div>
 
       {/* OpenSearch */}
       <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
         <h3 className="text-lg font-semibold text-gray-100 mb-4">OpenSearch (Lexical Search)</h3>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-300 mb-2">OpenSearch URL</label>
-          <input
+        <Field className="mb-6" label="OpenSearch URL" hint="OpenSearch HTTP URL">
+          <Input
             type="text"
             autoComplete="off"
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             placeholder="http://opensearch:9200"
             value={opensearchUrl}
             onChange={(e) => setOpensearchUrl(e.target.value)}
           />
-          <p className="text-xs text-gray-400 mt-1">OpenSearch HTTP URL</p>
-        </div>
+        </Field>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-300 mb-2">Username (Optional)</label>
-          <input
+        <Field className="mb-6" label="Username (Optional)">
+          <Input
             type="text"
             autoComplete="off"
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             placeholder="admin"
             value={opensearchUsername}
             onChange={(e) => setOpensearchUsername(e.target.value)}
           />
-        </div>
+        </Field>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-300 mb-2">Password (Optional)</label>
+        <Field className="mb-6" label="Password (Optional)">
           <div className="flex gap-2">
-            <input
+            <Input
               type={showOpensearchPassword ? 'text' : 'password'}
               autoComplete="new-password"
-              className="flex-1 px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+              fullWidth={false}
+              className="flex-1"
               placeholder="••••••••"
               value={opensearchPassword}
               onChange={(e) => setOpensearchPassword(e.target.value)}
@@ -3497,7 +3468,7 @@ function DatabasesTab(props: any) {
               {showOpensearchPassword ? 'Hide' : 'Show'}
             </button>
           </div>
-        </div>
+        </Field>
       </div>
 
       <div className="flex justify-end">
@@ -3518,30 +3489,25 @@ function DatabasesTab(props: any) {
           Changing PostgreSQL password will recreate the connection pool automatically.
         </div>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-300 mb-2">Username</label>
-          <input
+        <Field className="mb-6" label="Username">
+          <Input
             type="text"
             autoComplete="off"
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             value={postgresUsername}
             onChange={(e) => setPostgresUsername(e.target.value)}
           />
-        </div>
+        </Field>
 
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-300 mb-2">New Password</label>
-          <input
+        <Field className="mb-6" label="New Password" hint="Minimum 8 characters">
+          <Input
             type="password"
             autoComplete="new-password"
-            className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
             placeholder="Enter new password (min 8 characters)"
             value={postgresNewPassword}
             onChange={(e) => setPostgresNewPassword(e.target.value)}
             minLength={8}
           />
-          <p className="text-xs text-gray-400 mt-1">Minimum 8 characters</p>
-        </div>
+        </Field>
 
         <div className="flex justify-end">
           <button
