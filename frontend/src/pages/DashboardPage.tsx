@@ -53,12 +53,14 @@ export function DashboardPage() {
       {/* Header */}
       <header className="bg-gray-800 border-b border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center space-x-3">
               <div className="text-2xl">🧠</div>
-              <h1 className="text-2xl font-bold text-white">Knowledge Base Platform</h1>
+              <h1 className="min-w-0 text-xl font-bold text-white sm:text-2xl break-words">
+                Knowledge Base Platform
+              </h1>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4">
               <Button
                 onClick={() => navigate('/settings')}
                 size="sm"
@@ -75,7 +77,7 @@ export function DashboardPage() {
                 <span aria-hidden="true">⎋</span>
                 <span>Logout</span>
               </Button>
-              <div className="text-sm text-gray-400">
+              <div className="w-full text-sm text-gray-400 sm:w-auto">
                 {loading ? 'Loading...' : `${total} knowledge base${total !== 1 ? 's' : ''}`}
               </div>
             </div>
@@ -109,15 +111,15 @@ export function DashboardPage() {
         </div>
 
         {/* Title and Create Button */}
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-xl font-semibold text-white">
+        <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-xl font-semibold text-white break-words">
             {activeTab === 'trash' ? 'Deleted Knowledge Bases' : 'Your Knowledge Bases'}
           </h2>
           {activeTab === 'active' && (
             <Button
               onClick={() => setIsCreateModalOpen(true)}
               variant="primary"
-              className="flex items-center space-x-2"
+              className="flex items-center justify-center space-x-2 self-start sm:self-auto"
             >
               <span>+</span>
               <span>New KB</span>

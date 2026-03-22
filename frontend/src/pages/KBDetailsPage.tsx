@@ -1518,7 +1518,7 @@ export function KBDetailsPage() {
               </div>
               <div>
                 <span className="text-gray-400">Collection:</span>
-                <span className="text-white ml-2 font-mono text-sm">{kb.collection_name}</span>
+                <span className="text-white ml-2 min-w-0 break-all font-mono text-sm">{kb.collection_name}</span>
               </div>
             </div>
           ) : null}

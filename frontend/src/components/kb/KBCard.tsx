@@ -44,9 +44,9 @@ export function KBCard({ kb, onDelete }: KBCardProps) {
   }
 
   return (
-    <div className="card hover:shadow-xl transition-all hover:scale-105">
+    <div className="card min-w-0 overflow-hidden hover:shadow-xl transition-all hover:scale-105">
       <div className="flex items-start justify-between mb-3">
-        <h3 className="text-lg font-semibold text-white flex-1">{kb.name}</h3>
+        <h3 className="text-lg font-semibold text-white flex-1 break-words min-w-0">{kb.name}</h3>
       </div>
 
       {kb.description && (
@@ -55,10 +55,10 @@ export function KBCard({ kb, onDelete }: KBCardProps) {
 
       {/* Embedding Model Badge */}
       <div className="mb-4">
-        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md border text-xs ${getProviderBadgeColor(kb.embedding_provider)}`}>
+        <div className={`inline-flex max-w-full flex-wrap items-center gap-2 px-3 py-1.5 rounded-md border text-xs ${getProviderBadgeColor(kb.embedding_provider)}`}>
           <span className="font-medium">{kb.embedding_provider.toUpperCase()}</span>
           <span className="opacity-60">•</span>
-          <span className="opacity-90">{kb.embedding_model}</span>
+          <span className="max-w-full break-all opacity-90">{kb.embedding_model}</span>
           <span className="opacity-60">•</span>
           <span className="opacity-75">{kb.embedding_dimension}d</span>
         </div>
@@ -79,18 +79,18 @@ export function KBCard({ kb, onDelete }: KBCardProps) {
         </div>
       </div>
 
-      <div className="pt-4 border-t border-gray-700 flex space-x-2">
+      <div className="pt-4 border-t border-gray-700 flex flex-wrap gap-2">
         <Button
           variant="primary"
           size="sm"
-          className="flex-1"
+          className="min-w-0 flex-1"
           onClick={handleChatClick}
         >
           💬 Chat
         </Button>
         <Button
           size="sm"
-          className="flex-1"
+          className="min-w-0 flex-1"
           onClick={handleDocumentsClick}
         >
           📄 Documents

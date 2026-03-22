@@ -824,24 +824,33 @@ export function ChatPage() {
       {/* Header */}
       <header ref={headerRef} className="sticky top-0 z-30 bg-gray-800/95 backdrop-blur border-b border-gray-700 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex min-w-0 items-start gap-3 sm:gap-4">
               <button
                 onClick={() => navigate(`/kb/${id}`)}
-                className="text-gray-400 hover:text-white transition-colors"
+                className="shrink-0 text-gray-400 hover:text-white transition-colors text-sm sm:text-base"
                 aria-label="Go back"
               >
                 ← Back
               </button>
-              <div>
-                <h1 className="text-2xl font-bold text-white">💬 Chat with {kb.name}</h1>
-                <p className="text-sm text-gray-300 mt-1">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-base sm:text-2xl font-bold text-white leading-tight line-clamp-2 sm:line-clamp-none break-words">
+                  💬 Chat with {kb.name}
+                </h1>
+                <p className="mt-1 text-xs sm:text-sm text-gray-300 truncate">
                   {activeConversationTitle}
                 </p>
-                {kb.description && <p className="text-gray-400 text-sm mt-1">{kb.description}</p>}
+                {kb.description && (
+                  <p className="text-gray-400 text-xs sm:text-sm mt-1 line-clamp-2 sm:line-clamp-none">
+                    {kb.description}
+                  </p>
+                )}
               </div>
             </div>
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-wrap items-center justify-end gap-2 self-end text-xs text-gray-400 sm:self-auto sm:gap-3 sm:text-sm">
+              <span>{kb.document_count} documents</span>
+              <span className="hidden sm:inline">•</span>
+              <span>{kb.total_chunks} chunks</span>
               <Button onClick={handleLogout} size="sm">
                 Logout
               </Button>
@@ -853,12 +862,6 @@ export function ChatPage() {
                 ⚙️
               </button>
             </div>
-          </div>
-
-          <div className="flex items-center space-x-6 mt-4 text-sm text-gray-400">
-            <span>{kb.document_count} documents</span>
-            <span>•</span>
-            <span>{kb.total_chunks} chunks</span>
           </div>
         </div>
       </header>

@@ -37,8 +37,8 @@ export function ChatInput({ onSend, disabled = false }: ChatInputProps) {
   }, [input])
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-end space-x-3">
-      <div className="flex-1">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
+      <div className="min-w-0 flex-1">
         <textarea
           ref={textareaRef}
           value={input}
@@ -47,7 +47,7 @@ export function ChatInput({ onSend, disabled = false }: ChatInputProps) {
           placeholder="Ask a question... (Shift+Enter for new line)"
           disabled={disabled}
           rows={1}
-          className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 resize-none focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 resize-none text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ maxHeight: '200px' }}
         />
       </div>
@@ -55,7 +55,7 @@ export function ChatInput({ onSend, disabled = false }: ChatInputProps) {
         type="submit"
         variant="primary"
         disabled={disabled || !input.trim()}
-        className="px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full px-4 py-3 sm:w-auto sm:px-6 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Send
       </Button>
