@@ -1,13 +1,22 @@
-import React, { useEffect, useState } from 'react'
+import React, { Suspense, lazy, useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Outlet, Navigate } from 'react-router-dom'
-import { DashboardPage } from './pages/DashboardPage'
-import { KBDetailsPage } from './pages/KBDetailsPage'
-import { ChatPage } from './pages/ChatPage'
-import { SettingsPage } from './pages/SettingsPage'
-import Setup from './pages/Setup'
 import { getSetupStatus } from './api/setup'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import { LoginPage } from './pages/LoginPage'
+
+const DashboardPage = lazy(() => import('./pages/DashboardPage').then((module) => ({ default: module.DashboardPage })))
+const KBDetailsPage = lazy(() => import('./pages/KBDetailsPage').then((module) => ({ default: module.KBDetailsPage })))
+const ChatPage = lazy(() => import('./pages/ChatPage').then((module) => ({ default: module.ChatPage })))
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })))
+const Setup = lazy(() => import('./pages/Setup'))
+const LoginPage = lazy(() => import('./pages/LoginPage').then((module) => ({ default: module.LoginPage })))
+
+function FullScreenLoading() {
+  return (
+    <div className="flex items-center justify-center h-screen text-lg text-gray-500">
+      Loading...
+    </div>
+  )
+}
 
 function SetupRedirect({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
@@ -15,18 +24,15 @@ function SetupRedirect({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true)
 
   useEffect(() => {
-    // Don't check if already on setup page
     if (location.pathname === '/setup') {
       setChecking(false)
       return
     }
 
-    // Check setup status
     const checkSetup = async () => {
       try {
         const status = await getSetupStatus()
         if (status.needs_setup) {
-          // Redirect to setup if not complete
           navigate('/setup')
         }
       } catch (error) {
@@ -39,20 +45,8 @@ function SetupRedirect({ children }: { children: React.ReactNode }) {
     checkSetup()
   }, [navigate, location.pathname])
 
-  // Show loading while checking
   if (checking) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        fontSize: '18px',
-        color: '#666'
-      }}>
-        Loading...
-      </div>
-    )
+    return <FullScreenLoading />
   }
 
   return <>{children}</>
@@ -63,16 +57,18 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <SetupRedirect>
-          <Routes>
-            <Route path="/setup" element={<Setup />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route element={<ProtectedRoute />}>
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/kb/:id" element={<KBDetailsPage />} />
-              <Route path="/kb/:id/chat" element={<ChatPage />} />
-            </Route>
-          </Routes>
+          <Suspense fallback={<FullScreenLoading />}>
+            <Routes>
+              <Route path="/setup" element={<Setup />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route element={<ProtectedRoute />}>
+                <Route path="/" element={<DashboardPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/kb/:id" element={<KBDetailsPage />} />
+                <Route path="/kb/:id/chat" element={<ChatPage />} />
+              </Route>
+            </Routes>
+          </Suspense>
         </SetupRedirect>
       </BrowserRouter>
     </AuthProvider>
@@ -86,18 +82,7 @@ function ProtectedRoute() {
   const location = useLocation()
 
   if (loading) {
-    return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        fontSize: '18px',
-        color: '#666'
-      }}>
-        Loading...
-      </div>
-    )
+    return <FullScreenLoading />
   }
 
   if (!user) {

@@ -43,6 +43,17 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('react-markdown') || id.includes('remark-gfm') || id.includes('remark-math') || id.includes('rehype-katex') || id.includes('/katex/')) {
+              return 'markdown-math'
+            }
+          },
+        },
+      },
+    },
     server: {
       port: 5174,
       host: '0.0.0.0', // Allow access from network
