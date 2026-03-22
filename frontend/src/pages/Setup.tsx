@@ -423,20 +423,18 @@ const Setup: React.FC = () => {
 
             <div className="form-group">
               <label>New Password</label>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div className="setup-inline-row">
                 <input
                   type="text"
-                  className="form-control"
+                  className="form-control setup-inline-grow"
                   placeholder="Enter password or generate one"
                   value={dbSecurityData.new_password}
                   onChange={(e) => setDbSecurityData({ ...dbSecurityData, new_password: e.target.value })}
-                  style={{ flex: 1 }}
                 />
                 <Button
-                  className="btn"
+                  className="btn setup-nowrap"
                   onClick={handleGeneratePassword}
                   disabled={loading}
-                  style={{ whiteSpace: 'nowrap' }}
                 >
                   {loading ? 'Generating...' : '🎲 Generate'}
                 </Button>
@@ -445,7 +443,7 @@ const Setup: React.FC = () => {
             </div>
 
             {generatedPassword && (
-              <div className="alert" style={{ background: '#e7f5ff', border: '1px solid #339af0', color: '#1864ab' }}>
+              <div className="alert alert-info">
                 <strong>Generated Password:</strong> {generatedPassword}
                 <br />
                 <small>Copy this password and save it securely!</small>
@@ -453,7 +451,7 @@ const Setup: React.FC = () => {
             )}
 
             {passwordChanged && (
-              <div className="alert" style={{ background: '#d3f9d8', border: '1px solid #51cf66', color: '#2b8a3e' }}>
+              <div className="alert alert-success">
                 <strong>✓ Password Changed Successfully!</strong>
                 <br />
                 <small>Update Docker secret (.env/secret) before restart.</small>
@@ -559,10 +557,10 @@ const Setup: React.FC = () => {
 
             <div className="form-group">
               <label>Ollama API URL (Optional)</label>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div className="setup-inline-row">
                 <input
                   type="text"
-                  className="form-control"
+                  className="form-control setup-inline-grow"
                   placeholder="http://192.168.1.100:11434"
                   value={apiKeysData.ollama_base_url}
                   onChange={(e) => {
@@ -570,29 +568,20 @@ const Setup: React.FC = () => {
                     setOllamaTestStatus('idle');
                     setOllamaTestMessage('');
                   }}
-                  style={{ flex: 1 }}
                 />
                 <Button
                   type="button"
-                  className="btn"
+                  className="btn setup-nowrap"
                   onClick={handleTestOllamaConnection}
                   disabled={!apiKeysData.ollama_base_url || ollamaTestStatus === 'testing'}
-                  style={{ whiteSpace: 'nowrap' }}
                 >
                   {ollamaTestStatus === 'testing' ? 'Testing...' : 'Test Connection'}
                 </Button>
               </div>
               <small className="form-text">Local or cloud Ollama server (include port, e.g., :11434)</small>
               {ollamaTestMessage && (
-                <div style={{
-                  marginTop: '0.5rem',
-                  padding: '0.5rem',
-                  borderRadius: '4px',
-                  fontSize: '0.875rem',
-                  backgroundColor: ollamaTestStatus === 'success' ? '#d4edda' : ollamaTestStatus === 'error' ? '#f8d7da' : '#d1ecf1',
-                  color: ollamaTestStatus === 'success' ? '#155724' : ollamaTestStatus === 'error' ? '#721c24' : '#0c5460',
-                  border: `1px solid ${ollamaTestStatus === 'success' ? '#c3e6cb' : ollamaTestStatus === 'error' ? '#f5c6cb' : '#bee5eb'}`
-                }}>
+                <div className={`setup-status-message ${ollamaTestStatus === 'success' ? 'setup-status-success' : ollamaTestStatus === 'error' ? 'setup-status-error' : 'setup-status-info'}`}>
+
                   {ollamaTestMessage}
                 </div>
               )}
@@ -858,15 +847,14 @@ const Setup: React.FC = () => {
 
       <div className="setup-content">
         <div className="setup-header">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <div className="setup-header-row">
             <div>
               <h1>Knowledge Base Platform</h1>
               <p className="setup-subtitle">Initial Setup Wizard</p>
             </div>
             <Button
-              className="btn"
+              className="btn setup-exit-button"
               onClick={() => navigate('/')}
-              style={{ alignSelf: 'flex-start' }}
             >
               ← Exit Setup
             </Button>
