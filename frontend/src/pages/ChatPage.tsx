@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import React, { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { apiClient } from '../services/api'
@@ -6,11 +6,12 @@ import { useChat } from '../hooks/useChat'
 import { MessageBubble } from '../components/chat/MessageBubble'
 import { SourceCard } from '../components/chat/SourceCard'
 import { ChatInput } from '../components/chat/ChatInput'
-import { ChatSettings } from '../components/chat/ChatSettings'
 import { ConversationList } from '../components/chat/ConversationList'
 import { Panel } from '../components/common/Panel'
 import { PanelHeader } from '../components/common/PanelHeader'
 import { Button } from '../components/common/Button'
+
+const ChatSettings = lazy(() => import('../components/chat/ChatSettings').then((module) => ({ default: module.ChatSettings })))
 import type { KnowledgeBase, ConversationSettings, Document } from '../types/index'
 
 export function ChatPage() {
@@ -873,7 +874,8 @@ export function ChatPage() {
           style={{ top: headerHeight }}
         >
           <div className="max-h-[60vh] overflow-y-auto">
-            <ChatSettings
+            <Suspense fallback={<div className="p-4 text-sm text-gray-400">Loading settings...</div>}>
+              <ChatSettings
               topK={topK}
               temperature={temperature}
               maxContextChars={maxContextChars}
@@ -944,6 +946,7 @@ export function ChatPage() {
               onResetDefaults={handleResetDefaults}
               onClose={() => setShowSettings(false)}
             />
+            </Suspense>
           </div>
         </div>
       )}
