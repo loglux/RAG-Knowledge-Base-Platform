@@ -6,9 +6,8 @@ from datetime import datetime
 from typing import Optional
 
 import sqlalchemy as sa
-from sqlalchemy import Boolean, DateTime
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy import Enum as SQLEnum
-from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 

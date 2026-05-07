@@ -544,7 +544,7 @@ async def delete_knowledge_base(
     kb.is_deleted = True
     await db.commit()
 
-    logger.info(f"Marked KB as deleted")
+    logger.info("Marked KB as deleted")
 
     # 3. Delete Qdrant collection
     try:

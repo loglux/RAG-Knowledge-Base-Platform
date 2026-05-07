@@ -486,7 +486,7 @@ class SemanticChunking(ChunkingStrategy):
             return []
 
         # Lazy import to avoid circular dependencies
-        logger.info(f"[SemanticChunking] Initializing embeddings service...")
+        logger.info("[SemanticChunking] Initializing embeddings service...")
         if self.embeddings_service is None:
             from app.core.embeddings_factory import get_embedding_service
 
@@ -495,7 +495,7 @@ class SemanticChunking(ChunkingStrategy):
                 f"[SemanticChunking] Embeddings service initialized: {type(self.embeddings_service).__name__}"
             )
         else:
-            logger.info(f"[SemanticChunking] Using existing embeddings service")
+            logger.info("[SemanticChunking] Using existing embeddings service")
 
         logger.info(
             f"[SemanticChunking] Checking LLM client (use_contextual={self.use_contextual_embeddings})..."
@@ -540,7 +540,7 @@ class SemanticChunking(ChunkingStrategy):
         logger.info(f"[SemanticChunking] Starting semantic chunking of {len(text)} characters")
 
         # Run sync version - no async needed
-        logger.info(f"[SemanticChunking] Calling _split_sync()...")
+        logger.info("[SemanticChunking] Calling _split_sync()...")
         result = self._split_sync(text, metadata)
         logger.info(f"[SemanticChunking] _split_sync() completed, got {len(result)} chunks")
         return result
@@ -647,7 +647,7 @@ class SemanticChunking(ChunkingStrategy):
             self.nltk.data.path.insert(0, nltk_data_path)
 
         # Step 1: Split into sentences
-        logger.info(f"[SemanticChunking] Step 1: Splitting into sentences...")
+        logger.info("[SemanticChunking] Step 1: Splitting into sentences...")
         sentences = self._split_sentences(text)
         logger.info(f"[SemanticChunking] Step 1 complete: {len(sentences)} sentences")
 
@@ -670,19 +670,19 @@ class SemanticChunking(ChunkingStrategy):
         )
 
         # Step 3: Find semantic boundaries
-        logger.info(f"[SemanticChunking] Step 3: Finding semantic boundaries...")
+        logger.info("[SemanticChunking] Step 3: Finding semantic boundaries...")
         boundaries = self._find_boundaries(sentence_embeddings)
         logger.info(f"[SemanticChunking] Step 3 complete: found {len(boundaries)} boundaries")
 
         # Step 4: Group sentences into chunks
-        logger.info(f"[SemanticChunking] Step 4: Grouping sentences into chunks...")
+        logger.info("[SemanticChunking] Step 4: Grouping sentences into chunks...")
         initial_chunks = self._group_sentences(sentences, boundaries, text)
         logger.info(
             f"[SemanticChunking] Step 4 complete: created {len(initial_chunks)} initial chunks"
         )
 
         # Step 5: Balance chunks
-        logger.info(f"[SemanticChunking] Step 5: Balancing chunks...")
+        logger.info("[SemanticChunking] Step 5: Balancing chunks...")
         chunk_texts = [chunk["content"] for chunk in initial_chunks]
         chunk_embeddings = self._get_embeddings_sync(chunk_texts)
         logger.info(f"[SemanticChunking] Step 5a: embedded {len(chunk_embeddings)} chunks")
@@ -698,12 +698,12 @@ class SemanticChunking(ChunkingStrategy):
                 f"[SemanticChunking] Step 6: Adding contextual descriptions for {len(balanced_chunks)} chunks (sync)..."
             )
             balanced_chunks = self._add_contextual_descriptions_sync(balanced_chunks, text)
-            logger.info(f"[SemanticChunking] Step 6 complete: contextual descriptions added")
+            logger.info("[SemanticChunking] Step 6 complete: contextual descriptions added")
         else:
-            logger.info(f"[SemanticChunking] Step 6: Contextual embeddings disabled, skipping")
+            logger.info("[SemanticChunking] Step 6: Contextual embeddings disabled, skipping")
 
         # Step 7: Convert to Chunk objects
-        logger.info(f"[SemanticChunking] Step 7: Converting to Chunk objects...")
+        logger.info("[SemanticChunking] Step 7: Converting to Chunk objects...")
         chunks = self._to_chunk_objects(balanced_chunks, metadata)
 
         logger.info(
@@ -723,7 +723,7 @@ class SemanticChunking(ChunkingStrategy):
             self.nltk.data.path.insert(0, nltk_data_path)
 
         # Step 1: Split into sentences
-        logger.info(f"[SemanticChunking] Step 1: Splitting into sentences...")
+        logger.info("[SemanticChunking] Step 1: Splitting into sentences...")
         sentences = self._split_sentences(text)
         logger.info(f"[SemanticChunking] Step 1 complete: {len(sentences)} sentences")
         if len(sentences) <= 1:
@@ -746,19 +746,19 @@ class SemanticChunking(ChunkingStrategy):
         )
 
         # Step 3: Find semantic boundaries
-        logger.info(f"[SemanticChunking] Step 3: Finding semantic boundaries...")
+        logger.info("[SemanticChunking] Step 3: Finding semantic boundaries...")
         boundaries = self._find_boundaries(sentence_embeddings)
         logger.info(f"[SemanticChunking] Step 3 complete: found {len(boundaries)} boundaries")
 
         # Step 4: Group sentences into chunks
-        logger.info(f"[SemanticChunking] Step 4: Grouping sentences into chunks...")
+        logger.info("[SemanticChunking] Step 4: Grouping sentences into chunks...")
         initial_chunks = self._group_sentences(sentences, boundaries, text)
         logger.info(
             f"[SemanticChunking] Step 4 complete: created {len(initial_chunks)} initial chunks"
         )
 
         # Step 5: Balance chunks (merge small, split large)
-        logger.info(f"[SemanticChunking] Step 5: Balancing chunks...")
+        logger.info("[SemanticChunking] Step 5: Balancing chunks...")
         chunk_embeddings = await self._embed_chunks(initial_chunks)
         logger.info(f"[SemanticChunking] Step 5a: embedded {len(chunk_embeddings)} chunks")
         balanced_chunks = self._balance_chunks(initial_chunks, chunk_embeddings, text)
@@ -772,12 +772,12 @@ class SemanticChunking(ChunkingStrategy):
                 f"[SemanticChunking] Step 6: Adding contextual descriptions for {len(balanced_chunks)} chunks..."
             )
             balanced_chunks = await self._add_contextual_descriptions(balanced_chunks, text)
-            logger.info(f"[SemanticChunking] Step 6 complete: contextual descriptions added")
+            logger.info("[SemanticChunking] Step 6 complete: contextual descriptions added")
         else:
-            logger.info(f"[SemanticChunking] Step 6: Contextual embeddings disabled, skipping")
+            logger.info("[SemanticChunking] Step 6: Contextual embeddings disabled, skipping")
 
         # Step 7: Convert to Chunk objects
-        logger.info(f"[SemanticChunking] Step 7: Converting to Chunk objects...")
+        logger.info("[SemanticChunking] Step 7: Converting to Chunk objects...")
         chunks = self._to_chunk_objects(balanced_chunks, metadata)
 
         logger.info(

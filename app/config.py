@@ -295,11 +295,11 @@ class Settings(BaseSettings):
             if hasattr(self, key):
                 # Convert to appropriate type
                 field_type = self.__class__.model_fields[key].annotation
-                if field_type == int:
+                if field_type is int:
                     value = int(value)
-                elif field_type == float:
+                elif field_type is float:
                     value = float(value)
-                elif field_type == bool:
+                elif field_type is bool:
                     value = (
                         value.lower() in ("true", "1", "yes")
                         if isinstance(value, str)
