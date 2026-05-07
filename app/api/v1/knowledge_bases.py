@@ -2,7 +2,6 @@
 
 import json
 import logging
-from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
@@ -37,6 +36,7 @@ from app.services.retrieval_settings import (
     load_kb_retrieval_settings,
     resolve_retrieval_settings_scoped_with_explain,
 )
+from app.utils.time import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -481,7 +481,7 @@ async def regenerate_chat_titles(
             llm_model=llm_model,
             llm_provider=llm_provider,
         )
-        conversation.updated_at = datetime.utcnow()
+        conversation.updated_at = utcnow()
         updated += 1
 
     await db.commit()

@@ -9,37 +9,34 @@ from uuid import uuid4
 from jose import jwt
 
 from app.config import settings
+from app.utils.time import utcnow
 
 ACCESS_TOKEN_TYPE = "access"
 REFRESH_TOKEN_TYPE = "refresh"
 
 
-def _utcnow() -> datetime:
-    return datetime.utcnow()
-
-
 def create_access_token(admin_id: int, username: str, role: str) -> str:
-    expires = _utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    expires = utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {
         "sub": str(admin_id),
         "username": username,
         "role": role,
         "type": ACCESS_TOKEN_TYPE,
         "exp": expires,
-        "iat": _utcnow(),
+        "iat": utcnow(),
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
 def create_refresh_token(admin_id: int) -> tuple[str, str, datetime]:
     jti = str(uuid4())
-    expires = _utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    expires = utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     payload = {
         "sub": str(admin_id),
         "type": REFRESH_TOKEN_TYPE,
         "jti": jti,
         "exp": expires,
-        "iat": _utcnow(),
+        "iat": utcnow(),
     }
     token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return token, jti, expires

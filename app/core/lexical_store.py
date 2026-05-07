@@ -5,13 +5,13 @@ Provides BM25-based lexical search over chunk text.
 """
 
 import logging
-from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional
 
 from opensearchpy import AsyncOpenSearch, OpenSearchException
 from opensearchpy.helpers import async_bulk
 
 from app.config import settings
+from app.utils.time import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +157,7 @@ class OpenSearchStore:
                     "content": chunk["text"],
                     "char_count": chunk.get("char_count"),
                     "word_count": chunk.get("word_count"),
-                    "indexed_at": datetime.utcnow().isoformat(),
+                    "indexed_at": utcnow().isoformat(),
                 }
             )
 

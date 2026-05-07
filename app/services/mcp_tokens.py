@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models.database import MCPRefreshToken, MCPToken
+from app.utils.time import utcnow
 
 MCP_TOKEN_TYPE = "mcp"
 MCP_ACCESS_TOKEN_TYPE = "mcp_access"
@@ -33,7 +34,7 @@ async def create_mcp_token(
     expires_in_days: Optional[int] = None,
 ) -> tuple[MCPToken, str]:
     """Create a new MCP token and return (record, plaintext token)."""
-    now = datetime.utcnow()
+    now = utcnow()
     expires_at = None
     if expires_in_days and expires_in_days > 0:
         expires_at = now + timedelta(days=expires_in_days)
@@ -56,7 +57,7 @@ async def create_mcp_token(
         name=name,
         token_hash=token_hash,
         token_prefix=prefix,
-        created_at=datetime.utcnow(),
+        created_at=utcnow(),
         expires_at=expires_at,
     )
     db.add(record)
@@ -66,7 +67,7 @@ async def create_mcp_token(
 
 
 def _utcnow() -> datetime:
-    return datetime.utcnow()
+    return utcnow()
 
 
 def create_mcp_access_token(
@@ -121,7 +122,7 @@ async def revoke_mcp_token(db: AsyncSession, token_id: UUID) -> bool:
     if not token:
         return False
     if token.revoked_at is None:
-        token.revoked_at = datetime.utcnow()
+        token.revoked_at = utcnow()
         await db.commit()
     return True
 
@@ -152,9 +153,9 @@ async def verify_mcp_token(db: AsyncSession, token: str) -> Optional[MCPToken]:
         return None
     if record.revoked_at is not None:
         return None
-    if record.expires_at and record.expires_at <= datetime.utcnow():
+    if record.expires_at and record.expires_at <= utcnow():
         return None
-    record.last_used_at = datetime.utcnow()
+    record.last_used_at = utcnow()
     await db.commit()
     return record
 

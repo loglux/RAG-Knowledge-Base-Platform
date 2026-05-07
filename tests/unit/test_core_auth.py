@@ -15,6 +15,7 @@ from app.core.auth import (
     get_admin_id,
     is_token_type,
 )
+from app.utils.time import utcnow
 
 
 @pytest.fixture
@@ -66,7 +67,7 @@ class TestCreateRefreshToken:
         assert jti1 != jti2
 
     def test_expiration_matches_days_setting(self, auth_settings):
-        before = datetime.utcnow()
+        before = utcnow()
         _, _, expires = create_refresh_token(1)
         delta = expires - before
         # Allow a 1-minute slack on either side.

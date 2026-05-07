@@ -11,7 +11,6 @@ Handles the complete pipeline of document ingestion:
 
 import json
 import logging
-from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
@@ -28,6 +27,7 @@ from app.models.database import AppSettings, Document, KnowledgeBase
 from app.models.enums import DocumentStatus
 from app.services.chunking import Chunk, ChunkingService, get_chunking_service
 from app.services.duplicate_chunks import compute_duplicate_chunks_for_document, json_dumps
+from app.utils.time import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -283,7 +283,7 @@ class DocumentProcessor:
 
             # 12. Update document status to completed
             document.chunk_count = len(chunks)
-            document.processed_at = datetime.utcnow()
+            document.processed_at = utcnow()
             document.processing_stage = "Completed"
             document.progress_percentage = 100
             await self._update_document_status(document, DocumentStatus.COMPLETED, db)
@@ -612,7 +612,7 @@ class DocumentProcessor:
                 "filename": document.filename,
                 "file_type": document.file_type,
                 # Timestamps
-                "indexed_at": datetime.utcnow().isoformat(),
+                "indexed_at": utcnow().isoformat(),
             }
 
             # Merge chunk.metadata (e.g. contextual_description from SemanticChunking)

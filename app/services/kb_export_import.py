@@ -26,6 +26,7 @@ from app.models.database import Document as DocumentModel
 from app.models.database import KnowledgeBase as KnowledgeBaseModel
 from app.models.enums import ChunkingStrategy, DocumentStatus, FileType
 from app.models.schemas import KBExportInclude, KBImportOptions
+from app.utils.time import utcnow
 
 EXPORT_VERSION = "1.0"
 
@@ -90,14 +91,14 @@ async def export_kbs(
     if len(kbs) != len(kb_ids):
         raise KBExportImportError("One or more knowledge bases not found")
 
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = utcnow().strftime("%Y%m%d_%H%M%S")
     export_root = tempfile.mkdtemp(prefix="kb_export_")
     export_dir = os.path.join(export_root, f"kb_export_{timestamp}")
     os.makedirs(export_dir, exist_ok=True)
 
     metadata = {
         "export_version": EXPORT_VERSION,
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": utcnow().isoformat(),
         "kb_ids": [str(kb.id) for kb in kbs],
         "include": include.model_dump(),
         "source": {
@@ -363,7 +364,7 @@ async def export_chats_markdown(
     else:
         msg_rows = []
 
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = utcnow().strftime("%Y%m%d_%H%M%S")
     export_root = tempfile.mkdtemp(prefix="kb_chats_md_")
     export_dir = os.path.join(export_root, f"kb_chats_md_{timestamp}")
     os.makedirs(export_dir, exist_ok=True)
@@ -672,8 +673,8 @@ async def import_kbs(
                     title=convo.get("title"),
                     settings_json=convo.get("settings_json"),
                     user_id=None,
-                    created_at=_parse_dt(convo.get("created_at")) or datetime.utcnow(),
-                    updated_at=_parse_dt(convo.get("updated_at")) or datetime.utcnow(),
+                    created_at=_parse_dt(convo.get("created_at")) or utcnow(),
+                    updated_at=_parse_dt(convo.get("updated_at")) or utcnow(),
                     is_deleted=convo.get("is_deleted", False),
                 )
                 db.add(convo_model)
@@ -706,7 +707,7 @@ async def import_kbs(
                     use_self_check=msg.get("use_self_check"),
                     prompt_version_id=None,
                     message_index=msg.get("message_index", 0),
-                    created_at=_parse_dt(msg.get("created_at")) or datetime.utcnow(),
+                    created_at=_parse_dt(msg.get("created_at")) or utcnow(),
                 )
                 db.add(msg_model)
 

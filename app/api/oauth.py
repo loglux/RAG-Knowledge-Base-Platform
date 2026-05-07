@@ -4,7 +4,7 @@ import base64
 import hashlib
 import json
 import secrets
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -26,6 +26,7 @@ from app.services.mcp_tokens import (
     store_mcp_refresh_token,
     validate_mcp_refresh_token,
 )
+from app.utils.time import utcnow
 
 router = APIRouter(prefix="/oauth", tags=["oauth"])
 public_router = APIRouter(tags=["oauth"])
@@ -251,7 +252,7 @@ async def oauth_authorize(
         code_hash=_hash_code(code),
         code_challenge=code_challenge,
         code_challenge_method=code_challenge_method,
-        expires_at=datetime.utcnow() + timedelta(minutes=AUTH_CODE_TTL_MINUTES),
+        expires_at=utcnow() + timedelta(minutes=AUTH_CODE_TTL_MINUTES),
     )
     db.add(record)
     await db.commit()
@@ -404,7 +405,7 @@ async def _handle_oauth_token(
         record = result.scalar_one_or_none()
         if not record:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid code")
-        if record.used_at is not None or record.expires_at < datetime.utcnow():
+        if record.used_at is not None or record.expires_at < utcnow():
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Expired code")
         if record.client_id != client_id or record.redirect_uri != redirect_uri:
             raise HTTPException(
@@ -420,7 +421,7 @@ async def _handle_oauth_token(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid code verifier"
             )
 
-        record.used_at = datetime.utcnow()
+        record.used_at = utcnow()
         await db.commit()
 
         access_ttl = _parse_positive_int(

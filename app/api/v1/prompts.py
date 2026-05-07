@@ -1,6 +1,5 @@
 """Prompt version management endpoints."""
 
-from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
@@ -22,6 +21,7 @@ from app.models.schemas import (
     SelfCheckPromptVersionSummary,
 )
 from app.services.prompts import validate_system_prompt
+from app.utils.time import utcnow
 
 router = APIRouter()
 
@@ -91,7 +91,7 @@ async def create_prompt_version(
             detail="; ".join(errors),
         )
 
-    default_name = f"KB Chat Prompt — {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+    default_name = f"KB Chat Prompt — {utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
     prompt_name = payload.name.strip() if payload.name else default_name
     prompt = PromptVersionModel(
         name=prompt_name,
@@ -193,7 +193,7 @@ async def create_self_check_prompt_version(
             detail="; ".join(errors),
         )
 
-    default_name = f"Self-Check Prompt — {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+    default_name = f"Self-Check Prompt — {utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
     prompt_name = payload.name.strip() if payload.name else default_name
     prompt = SelfCheckPromptVersionModel(
         name=prompt_name,

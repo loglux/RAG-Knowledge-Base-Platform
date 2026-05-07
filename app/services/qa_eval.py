@@ -7,7 +7,6 @@ import json
 import logging
 import re
 from dataclasses import asdict, dataclass
-from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import delete, select
@@ -20,6 +19,7 @@ from app.models.database import (
     QASample,
 )
 from app.services.rag import RAGService
+from app.utils.time import utcnow
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+", re.IGNORECASE)
 NO_ANSWER_SENTINEL = "__NO_ANSWER__"
@@ -313,7 +313,7 @@ async def run_gold_evaluation_on_run(
     }
 
     run.status = "completed"
-    run.completed_at = datetime.utcnow()
+    run.completed_at = utcnow()
     run.metrics_json = json.dumps(metrics_summary)
 
     await db.flush()
@@ -343,7 +343,7 @@ async def create_gold_run(
         config_json=json.dumps(asdict(config)),
         sample_count=sample_count,
         processed_count=0,
-        started_at=datetime.utcnow(),
+        started_at=utcnow(),
     )
     db.add(run)
     await db.flush()

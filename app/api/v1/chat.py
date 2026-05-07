@@ -2,7 +2,6 @@
 
 import json
 import logging
-from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
@@ -38,6 +37,7 @@ from app.services.retrieval_settings import (
     resolve_retrieval_settings_scoped,
 )
 from app.services.settings_resolution import parse_uuid_list, resolve_scoped_value
+from app.utils.time import utcnow
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -452,7 +452,7 @@ async def chat_query(
         )
         db.add(assistant_message)
         await db.flush()
-        conversation.updated_at = datetime.utcnow()
+        conversation.updated_at = utcnow()
 
         if conversation.title is None:
             conversation.title = await build_conversation_title(
@@ -463,7 +463,7 @@ async def chat_query(
                 llm_model=request.llm_model,
                 llm_provider=request.llm_provider,
             )
-            conversation.updated_at = datetime.utcnow()
+            conversation.updated_at = utcnow()
 
         # 7. Convert to API response format
         sources = [
@@ -641,7 +641,7 @@ async def update_conversation_settings(
         )
 
     conversation.settings_json = payload.model_dump_json(exclude_none=True)
-    conversation.updated_at = datetime.utcnow()
+    conversation.updated_at = utcnow()
 
     return ConversationDetail(
         id=conversation.id,
@@ -675,7 +675,7 @@ async def update_conversation(
 
     title = payload.title.strip() if payload.title else None
     conversation.title = title if title else None
-    conversation.updated_at = datetime.utcnow()
+    conversation.updated_at = utcnow()
 
     settings = None
     if conversation.settings_json:
@@ -800,7 +800,7 @@ async def delete_conversation_message(
                 deleted_ids.add(adjacent_message.id)
 
     await db.execute(delete(ChatMessageModel).where(ChatMessageModel.id.in_(deleted_ids)))
-    conversation.updated_at = datetime.utcnow()
+    conversation.updated_at = utcnow()
 
     return ChatDeleteResponse(
         status="deleted",

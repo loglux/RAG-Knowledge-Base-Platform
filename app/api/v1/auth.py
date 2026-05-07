@@ -1,7 +1,5 @@
 """Authentication endpoints (JWT + refresh tokens)."""
 
-from datetime import datetime
-
 import bcrypt
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from sqlalchemy import select, update
@@ -20,6 +18,7 @@ from app.db.session import get_db
 from app.dependencies import get_current_admin_id
 from app.models.database import AdminRefreshToken, AdminUser
 from app.models.schemas import LoginRequest, MeResponse, TokenResponse
+from app.utils.time import utcnow
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -65,10 +64,10 @@ async def login(
             admin_user_id=admin.id,
             jti=jti,
             expires_at=expires_at,
-            created_at=datetime.utcnow(),
+            created_at=utcnow(),
         )
     )
-    admin.last_login = datetime.utcnow()
+    admin.last_login = utcnow()
     await db.commit()
 
     _set_refresh_cookie(response, refresh_token)
@@ -118,13 +117,13 @@ async def refresh(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token revoked"
         )
 
-    if token_row.expires_at < datetime.utcnow():
+    if token_row.expires_at < utcnow():
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token expired"
         )
 
     # Rotate refresh token
-    token_row.revoked_at = datetime.utcnow()
+    token_row.revoked_at = utcnow()
     access_token = None
     refresh_token_new, new_jti, expires_at = create_refresh_token(admin_id)
 
@@ -133,7 +132,7 @@ async def refresh(
             admin_user_id=admin_id,
             jti=new_jti,
             expires_at=expires_at,
-            created_at=datetime.utcnow(),
+            created_at=utcnow(),
         )
     )
 
@@ -171,7 +170,7 @@ async def logout(
                 await db.execute(
                     update(AdminRefreshToken)
                     .where(AdminRefreshToken.jti == jti)
-                    .values(revoked_at=datetime.utcnow())
+                    .values(revoked_at=utcnow())
                 )
                 await db.commit()
         except Exception:

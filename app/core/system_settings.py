@@ -3,7 +3,6 @@
 import base64
 import hashlib
 import logging
-from datetime import datetime
 from typing import Any, Dict, Optional
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -12,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.models.database import SystemSettings
+from app.utils.time import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +173,7 @@ class SystemSettingsManager:
             setting.description = description
             setting.is_encrypted = should_encrypt
             setting.updated_by = updated_by
-            setting.updated_at = datetime.utcnow()
+            setting.updated_at = utcnow()
         else:
             # Create new
             setting = SystemSettings(
@@ -183,8 +183,8 @@ class SystemSettingsManager:
                 description=description,
                 is_encrypted=should_encrypt,
                 updated_by=updated_by,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=utcnow(),
+                updated_at=utcnow(),
             )
             db.add(setting)
 

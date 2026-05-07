@@ -4,7 +4,6 @@ import logging
 import re
 import secrets
 import string
-from datetime import datetime
 from typing import Any, Dict, Optional
 
 import bcrypt
@@ -13,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.system_settings import SystemSettingsManager
 from app.models.database import AdminUser, SystemSettings
+from app.utils.time import utcnow
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ class SetupManager:
                 email=email,
                 role="admin",
                 is_active=True,
-                created_at=datetime.utcnow(),
+                created_at=utcnow(),
             )
 
             db.add(admin)
@@ -420,7 +420,7 @@ class SetupManager:
             await SystemSettingsManager.save_setting(
                 db=db,
                 key="setup_completed_at",
-                value=datetime.utcnow().isoformat(),
+                value=utcnow().isoformat(),
                 category="system",
                 description="Setup wizard completion timestamp",
                 is_encrypted=False,

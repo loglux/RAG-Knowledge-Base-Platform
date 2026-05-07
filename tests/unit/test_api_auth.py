@@ -14,6 +14,7 @@ from app.core.auth import REFRESH_TOKEN_TYPE, create_access_token, create_refres
 from app.db.session import get_db
 from app.dependencies import get_current_admin_id
 from app.main import app
+from app.utils.time import utcnow
 
 # ---------- Helpers ---------------------------------------------------------
 
@@ -39,7 +40,7 @@ def make_admin(
 
 def make_token_row(jti: str, *, revoked_at=None, expires_at=None):
     if expires_at is None:
-        expires_at = datetime.utcnow() + timedelta(days=7)
+        expires_at = utcnow() + timedelta(days=7)
     row = MagicMock()
     row.jti = jti
     row.revoked_at = revoked_at
@@ -227,7 +228,7 @@ class TestRefresh:
 
     async def test_revoked_token_returns_401(self, auth_settings, client):
         token, jti, _ = create_refresh_token(admin_id=1)
-        revoked = make_token_row(jti=jti, revoked_at=datetime.utcnow())
+        revoked = make_token_row(jti=jti, revoked_at=utcnow())
         install_db(make_db(revoked))
 
         resp = await client.post(
@@ -240,7 +241,7 @@ class TestRefresh:
 
     async def test_expired_token_row_returns_401(self, auth_settings, client):
         token, jti, _ = create_refresh_token(admin_id=1)
-        expired = make_token_row(jti=jti, expires_at=datetime.utcnow() - timedelta(seconds=1))
+        expired = make_token_row(jti=jti, expires_at=utcnow() - timedelta(seconds=1))
         install_db(make_db(expired))
 
         resp = await client.post(
