@@ -1,10 +1,13 @@
 """Application configuration using Pydantic Settings."""
 
+import logging
 from functools import lru_cache
 from typing import List, Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -198,8 +201,10 @@ class Settings(BaseSettings):
                     import json
 
                     return json.loads(v)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning(
+                        "Malformed JSON list env var, falling back to comma-split: %s", exc
+                    )
             return [item.strip() for item in v.split(",") if item.strip()]
         return v
 
@@ -360,8 +365,10 @@ async def load_settings_from_db() -> None:
                     from app.services.rag import close_rag_service
 
                     await close_rag_service()
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to close cached RAG service after settings reload: %s", exc
+                    )
 
                 import logging
 

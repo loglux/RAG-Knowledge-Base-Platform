@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import tarfile
@@ -27,6 +28,8 @@ from app.models.database import KnowledgeBase as KnowledgeBaseModel
 from app.models.enums import ChunkingStrategy, DocumentStatus, FileType
 from app.models.schemas import KBExportInclude, KBImportOptions
 from app.utils.time import utcnow
+
+logger = logging.getLogger(__name__)
 
 EXPORT_VERSION = "1.0"
 
@@ -318,8 +321,8 @@ async def export_kbs(
                 if scroll_id:
                     try:
                         await client.clear_scroll(scroll_id=scroll_id)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.debug("Failed to clear OpenSearch scroll: %s", exc)
 
     if include.uploads:
         uploads_src = os.path.join(os.getcwd(), "uploads")
@@ -400,7 +403,12 @@ async def export_chats_markdown(
                 if msg.sources_json:
                     try:
                         sources = json.loads(msg.sources_json)
-                    except Exception:
+                    except Exception as exc:
+                        logger.warning(
+                            "Malformed sources_json in message %s during MD export: %s",
+                            msg.id,
+                            exc,
+                        )
                         sources = []
                     if sources:
                         f.write("> Sources:\n")
@@ -694,7 +702,12 @@ async def import_kbs(
                             if old_doc_id in doc_id_map:
                                 source["document_id"] = doc_id_map[old_doc_id]
                         sources_json = json.dumps(sources, ensure_ascii=False)
-                    except Exception:
+                    except Exception as exc:
+                        logger.warning(
+                            "Failed to remap sources_json during import (msg=%s): %s",
+                            msg.get("id"),
+                            exc,
+                        )
                         sources_json = None
 
                 msg_model = ChatMessageModel(

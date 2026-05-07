@@ -1,6 +1,7 @@
 """Knowledge Base export/import endpoints (MVP)."""
 
 import json
+import logging
 import os
 from typing import Optional
 
@@ -26,6 +27,8 @@ from app.services.kb_export_import import (
     import_kbs,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/kb", tags=["kb-transfer"])
 
 
@@ -49,8 +52,8 @@ async def export_kb(
         try:
             if os.path.exists(path):
                 os.remove(path)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to remove temp archive %s: %s", path, exc)
 
     background_tasks.add_task(_cleanup, archive_path)
 
@@ -81,8 +84,8 @@ async def export_chats_md(
         try:
             if os.path.exists(path):
                 os.remove(path)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to remove temp archive %s: %s", path, exc)
 
     background_tasks.add_task(_cleanup, archive_path)
 

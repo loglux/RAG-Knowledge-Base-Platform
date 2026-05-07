@@ -1,5 +1,7 @@
 """Authentication endpoints (JWT + refresh tokens)."""
 
+import logging
+
 import bcrypt
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from sqlalchemy import select, update
@@ -19,6 +21,8 @@ from app.dependencies import get_current_admin_id
 from app.models.database import AdminRefreshToken, AdminUser
 from app.models.schemas import LoginRequest, MeResponse, TokenResponse
 from app.utils.time import utcnow
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -173,8 +177,8 @@ async def logout(
                     .values(revoked_at=utcnow())
                 )
                 await db.commit()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("logout: ignoring invalid refresh token: %s", exc)
 
     _clear_refresh_cookie(response)
     return {"success": True}

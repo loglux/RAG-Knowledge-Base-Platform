@@ -3,6 +3,7 @@
 import base64
 import hashlib
 import json
+import logging
 import secrets
 from datetime import timedelta
 from typing import Optional
@@ -28,6 +29,8 @@ from app.services.mcp_tokens import (
 )
 from app.utils.time import utcnow
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/oauth", tags=["oauth"])
 public_router = APIRouter(tags=["oauth"])
 
@@ -52,7 +55,8 @@ def _parse_list_setting(raw: Optional[str]) -> list[str]:
     if raw.startswith("["):
         try:
             return [str(item).strip() for item in json.loads(raw) if str(item).strip()]
-        except Exception:
+        except Exception as exc:
+            logger.warning("Malformed JSON list setting, returning empty: %s", exc)
             return []
     return [item.strip() for item in raw.split(",") if item.strip()]
 
@@ -133,8 +137,8 @@ def _parse_positive_int(value: str | None, field_name: str) -> int:
         parsed = int(value)
         if parsed > 0:
             return parsed
-    except (TypeError, ValueError):
-        pass
+    except (TypeError, ValueError) as exc:
+        logger.debug("Failed to parse %s setting %r as int: %s", field_name, value, exc)
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid {field_name} setting"
     )

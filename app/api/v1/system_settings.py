@@ -39,7 +39,8 @@ def _coerce_list(value: Optional[str]) -> Optional[list[str]]:
 
             try:
                 return json.loads(value)
-            except Exception:
+            except Exception as exc:
+                logger.warning("Malformed JSON list setting, returning empty: %s", exc)
                 return []
         return [item.strip() for item in value.split(",") if item.strip()]
     return None
@@ -556,8 +557,8 @@ async def update_system_settings(
             from app.services.rag import close_rag_service
 
             await close_rag_service()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Failed to close cached RAG service after settings update: %s", exc)
 
         if mcp_updated:
             try:

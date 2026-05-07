@@ -153,7 +153,12 @@ async def chat_query(
                 loaded = json.loads(conversation.settings_json)
                 if isinstance(loaded, dict):
                     conversation_settings_payload = loaded
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "Malformed settings_json in conversation %s: %s",
+                    conversation.id,
+                    exc,
+                )
                 conversation_settings_payload = {}
 
         request_payload = request.model_dump(exclude_unset=True, exclude_none=True)
@@ -370,7 +375,12 @@ async def chat_query(
             if conversation.settings_json:
                 try:
                     existing_settings = json.loads(conversation.settings_json)
-                except Exception:
+                except Exception as exc:
+                    logger.warning(
+                        "Malformed settings_json in conversation %s: %s",
+                        conversation.id,
+                        exc,
+                    )
                     existing_settings = {}
             existing_settings.update(
                 {
@@ -607,7 +617,12 @@ async def get_conversation(
     if conversation.settings_json:
         try:
             settings = ConversationSettings(**json.loads(conversation.settings_json))
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                "Malformed settings_json in conversation %s: %s",
+                conversation.id,
+                exc,
+            )
             settings = None
 
     return ConversationDetail(
@@ -681,7 +696,12 @@ async def update_conversation(
     if conversation.settings_json:
         try:
             settings = ConversationSettings(**json.loads(conversation.settings_json))
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                "Malformed settings_json in conversation %s: %s",
+                conversation.id,
+                exc,
+            )
             settings = None
 
     return ConversationDetail(
@@ -728,7 +748,12 @@ async def get_conversation_messages(
             try:
                 raw_sources = json.loads(msg.sources_json)
                 sources = [SourceChunk(**source) for source in raw_sources]
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "Malformed sources_json in message %s: %s",
+                    msg.id,
+                    exc,
+                )
                 sources = None
         response_messages.append(
             ChatMessageResponse(

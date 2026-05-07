@@ -129,8 +129,8 @@ class FB2FileHandler(FileHandler):
         """
         try:
             return ElementTree.fromstring(content)
-        except ElementTree.ParseError:
-            pass
+        except ElementTree.ParseError as exc:
+            logger.debug("FB2 strict parse failed, falling back to lxml recovery: %s", exc)
         try:
             from lxml import etree
 
@@ -141,7 +141,8 @@ class FB2FileHandler(FileHandler):
             # Convert lxml tree to stdlib ElementTree via serialization
             reparsed = ElementTree.fromstring(etree.tostring(root_lxml))
             return reparsed
-        except Exception:
+        except Exception as exc:
+            logger.debug("FB2 lxml recovery parse failed: %s", exc)
             return None
 
     @staticmethod
@@ -356,8 +357,10 @@ class DocxFileHandler(FileHandler):
                     level = int(style_name.split(" ")[1])
                     if 1 <= level <= 6:
                         headings.append({"pos": current_pos, "level": level, "text": text.strip()})
-                except (ValueError, IndexError):
-                    pass
+                except (ValueError, IndexError) as exc:
+                    logger.debug(
+                        "Skipped DOCX heading with unparseable style '%s': %s", style_name, exc
+                    )
 
             # Each kept paragraph contributes len(text) + 2 chars ("\n\n" separator)
             current_pos += len(text) + 2
@@ -594,8 +597,8 @@ class PDFFileHandler(FileHandler):
                         table_rects.append(tr)
                         md = self._rows_to_markdown(rows)
                         table_items.append((tab.bbox[1], md))
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("PDF table extraction failed on a page: %s", exc)
 
             # ── 2. Extract text blocks, skipping table regions ────────────
             text_items: List = []  # (y0, text)
@@ -677,7 +680,8 @@ class PDFFileHandler(FileHandler):
                                 first_line_total,
                             )
                         )
-            except Exception:
+            except Exception as exc:
+                logger.warning("PDF block parsing failed, falling back to plain text: %s", exc)
                 fallback = page.get_text("text")
                 if fallback.strip():
                     text_items.append((0.0, fallback))
@@ -788,7 +792,8 @@ class PDFFileHandler(FileHandler):
 
         try:
             doc = fitz.open(stream=self._to_bytes(content), filetype="pdf")
-        except Exception:
+        except Exception as exc:
+            logger.warning("Failed to open PDF for metadata extraction: %s", exc)
             return {"file_type": "pdf", "filename": filename}
 
         meta = doc.metadata or {}

@@ -1,5 +1,6 @@
 """Helpers for generating chat titles."""
 
+import logging
 from typing import Optional
 from uuid import UUID
 
@@ -10,6 +11,8 @@ from app.core.llm_base import Message
 from app.core.llm_factory import create_llm_service
 from app.models.database import AppSettings as AppSettingsModel
 from app.models.database import KnowledgeBase as KnowledgeBaseModel
+
+logger = logging.getLogger(__name__)
 
 
 def clean_title(title: str) -> str:
@@ -95,6 +98,6 @@ async def build_conversation_title(
             title = await generate_title(question, answer, llm_model, llm_provider)
             if title:
                 return title
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("LLM title generation failed, using fallback: %s", exc)
     return fallback_title(question)
