@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { AxiosInstance, AxiosError } from 'axios'
+import type { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios'
 import type { APIError } from '../types/index'
 import type {
   KnowledgeBase,
@@ -49,12 +49,15 @@ const ACCESS_TOKEN_KEY = 'kb_access_token'
 const REFRESH_LOCK_KEY = 'kb_refresh_lock'
 const REFRESH_CHANNEL_NAME = 'kb_auth_channel'
 const REFRESH_LOCK_TTL_MS = 15000
+const AUTH_FAILURE_MESSAGE = 'Authentication required'
+export const AUTH_FAILURE_EVENT = 'kb-auth-failure'
 
 class APIClient {
   private client: AxiosInstance
   private refreshPromise: Promise<boolean> | null = null
   private oauthClient: AxiosInstance
   private refreshChannel: BroadcastChannel | null = null
+  private authFailureInProgress = false
 
   constructor() {
     const baseURL = import.meta.env.VITE_API_BASE_URL || ''
@@ -82,11 +85,16 @@ class APIClient {
         const data = event.data || {}
         if (data.type === 'refresh_token' && typeof data.token === 'string') {
           this.setAccessToken(data.token)
+          this.authFailureInProgress = false
         }
       })
     }
 
     this.client.interceptors.request.use((config) => {
+      if (this.shouldShortCircuitRequest(config)) {
+        return Promise.reject(new Error(AUTH_FAILURE_MESSAGE))
+      }
+
       const token = this.getAccessToken()
       if (token) {
         config.headers = config.headers || {}
@@ -99,20 +107,29 @@ class APIClient {
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError<APIError>) => {
-        const originalRequest = error.config as any
+        const originalRequest = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined
         const status = error.response?.status
 
         if (status === 401 && !originalRequest?._retry && !originalRequest?.url?.includes('/auth/')) {
-          originalRequest._retry = true
+          if (this.authFailureInProgress) {
+            throw new Error(AUTH_FAILURE_MESSAGE)
+          }
+
+          if (originalRequest) {
+            originalRequest._retry = true
+          }
+
           try {
             const refreshed = await this.refreshToken()
-            if (refreshed) {
+            if (refreshed && originalRequest) {
               return this.client(originalRequest)
             }
           } catch {
             this.handleAuthFailure()
           }
+
           this.handleAuthFailure()
+          throw new Error(AUTH_FAILURE_MESSAGE)
         }
 
         if (error.response?.data) {
@@ -121,6 +138,14 @@ class APIClient {
         throw error
       }
     )
+  }
+
+  private isAuthRequest(config?: Pick<InternalAxiosRequestConfig, 'url'> | null): boolean {
+    return Boolean(config?.url?.includes('/auth/'))
+  }
+
+  private shouldShortCircuitRequest(config: InternalAxiosRequestConfig): boolean {
+    return this.authFailureInProgress && !this.isAuthRequest(config)
   }
 
   private getAccessToken(): string | null {
@@ -134,6 +159,7 @@ class APIClient {
   private setAccessToken(token: string) {
     try {
       localStorage.setItem(ACCESS_TOKEN_KEY, token)
+      this.authFailureInProgress = false
     } catch {
       // ignore
     }
@@ -215,11 +241,18 @@ class APIClient {
   }
 
   private handleAuthFailure() {
+    if (this.authFailureInProgress) {
+      return
+    }
+
+    this.authFailureInProgress = true
     this.clearAccessToken()
+
     if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event(AUTH_FAILURE_EVENT))
       const path = window.location?.pathname || ''
       if (!path.startsWith('/login')) {
-        window.location.href = '/login'
+        window.location.replace('/login')
       }
     }
   }
@@ -232,6 +265,10 @@ class APIClient {
   }
 
   async refreshToken(): Promise<boolean> {
+    if (this.authFailureInProgress) {
+      return false
+    }
+
     if (this.refreshPromise) {
       return this.refreshPromise
     }
@@ -269,6 +306,7 @@ class APIClient {
     try {
       await this.client.post('/auth/logout')
     } finally {
+      this.authFailureInProgress = false
       this.clearAccessToken()
     }
   }
