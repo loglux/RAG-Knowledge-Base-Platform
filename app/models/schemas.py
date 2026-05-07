@@ -1,6 +1,6 @@
 """Pydantic schemas for API request/response validation."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -274,7 +274,7 @@ class HealthCheck(BaseModel):
     """Schema for health check response."""
 
     status: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class ReadinessCheck(BaseModel):
@@ -282,7 +282,7 @@ class ReadinessCheck(BaseModel):
 
     ready: bool
     checks: dict
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 # ============================================================================

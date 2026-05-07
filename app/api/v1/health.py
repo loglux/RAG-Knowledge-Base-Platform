@@ -1,7 +1,7 @@
 """Health check endpoints."""
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
 
 import httpx
@@ -125,7 +125,7 @@ async def health_check():
 
     Returns OK if the service is running.
     """
-    return HealthCheck(status="ok", timestamp=datetime.utcnow())
+    return HealthCheck(status="ok", timestamp=datetime.now(UTC))
 
 
 @router.get("/ready", response_model=ReadinessCheck)
@@ -217,7 +217,7 @@ async def readiness_check(db: AsyncSession = Depends(get_db)):
 
     # System is ready if all checked services are healthy
     all_ready = all(checks.values())
-    return ReadinessCheck(ready=all_ready, checks=checks, timestamp=datetime.utcnow())
+    return ReadinessCheck(ready=all_ready, checks=checks, timestamp=datetime.now(UTC))
 
 
 @router.get("/info")
