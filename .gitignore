@@ -162,7 +162,6 @@ scripts/*
 !scripts/check.sh
 !scripts/check_mcp_smoke.sh
 !scripts/README.md
-tests/
 frontend/_local/
 screenshots/
 chat*.png
