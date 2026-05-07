@@ -17,6 +17,7 @@ API_PORT := 8004
         dev test test-unit test-integration coverage \
         lint format check \
         docker-up docker-down docker-logs docker-restart \
+        docker-build docker-rebuild docker-rebuild-nocache docker-ps \
         migrate migrate-create migrate-down \
         frontend-dev frontend-build frontend-lint frontend-test
 
@@ -77,6 +78,18 @@ docker-restart:  ## Restart the api container
 
 docker-logs:  ## Tail the api container logs
 	docker compose logs -f api
+
+docker-build:  ## Rebuild api + frontend images (uses cache)
+	docker compose build api frontend
+
+docker-rebuild: docker-build docker-up  ## Build and roll services to the new images
+
+docker-rebuild-nocache:  ## Full no-cache rebuild + roll (slow, use after deps changes)
+	docker compose build --no-cache api frontend
+	docker compose up -d
+
+docker-ps:  ## Show service status
+	docker compose ps
 
 # ---- Database -------------------------------------------------------------
 
