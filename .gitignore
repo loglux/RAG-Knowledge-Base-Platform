@@ -180,6 +180,12 @@ chat*.png
 /voyageai_key.txt
 /MobaXterm_NAS_20260125_195638.rtf
 
+# Root-level test artifacts (PDFs, screenshots, ebook samples, ad-hoc output)
+/[0-9][0-9].png
+/*.pdf
+/*.fb2
+/output/
+
 # Alembic
 alembic/versions/*.pyc
 
