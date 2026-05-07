@@ -1,45 +1,45 @@
 # Web Framework
-fastapi==0.129.0
-uvicorn[standard]==0.35.0
-python-multipart==0.0.22
+fastapi==0.136.1
+uvicorn[standard]==0.46.0
+python-multipart==0.0.27
 
 # Database - SQLAlchemy with async support
-sqlalchemy[asyncio]==2.0.46
+sqlalchemy[asyncio]==2.0.49
 asyncpg==0.31.0
 alembic==1.18.4
 
 # Security
 bcrypt==5.0.0
-python-jose[cryptography]==3.3.0
+python-jose[cryptography]==3.5.0
 
 # Pydantic for validation and settings
-pydantic==2.12.5
-pydantic-settings==2.13.0
+pydantic==2.13.4
+pydantic-settings==2.14.0
 
 # Vector Database
-qdrant-client==1.16.2
+qdrant-client==1.17.1
 opensearch-py==3.1.0
 
 # LLM & Embedding APIs
 openai>=2.0.0,<3.0
-anthropic>=0.39.0
+anthropic==0.39.0
 voyageai==0.2.3
 
 # LangChain for document processing
-langchain==1.2.10
+langchain==1.2.17
 langchain-community==0.4.1
-langchain-openai==1.1.9
+langchain-openai==1.2.1
 
 # Document processing utilities
 python-docx==1.2.0
-PyMuPDF==1.27.1
+PyMuPDF==1.27.2
 pymupdf4llm==0.0.17
 python-magic==0.4.27
 chardet==5.2.0
 aiofiles==25.1.0
 
 # Semantic chunking dependencies
-nltk==3.9.2
+nltk==3.9.4
 numpy==2.4.2
 scikit-learn==1.8.0
 
@@ -47,8 +47,8 @@ scikit-learn==1.8.0
 langdetect==1.0.9
 
 # Utilities
-python-dotenv==1.2.1
+python-dotenv==1.2.2
 tenacity==9.1.4
 httpx==0.28.1
-langchain-text-splitters==1.1.0
+langchain-text-splitters==1.1.2
 fastmcp==2.14.5
