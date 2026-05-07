@@ -353,8 +353,15 @@ class TestMe:
 
         resp = await client.get("/api/v1/auth/me")
 
-        # The endpoint raises HTTPException(404, "User not found") but app.main has
-        # a catch-all @app.exception_handler(404) that rewrites the detail to a
-        # generic "Endpoint not found". Asserting on status only — that handler is
-        # a separate concern.
         assert resp.status_code == 404
+        assert resp.json()["detail"] == "User not found"
+
+    async def test_unrouted_url_still_returns_generic_404(self, client):
+        # Sanity check: the global 404 handler keeps the helpful generic body
+        # for URLs that don't match any route.
+        resp = await client.get("/api/v1/this-route-does-not-exist")
+
+        assert resp.status_code == 404
+        body = resp.json()
+        assert body["detail"] == "Endpoint not found"
+        assert "suggestion" in body

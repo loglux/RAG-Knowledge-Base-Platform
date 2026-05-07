@@ -210,7 +210,18 @@ async def root():
 
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
-    """Custom 404 handler."""
+    """Custom 404 handler.
+
+    When a route matched (i.e. the 404 was raised by an endpoint via
+    HTTPException), respect the domain-specific `detail` so callers can
+    distinguish "user not found" from "wrong URL". Otherwise, fall back
+    to the helpful generic message that points to /docs.
+    """
+    if request.scope.get("route") is not None:
+        return JSONResponse(
+            status_code=404,
+            content={"detail": getattr(exc, "detail", "Not Found")},
+        )
     return JSONResponse(
         status_code=404,
         content={
