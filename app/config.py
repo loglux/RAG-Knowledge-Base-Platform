@@ -237,13 +237,6 @@ class Settings(BaseSettings):
         default="Knowledge Base Platform", description="System name displayed in UI"
     )
 
-    # Feature Flags
-    ENABLE_ASYNC_PROCESSING: bool = Field(
-        default=True, description="Enable async document processing"
-    )
-    ENABLE_CACHE: bool = Field(default=False, description="Enable caching (Redis required)")
-    ENABLE_METRICS: bool = Field(default=False, description="Enable Prometheus metrics")
-
     @field_validator("LOG_LEVEL")
     @classmethod
     def validate_log_level(cls, v: str) -> str:

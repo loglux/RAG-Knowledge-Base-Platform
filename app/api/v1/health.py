@@ -236,11 +236,6 @@ async def info():
     return {
         "version": "0.1.0",
         "environment": settings.ENVIRONMENT,
-        "features": {
-            "async_processing": settings.ENABLE_ASYNC_PROCESSING,
-            "cache": settings.ENABLE_CACHE,
-            "metrics": settings.ENABLE_METRICS,
-        },
         "integrations": {
             "opensearch_available": opensearch_available,
         },
