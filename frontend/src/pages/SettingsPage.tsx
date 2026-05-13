@@ -1122,7 +1122,6 @@ export function SettingsPage() {
           <QueryDefaultsTab
             llmModel={llmModel}
             setLlmModel={setLlmModel}
-            llmProvider={llmProvider}
             setLlmProvider={setLlmProvider}
             temperature={temperature}
             setTemperature={setTemperature}
@@ -1137,9 +1136,7 @@ export function SettingsPage() {
             lexicalTopK={lexicalTopK}
             setLexicalTopK={setLexicalTopK}
             hybridDenseWeight={hybridDenseWeight}
-            setHybridDenseWeight={setHybridDenseWeight}
             hybridLexicalWeight={hybridLexicalWeight}
-            setHybridLexicalWeight={setHybridLexicalWeight}
             linkHybridWeights={linkHybridWeights}
             setLinkHybridWeights={setLinkHybridWeights}
             handleDenseWeightChange={handleDenseWeightChange}
@@ -2197,7 +2194,6 @@ const KBTransferTab: React.FC<KBTransferTabProps> = ({
 type QueryDefaultsTabProps = {
   llmModel: string
   setLlmModel: (value: string) => void
-  llmProvider: string
   setLlmProvider: (value: string) => void
   temperature: number
   setTemperature: (value: number) => void
@@ -2260,7 +2256,7 @@ type QueryDefaultsTabProps = {
 
 function QueryDefaultsTab({
   llmModel, setLlmModel,
-  llmProvider, setLlmProvider,
+  setLlmProvider,
   temperature, setTemperature,
   topK, setTopK,
   maxContextChars, setMaxContextChars,
@@ -2314,7 +2310,6 @@ function QueryDefaultsTab({
           <label className="block text-sm font-medium text-gray-300 mb-2">Model & Provider</label>
           <LLMSelector
             value={llmModel}
-            provider={llmProvider}
             onChange={(model, provider) => {
               setLlmModel(model)
               setLlmProvider(provider)

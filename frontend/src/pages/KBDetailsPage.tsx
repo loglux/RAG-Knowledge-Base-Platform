@@ -114,17 +114,18 @@ export function KBDetailsPage() {
   }
 
   const buildSettingsData = (kbData: KnowledgeBase) => {
+    const mode: 'default' | 'enabled' | 'disabled' =
+      kbData.contextual_description_enabled == null
+        ? 'default'
+        : kbData.contextual_description_enabled
+        ? 'enabled'
+        : 'disabled'
     return {
       chunk_size: kbData.chunk_size,
       chunk_overlap: kbData.chunk_overlap,
       upsert_batch_size: kbData.upsert_batch_size,
       chunking_strategy: kbData.chunking_strategy as ChunkingStrategy,
-      contextual_description_mode:
-        kbData.contextual_description_enabled == null
-          ? 'default'
-          : kbData.contextual_description_enabled
-          ? 'enabled'
-          : 'disabled',
+      contextual_description_mode: mode,
     }
   }
 

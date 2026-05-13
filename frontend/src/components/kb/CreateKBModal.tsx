@@ -10,8 +10,15 @@ interface CreateKBModalProps {
   onSubmit: (data: CreateKBRequest) => Promise<void>
 }
 
+type CreateKBFormState = CreateKBRequest & {
+  chunk_size: number
+  chunk_overlap: number
+  upsert_batch_size: number
+  chunking_strategy: ChunkingStrategy
+}
+
 export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps) {
-  const [formData, setFormData] = useState<CreateKBRequest>({
+  const [formData, setFormData] = useState<CreateKBFormState>({
     name: '',
     description: '',
     embedding_model: 'text-embedding-3-large',

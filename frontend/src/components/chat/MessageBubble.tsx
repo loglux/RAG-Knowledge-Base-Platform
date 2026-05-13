@@ -136,15 +136,14 @@ export function MessageBubble({ message, onDelete, showPromptVersion, sourceAnch
                 [rehypeKatex, { strict: false, throwOnError: false }]
               ]}
               components={{
-                code: ({ inline, className, children, ...props }) => {
+                code: ({ className, children, ...props }) => {
+                  const isBlock = typeof className === 'string' && /\blanguage-/.test(className)
                   const childText = String(children).trim()
 
-                  // Check if this is a single-line path/command (likely should be inline)
-                  const isSingleLinePath = !inline && childText.split('\n').length === 1 &&
+                  const isSingleLinePath = isBlock && childText.split('\n').length === 1 &&
                     (childText.endsWith('/') || childText.length < 50)
 
                   if (isSingleLinePath) {
-                    // Render short paths as inline code instead of blocks
                     return (
                       <code className="bg-gray-900 px-2 py-1 rounded text-xs font-mono border border-gray-700 inline-block" {...props}>
                         {children}
@@ -152,7 +151,7 @@ export function MessageBubble({ message, onDelete, showPromptVersion, sourceAnch
                     )
                   }
 
-                  return !inline ? (
+                  return isBlock ? (
                     <pre className="bg-gray-900 rounded p-3 overflow-x-auto my-2 text-xs font-mono border border-gray-700">
                       <code className={className} {...props}>
                         {children}

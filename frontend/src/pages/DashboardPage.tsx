@@ -296,7 +296,9 @@ export function DashboardPage() {
       <CreateKBModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        onSubmit={createKnowledgeBase}
+        onSubmit={async (data) => {
+          await createKnowledgeBase(data)
+        }}
       />
     </div>
   )
