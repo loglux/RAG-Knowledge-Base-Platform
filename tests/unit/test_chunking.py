@@ -281,14 +281,6 @@ class TestGetChunkingService:
         service = get_chunking_service(chunk_size=200, chunk_overlap=20, strategy_name="smart")
         assert isinstance(service.strategy, RecursiveChunking)
 
-    def test_legacy_fixed_size_name(self):
-        service = get_chunking_service(chunk_size=200, chunk_overlap=20, strategy_name="fixed_size")
-        assert isinstance(service.strategy, FixedSizeChunking)
-
-    def test_legacy_paragraph_name(self):
-        service = get_chunking_service(chunk_size=200, chunk_overlap=20, strategy_name="paragraph")
-        assert isinstance(service.strategy, RecursiveChunking)
-
     def test_unknown_strategy_falls_back_to_fixed_size(self):
         service = get_chunking_service(
             chunk_size=200, chunk_overlap=20, strategy_name="unknown_xyz"

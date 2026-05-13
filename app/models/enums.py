@@ -15,14 +15,9 @@ class DocumentStatus(str, Enum):
 class ChunkingStrategy(str, Enum):
     """Text chunking strategy."""
 
-    # New naming scheme (preferred)
     SIMPLE = "simple"  # Fixed-size chunking (basic, fast)
     SMART = "smart"  # Recursive/paragraph-aware chunking (LangChain)
     SEMANTIC = "semantic"  # Semantic chunking with embeddings (future)
-
-    # Legacy naming (for backward compatibility with existing DB records)
-    FIXED_SIZE = "FIXED_SIZE"  # Old name for SIMPLE
-    PARAGRAPH = "PARAGRAPH"  # Old name for SMART
 
 
 class FileType(str, Enum):

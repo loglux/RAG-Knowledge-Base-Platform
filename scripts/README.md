@@ -123,34 +123,6 @@ Migrates development data to production environment.
 
 ---
 
-## 🔧 Maintenance
-
-### fix_enum_case.sh
-Checks and fixes enum case compatibility issues.
-
-```bash
-./scripts/fix_enum_case.sh
-```
-
-**What it does:**
-- Verifies enum values match Python code definitions
-- Adds missing lowercase chunking strategy values
-- Detects incorrect uppercase DocumentStatus/FileType enums
-- Provides remediation instructions
-
-**When to use:**
-- After fresh database creation
-- If encountering enum-related errors
-- Before data import/migration
-- For troubleshooting
-
-**Expected enum values:**
-- `documentstatus`: pending, processing, completed, failed (lowercase)
-- `filetype`: txt, md (lowercase)
-- `chunkingstrategy`: simple, smart, semantic (lowercase), FIXED_SIZE, PARAGRAPH (uppercase legacy)
-
----
-
 ## 📚 Data Setup Scripts
 
 ### setup-wiki.sh / setup-wiki-simple.sh
@@ -192,20 +164,6 @@ docker-compose -f docker-compose.production.yml down
 curl http://localhost:8004/api/v1/health/ready
 ```
 
-### Enum Compatibility Check
-```bash
-# Before data import
-./scripts/fix_enum_case.sh
-
-# If issues found, rebuild schema
-docker exec kb-platform-db-prod psql -U kb_user -d postgres \
-  --command "DROP DATABASE IF EXISTS knowledge_base"
-docker exec kb-platform-db-prod psql -U kb_user -d postgres \
-  --command "CREATE DATABASE knowledge_base OWNER kb_user"
-docker exec kb-platform-backend-prod alembic upgrade head
-./scripts/fix_enum_case.sh
-```
-
 ---
 
 ## ⚠️ Important Notes
@@ -231,15 +189,6 @@ docker exec kb-platform-backend-prod alembic upgrade head
 ---
 
 ## 🐛 Troubleshooting
-
-### "invalid input value for enum"
-```bash
-# Check enum values
-./scripts/fix_enum_case.sh
-
-# If uppercase values found, rebuild schema
-./scripts/migrate_dev_to_prod.sh
-```
 
 ### "relation does not exist"
 ```bash

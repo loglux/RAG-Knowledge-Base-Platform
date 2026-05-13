@@ -31,7 +31,7 @@ class KnowledgeBaseBase(BaseModel):
         default=200, ge=0, le=1000, description="Chunk overlap in characters"
     )
     chunking_strategy: ChunkingStrategy = Field(
-        default=ChunkingStrategy.FIXED_SIZE, description="Chunking strategy"
+        default=ChunkingStrategy.SMART, description="Chunking strategy"
     )
     upsert_batch_size: int = Field(
         default=256, ge=64, le=1024, description="Max vectors per upsert request"

@@ -149,7 +149,7 @@ def mock_kb_data() -> dict:
         "description": "A test knowledge base for unit tests",
         "chunk_size": 1000,
         "chunk_overlap": 200,
-        "chunking_strategy": ChunkingStrategy.FIXED_SIZE,
+        "chunking_strategy": ChunkingStrategy.SMART,
     }
 
 

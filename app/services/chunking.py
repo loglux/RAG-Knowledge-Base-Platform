@@ -1164,24 +1164,12 @@ def get_chunking_service(
     Raises:
         ValueError: If strategy_name is invalid
     """
-    # Import enum here to avoid circular dependency
     from app.models.enums import ChunkingStrategy as ChunkingStrategyEnum
 
-    # Map strategy names to classes
     strategy_map = {
-        "simple": FixedSizeChunking,
         ChunkingStrategyEnum.SIMPLE.value: FixedSizeChunking,
-        "smart": RecursiveChunking,
         ChunkingStrategyEnum.SMART.value: RecursiveChunking,
-        "semantic": SemanticChunking,
         ChunkingStrategyEnum.SEMANTIC.value: SemanticChunking,
-        # Legacy support (old enum values from DB)
-        "fixed_size": FixedSizeChunking,
-        "FIXED_SIZE": FixedSizeChunking,  # Old PostgreSQL enum value
-        ChunkingStrategyEnum.FIXED_SIZE.value: FixedSizeChunking,
-        "paragraph": RecursiveChunking,
-        "PARAGRAPH": RecursiveChunking,  # Old PostgreSQL enum value
-        ChunkingStrategyEnum.PARAGRAPH.value: RecursiveChunking,
     }
 
     strategy_class = strategy_map.get(strategy_name)
