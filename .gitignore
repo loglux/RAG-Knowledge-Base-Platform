@@ -201,6 +201,9 @@ check_documents.py
 secrets/
 uploads/
 
+# Database backups (pg_dump output)
+backups/
+
 # Private local agent/testing docs
 AGENTS.local.md
 TESTING.local.md
