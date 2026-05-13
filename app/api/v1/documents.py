@@ -165,36 +165,23 @@ async def create_document(
     heading_map_json: str | None = None
     page_map_json: str | None = None
     if file_type in (FileType.DOCX, FileType.FB2, FileType.PDF):
-        from app.utils.file_handlers import FileHandlerFactory, process_file
+        from app.utils.file_handlers import FileHandlerFactory
 
         type_label = file_type.value.upper()
+        handler = FileHandlerFactory.get_handler(file_type)
         try:
-            processed = process_file(content_bytes, filename, file_type)
-            content = processed["text"]
+            extracted = handler.extract_all(content_bytes, filename)
         except Exception as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Failed to parse {type_label}: {exc}",
             ) from exc
 
-        handler = FileHandlerFactory.get_handler(file_type)
-
-        # Extract heading map for structural metadata indexing
-        try:
-            headings = handler.extract_heading_map(content_bytes)
-            if headings:
-                heading_map_json = json.dumps(headings, ensure_ascii=False)
-        except Exception as exc:
-            logger.warning(f"Failed to extract {type_label} heading map for '{filename}': {exc}")
-
-        # Extract page map for PDF (char offset → page number)
-        if file_type == FileType.PDF:
-            try:
-                page_map = handler.extract_page_map(content_bytes)
-                if page_map:
-                    page_map_json = json.dumps(page_map)
-            except Exception as exc:
-                logger.warning(f"Failed to extract PDF page map for '{filename}': {exc}")
+        content = extracted.text
+        if extracted.headings:
+            heading_map_json = json.dumps(extracted.headings, ensure_ascii=False)
+        if extracted.page_map:
+            page_map_json = json.dumps(extracted.page_map)
     else:
         try:
             content = content_bytes.decode("utf-8")

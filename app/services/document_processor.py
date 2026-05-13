@@ -385,7 +385,6 @@ class DocumentProcessor:
                 import json as _json
                 from pathlib import Path
 
-                from app.models.enums import FileType
                 from app.utils.file_handlers import FileHandlerFactory
 
                 _file_path = Path(document.file_path)
@@ -394,29 +393,22 @@ class DocumentProcessor:
                     try:
                         file_bytes = _file_path.read_bytes()
                         handler = FileHandlerFactory.get_handler(document.file_type)
-                        # Re-extract full text content so fixes to extraction
-                        # logic (e.g. table detection) take effect on reprocess
                         try:
-                            new_content = handler.extract_text(file_bytes, {})
-                            if new_content and new_content.strip():
-                                document.content = new_content
-                                logger.info(f"Re-extracted content: {len(new_content)} chars")
-                        except Exception as exc:
-                            logger.warning(f"Failed to re-extract content: {exc}")
-                        try:
-                            headings = handler.extract_heading_map(file_bytes)
+                            extracted = handler.extract_all(file_bytes, document.filename or "")
+                            if extracted.text and extracted.text.strip():
+                                document.content = extracted.text
+                                logger.info(f"Re-extracted content: {len(extracted.text)} chars")
                             document.heading_map_json = (
-                                _json.dumps(headings, ensure_ascii=False) if headings else None
+                                _json.dumps(extracted.headings, ensure_ascii=False)
+                                if extracted.headings
+                                else None
                             )
+                            document.page_map_json = (
+                                _json.dumps(extracted.page_map) if extracted.page_map else None
+                            )
+                            await db.flush()
                         except Exception as exc:
-                            logger.warning(f"Failed to re-extract heading map: {exc}")
-                        if document.file_type == FileType.PDF:
-                            try:
-                                page_map = handler.extract_page_map(file_bytes)
-                                document.page_map_json = _json.dumps(page_map) if page_map else None
-                            except Exception as exc:
-                                logger.warning(f"Failed to re-extract page map: {exc}")
-                        await db.flush()
+                            logger.warning(f"Failed to re-extract document: {exc}")
                     except Exception as exc:
                         logger.warning(f"Failed to read file for re-extraction: {exc}")
                 else:

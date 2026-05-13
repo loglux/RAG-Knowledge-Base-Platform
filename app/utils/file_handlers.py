@@ -15,6 +15,27 @@ from app.utils.validators import sanitize_text_content
 logger = get_logger(__name__)
 
 
+@dataclass
+class ExtractResult:
+    """Result of one-shot file extraction.
+
+    Combines text, metadata, and (where applicable) structural maps so the
+    document can be parsed exactly once instead of separately per piece.
+
+    Attributes:
+        text: Sanitised full text of the document.
+        metadata: File-level metadata (filename, page_count, title, …).
+        headings: Optional list of {pos, level, text} entries.
+        page_map: Optional list of [char_offset, physical_page, logical_page]
+                  entries (PDF only).
+    """
+
+    text: str
+    metadata: Dict[str, Any]
+    headings: Optional[List[Dict[str, Any]]] = None
+    page_map: Optional[List[List[int]]] = None
+
+
 class FileHandler:
     """Base class for file handlers."""
 
@@ -29,6 +50,23 @@ class FileHandler:
     def extract_metadata(self, content: Union[str, bytes], filename: str) -> Dict[str, Any]:
         """Extract metadata from file."""
         raise NotImplementedError
+
+    def extract_all(self, content: Union[str, bytes], filename: str) -> ExtractResult:
+        """Extract text, metadata, and any structural data in a single logical pass.
+
+        Default implementation calls extract_metadata() and extract_text() separately.
+        Subclasses with expensive parsing (PDF, DOCX, FB2) override this so that
+        the underlying file is parsed exactly once per upload.
+        """
+        metadata = self.extract_metadata(content, filename)
+        text = self.extract_text(content, metadata)
+        headings: Optional[List[Dict[str, Any]]] = None
+        if hasattr(self, "extract_heading_map"):
+            try:
+                headings = self.extract_heading_map(content) or None
+            except Exception as exc:
+                logger.warning("Heading map extraction failed: %s", exc)
+        return ExtractResult(text=text, metadata=metadata, headings=headings)
 
 
 class TextFileHandler(FileHandler):
@@ -255,12 +293,16 @@ class FB2FileHandler(FileHandler):
         if isinstance(content, bytes):
             content = content.decode("utf-8", errors="replace")
         root = self._parse_xml(content)
+        return self._metadata_from_tree(root, filename, content)
+
+    @staticmethod
+    def _metadata_from_tree(root, filename: str, raw_content: str) -> Dict[str, Any]:
         if root is None:
             return {
                 "file_type": "fb2",
                 "filename": filename,
-                "char_count": len(content),
-                "word_count": len(content.split()),
+                "char_count": len(raw_content),
+                "word_count": len(raw_content.split()),
             }
 
         title = None
@@ -288,9 +330,47 @@ class FB2FileHandler(FileHandler):
             "filename": filename,
             "title": title,
             "author": author,
-            "char_count": len(content),
-            "word_count": len(content.split()),
+            "char_count": len(raw_content),
+            "word_count": len(raw_content.split()),
         }
+
+    def extract_all(self, content: Union[str, bytes], filename: str) -> ExtractResult:
+        """One-pass FB2 extraction: parse XML once, derive text + headings + metadata."""
+        if isinstance(content, bytes):
+            content = content.decode("utf-8", errors="replace")
+
+        root = self._parse_xml(content)
+        metadata = self._metadata_from_tree(root, filename, content)
+
+        if root is None:
+            return ExtractResult(text=sanitize_text_content(content), metadata=metadata)
+
+        all_segments: List[Dict[str, Any]] = []
+        for node in root.iter():
+            if node.tag.endswith("body"):
+                all_segments.extend(self._parse_body(node))
+
+        if not all_segments:
+            fallback = " ".join(t for t in root.itertext() if t.strip())
+            return ExtractResult(
+                text=sanitize_text_content(fallback),
+                metadata=metadata,
+            )
+
+        text = sanitize_text_content("\n\n".join(seg["text"] for seg in all_segments))
+
+        headings: List[Dict[str, Any]] = []
+        current_pos = 0
+        for seg in all_segments:
+            if seg["is_heading"] and 1 <= seg["level"] <= 6:
+                headings.append({"pos": current_pos, "level": seg["level"], "text": seg["text"]})
+            current_pos += len(seg["text"]) + 2
+
+        return ExtractResult(
+            text=text,
+            metadata=metadata,
+            headings=headings if headings else None,
+        )
 
 
 class DocxFileHandler(FileHandler):
@@ -343,6 +423,10 @@ class DocxFileHandler(FileHandler):
         sorted by position.
         """
         doc = self._load_document(content)
+        return self._extract_headings_from_doc(doc)
+
+    @staticmethod
+    def _extract_headings_from_doc(doc: DocxDocument) -> List[Dict[str, Any]]:
         headings: List[Dict[str, Any]] = []
         current_pos = 0
 
@@ -366,6 +450,34 @@ class DocxFileHandler(FileHandler):
             current_pos += len(text) + 2
 
         return headings
+
+    def extract_all(self, content: Union[str, bytes], filename: str) -> ExtractResult:
+        """One-pass DOCX extraction: load the document once, extract everything."""
+        doc = self._load_document(content)
+
+        texts = [p.text for p in doc.paragraphs if p.text and p.text.strip()]
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    cell_text = cell.text.strip()
+                    if cell_text:
+                        texts.append(cell_text)
+        text = sanitize_text_content("\n\n".join(texts))
+
+        paragraph_count = len(doc.paragraphs)
+        table_count = len(doc.tables)
+        meta_text = "\n".join(p.text for p in doc.paragraphs if p.text)
+        metadata = {
+            "file_type": "docx",
+            "filename": filename,
+            "paragraph_count": paragraph_count,
+            "table_count": table_count,
+            "char_count": len(meta_text),
+            "word_count": len(meta_text.split()),
+        }
+
+        headings = self._extract_headings_from_doc(doc) or None
+        return ExtractResult(text=text, metadata=metadata, headings=headings)
 
 
 @dataclass
@@ -809,6 +921,23 @@ class PDFFileHandler(FileHandler):
             "creator": meta.get("creator") or None,
         }
 
+    def extract_all(self, content: Union[str, bytes], filename: str) -> ExtractResult:
+        """One-pass PDF extraction: text + headings + page_map + metadata.
+
+        Replaces four separate parses (extract_metadata, extract_text,
+        extract_heading_map, extract_page_map) with a single _extract_pdf
+        invocation plus a lightweight metadata read.
+        """
+        content_bytes = self._to_bytes(content)
+        text, headings, page_map = self._extract_pdf(content_bytes)
+        metadata = self.extract_metadata(content_bytes, filename)
+        return ExtractResult(
+            text=text,
+            metadata=metadata,
+            headings=headings if headings else None,
+            page_map=page_map if page_map else None,
+        )
+
 
 class FileHandlerFactory:
     """
@@ -881,14 +1010,8 @@ def process_file(content: Union[str, bytes], filename: str, file_type: FileType)
         >>> print(result['metadata'])
     """
     handler = FileHandlerFactory.get_handler(file_type)
-
-    # Extract metadata first
-    metadata = handler.extract_metadata(content, filename)
-
-    # Extract text
-    text = handler.extract_text(content, metadata)
-
+    result = handler.extract_all(content, filename)
     return {
-        "text": text,
-        "metadata": metadata,
+        "text": result.text,
+        "metadata": result.metadata,
     }
