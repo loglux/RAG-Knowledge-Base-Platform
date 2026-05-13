@@ -1,5 +1,15 @@
 import { useEffect, useRef } from 'react'
 
+interface MathJax {
+  typesetPromise: (elements?: HTMLElement[]) => Promise<void>
+}
+
+declare global {
+  interface Window {
+    MathJax?: MathJax
+  }
+}
+
 interface MathRendererProps {
   content: string
   className?: string
@@ -18,9 +28,8 @@ export function MathRenderer({ content, className = '' }: MathRendererProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    // Typeset math after content changes
-    if (containerRef.current && (window as any).MathJax?.typesetPromise) {
-      (window as any).MathJax.typesetPromise([containerRef.current]).catch((err: any) => {
+    if (containerRef.current && window.MathJax?.typesetPromise) {
+      window.MathJax.typesetPromise([containerRef.current]).catch((err: unknown) => {
         console.error('MathJax typesetting failed:', err)
       })
     }
@@ -48,8 +57,8 @@ export function MathRenderer({ content, className = '' }: MathRendererProps) {
  */
 export function useMathTypeset() {
   return (element: HTMLElement | null) => {
-    if (element && (window as any).MathJax?.typesetPromise) {
-      (window as any).MathJax.typesetPromise([element]).catch((err: any) => {
+    if (element && window.MathJax?.typesetPromise) {
+      window.MathJax.typesetPromise([element]).catch((err: unknown) => {
         console.error('MathJax typesetting failed:', err)
       })
     }
