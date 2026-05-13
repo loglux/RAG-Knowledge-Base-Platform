@@ -651,6 +651,111 @@ class PDFFileHandler(FileHandler):
             lines.append("| " + " | ".join(cells[: len(header)]) + " |")
         return "\n".join(lines)
 
+    @staticmethod
+    def _detect_column_gutter(items: List[tuple], page_width: float) -> Optional[float]:
+        """Detect the x-coordinate of a vertical gutter on a multi-column page.
+
+        Looks at block center-x values. If the largest gap between consecutive
+        sorted centers is wide enough (>= 15% of page width) and each side
+        carries at least 3 blocks, the midpoint of that gap is the gutter.
+
+        Args:
+            items: Sequence of (y0, x0, x1, text) tuples for the page.
+            page_width: Page width in points.
+
+        Returns:
+            x-coordinate of the gutter, or None if the page is single-column
+            (or detection is unreliable due to too few blocks).
+        """
+        if len(items) < 6:
+            return None
+
+        centers = sorted((it[1] + it[2]) / 2 for it in items)
+        max_gap = 0.0
+        max_gap_x = 0.0
+        for i in range(1, len(centers)):
+            gap = centers[i] - centers[i - 1]
+            if gap > max_gap:
+                max_gap = gap
+                max_gap_x = (centers[i] + centers[i - 1]) / 2
+
+        if max_gap < page_width * 0.15:
+            return None
+
+        left = sum(1 for c in centers if c < max_gap_x)
+        right = len(centers) - left
+        if left < 3 or right < 3:
+            return None
+
+        return max_gap_x
+
+    @staticmethod
+    def _sort_blocks_by_column(
+        items: List[tuple],
+        gutter_x: float,
+        page_width: float,
+    ) -> List[tuple]:
+        """Sort blocks in column-aware reading order.
+
+        Blocks are classified as left / right / spanning relative to the gutter.
+        A spanning block crosses the gutter AND is wider than ~1.2× a typical
+        column (>= 60% of page width) — it breaks the column flow at its y0.
+
+        Reading order: for each band between consecutive spanning blocks,
+        emit all left-column blocks (sorted by y0), then all right-column
+        blocks (sorted by y0); then the spanning block itself.
+
+        Args:
+            items: List of (y0, x0, x1, text) tuples.
+            gutter_x: Gutter x-coordinate from _detect_column_gutter.
+            page_width: Page width in points (used to set spanning threshold).
+
+        Returns:
+            Items reordered into reading order.
+        """
+        col_width_est = page_width / 2.0
+        spanning_threshold = col_width_est * 1.2
+
+        spanning: List[tuple] = []
+        left: List[tuple] = []
+        right: List[tuple] = []
+        for it in items:
+            _, x0, x1, _ = it
+            block_width = x1 - x0
+            crosses_gutter = x0 < gutter_x < x1
+            if crosses_gutter and block_width >= spanning_threshold:
+                spanning.append(it)
+            elif (x0 + x1) / 2 < gutter_x:
+                left.append(it)
+            else:
+                right.append(it)
+
+        left.sort(key=lambda t: t[0])
+        right.sort(key=lambda t: t[0])
+        spanning.sort(key=lambda t: t[0])
+
+        result: List[tuple] = []
+        prev_band_y = float("-inf")
+        for span in spanning:
+            span_y0 = span[0]
+            for it in left:
+                if prev_band_y < it[0] < span_y0:
+                    result.append(it)
+            for it in right:
+                if prev_band_y < it[0] < span_y0:
+                    result.append(it)
+            result.append(span)
+            prev_band_y = span_y0
+
+        for it in left:
+            if it[0] >= prev_band_y:
+                result.append(it)
+        for it in right:
+            if it[0] >= prev_band_y:
+                result.append(it)
+
+        return result
+
     def _extract_pdf(self, content: bytes):
         """Extract (text, heading_map, page_map).
 
@@ -658,7 +763,9 @@ class PDFFileHandler(FileHandler):
           1. Detect tables with find_tables(strategy="lines") → Markdown.
           2. Extract text blocks via get_text("dict"), skipping blocks that
              overlap ≥40% with a table region.
-          3. Merge text blocks and table Markdowns sorted by top-y coordinate.
+          3. Detect column layout and merge blocks in reading order:
+             single-column pages sort by y; multi-column pages sort
+             left-column → right-column with spanning elements breaking flow.
           4. Detect headings by comparing block font sizes to the page median.
 
         page_map: [[char_offset, physical_page, logical_page_or_null], ...]
@@ -692,6 +799,7 @@ class PDFFileHandler(FileHandler):
         headings: List[Dict[str, Any]] = []
         page_map: List[List] = []
         current_pos = 0
+        multi_column_pages = 0
 
         for page in doc:
             page_num = page.number + 1
@@ -699,7 +807,7 @@ class PDFFileHandler(FileHandler):
 
             # ── 1. Detect tables ──────────────────────────────────────────
             table_rects: List[Any] = []  # fitz.Rect objects
-            table_items: List = []  # (y0, markdown_string)
+            table_items: List = []  # (y0, x0, x1, markdown_string)
             try:
                 tabs = page.find_tables(strategy="lines")
                 for tab in tabs.tables:
@@ -708,14 +816,14 @@ class PDFFileHandler(FileHandler):
                         tr = fitz.Rect(tab.bbox)
                         table_rects.append(tr)
                         md = self._rows_to_markdown(rows)
-                        table_items.append((tab.bbox[1], md))
+                        table_items.append((tab.bbox[1], tab.bbox[0], tab.bbox[2], md))
             except Exception as exc:
                 logger.warning("PDF table extraction failed on a page: %s", exc)
 
             # ── 2. Extract text blocks, skipping table regions ────────────
-            text_items: List = []  # (y0, text)
+            text_items: List = []  # (y0, x0, x1, text)
             all_font_sizes: List[float] = []
-            # (y0, block_text, max_font_size, first_line_text,
+            # (y0, x0, x1, block_text, max_font_size, first_line_text,
             #  first_line_bold_chars, first_line_total_chars)
             block_info: List = []
 
@@ -785,6 +893,8 @@ class PDFFileHandler(FileHandler):
                         block_info.append(
                             (
                                 block["bbox"][1],
+                                block["bbox"][0],
+                                block["bbox"][2],
                                 block_text,
                                 max_size,
                                 first_line_text,
@@ -796,13 +906,22 @@ class PDFFileHandler(FileHandler):
                 logger.warning("PDF block parsing failed, falling back to plain text: %s", exc)
                 fallback = page.get_text("text")
                 if fallback.strip():
-                    text_items.append((0.0, fallback))
+                    text_items.append((0.0, 0.0, page.rect.width, fallback))
 
             # ── 3. Heading detection: font-size or bold first line ─────────
             median_size = statistics.median(all_font_sizes) if all_font_sizes else 0.0
 
-            for y0, block_text, max_size, first_line_text, fl_bold, fl_total in block_info:
-                text_items.append((y0, block_text))
+            for (
+                y0,
+                x0,
+                x1,
+                block_text,
+                max_size,
+                first_line_text,
+                fl_bold,
+                fl_total,
+            ) in block_info:
+                text_items.append((y0, x0, x1, block_text))
 
                 # Size-based: any font in block noticeably larger than median
                 is_size_heading = (
@@ -836,8 +955,14 @@ class PDFFileHandler(FileHandler):
                         headings.append({"pos": current_pos, "level": 2, "text": heading_text})
 
             # ── 4. Merge items and build page text ────────────────────────
-            all_items = sorted(text_items + table_items, key=lambda x: x[0])
-            page_text = "\n\n".join(item[1] for item in all_items).strip()
+            combined = text_items + table_items
+            gutter = self._detect_column_gutter(combined, page.rect.width)
+            if gutter is not None:
+                all_items = self._sort_blocks_by_column(combined, gutter, page.rect.width)
+                multi_column_pages += 1
+            else:
+                all_items = sorted(combined, key=lambda x: x[0])
+            page_text = "\n\n".join(item[3] for item in all_items).strip()
 
             if not page_text:
                 continue
@@ -848,6 +973,13 @@ class PDFFileHandler(FileHandler):
             current_pos += len(page_text) + 2  # +2 for \n\n page separator
 
         doc.close()
+
+        if multi_column_pages:
+            logger.info(
+                "PDF: detected multi-column layout on %d/%d pages",
+                multi_column_pages,
+                len(page_map),
+            )
 
         # ── Deduplicate running headers ───────────────────────────────────
         # Heading texts that repeat on many pages are running headers (e.g.
