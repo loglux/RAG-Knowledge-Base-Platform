@@ -1,6 +1,7 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios'
 import type { APIError } from '../types/index'
+import { normalizeChunkingStrategy } from '../types/index'
 import type {
   KnowledgeBase,
   CreateKBRequest,
@@ -317,23 +318,27 @@ class APIClient {
   }
 
   // Knowledge Bases
+  private normalizeKB(kb: KnowledgeBase): KnowledgeBase {
+    return { ...kb, chunking_strategy: normalizeChunkingStrategy(kb.chunking_strategy) }
+  }
+
   async getKnowledgeBases(page = 1, pageSize = 10): Promise<PaginatedResponse<KnowledgeBase>> {
     const response = await this.client.get<PaginatedResponse<KnowledgeBase>>('/knowledge-bases/', {
       params: { page, page_size: pageSize },
     })
-    return response.data
+    return { ...response.data, items: response.data.items.map((kb) => this.normalizeKB(kb)) }
   }
 
   async getDeletedKnowledgeBases(page = 1, pageSize = 10): Promise<PaginatedResponse<KnowledgeBase>> {
     const response = await this.client.get<PaginatedResponse<KnowledgeBase>>('/knowledge-bases/deleted', {
       params: { page, page_size: pageSize },
     })
-    return response.data
+    return { ...response.data, items: response.data.items.map((kb) => this.normalizeKB(kb)) }
   }
 
   async getKnowledgeBase(id: string): Promise<KnowledgeBase> {
     const response = await this.client.get<KnowledgeBase>(`/knowledge-bases/${id}`)
-    return response.data
+    return this.normalizeKB(response.data)
   }
 
   async exportKnowledgeBases(payload: KBExportRequest): Promise<{ blob: Blob; filename: string }> {
@@ -418,12 +423,12 @@ class APIClient {
 
   async createKnowledgeBase(data: CreateKBRequest): Promise<KnowledgeBase> {
     const response = await this.client.post<KnowledgeBase>('/knowledge-bases/', data)
-    return response.data
+    return this.normalizeKB(response.data)
   }
 
   async updateKnowledgeBase(id: string, data: Partial<CreateKBRequest>): Promise<KnowledgeBase> {
     const response = await this.client.put<KnowledgeBase>(`/knowledge-bases/${id}`, data)
-    return response.data
+    return this.normalizeKB(response.data)
   }
 
   async getKBRetrievalSettings(id: string): Promise<KBRetrievalSettingsEnvelope> {

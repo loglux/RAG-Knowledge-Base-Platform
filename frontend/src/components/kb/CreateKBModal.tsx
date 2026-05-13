@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Button } from '../common/Button'
 import { Modal } from '../common/Modal'
 import { apiClient } from '../../services/api'
-import type { CreateKBRequest, EmbeddingModel } from '../../types/index'
+import type { CreateKBRequest, EmbeddingModel, ChunkingStrategy } from '../../types/index'
 
 interface CreateKBModalProps {
   isOpen: boolean
@@ -151,7 +151,7 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
         chunk_size: kbDefaults.chunk_size,
         chunk_overlap: kbDefaults.chunk_overlap,
         upsert_batch_size: kbDefaults.upsert_batch_size,
-        chunking_strategy: 'fixed_size',
+        chunking_strategy: 'smart',
         use_llm_chat_titles: kbDefaults.use_llm_chat_titles,
       })
       setErrors({})
@@ -334,8 +334,7 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
             id="chunking-strategy"
             value={formData.chunking_strategy}
             onChange={(e) => {
-              const newStrategy = e.target.value
-              // Auto-adjust chunk size for semantic chunking
+              const newStrategy = e.target.value as ChunkingStrategy
               const newChunkSize = newStrategy === 'semantic' ? 800 : formData.chunk_size
               setFormData({
                 ...formData,

@@ -1,4 +1,24 @@
 // API Types
+export type ChunkingStrategy = 'simple' | 'smart' | 'semantic'
+
+export const LEGACY_CHUNKING_STRATEGY_MAP: Record<string, ChunkingStrategy> = {
+  fixed_size: 'simple',
+  FIXED_SIZE: 'simple',
+  paragraph: 'smart',
+  PARAGRAPH: 'smart',
+  SEMANTIC: 'semantic',
+}
+
+export function normalizeChunkingStrategy(value: string | null | undefined): ChunkingStrategy {
+  if (value && value in LEGACY_CHUNKING_STRATEGY_MAP) {
+    return LEGACY_CHUNKING_STRATEGY_MAP[value]
+  }
+  if (value === 'simple' || value === 'smart' || value === 'semantic') {
+    return value
+  }
+  return 'smart'
+}
+
 export interface KnowledgeBase {
   id: string
   name: string
@@ -6,7 +26,7 @@ export interface KnowledgeBase {
   chunk_size: number
   chunk_overlap: number
   upsert_batch_size: number
-  chunking_strategy: 'simple' | 'smart' | 'semantic' | 'fixed_size' | 'FIXED_SIZE' | 'paragraph' | 'PARAGRAPH'
+  chunking_strategy: ChunkingStrategy
   bm25_match_mode?: string | null
   bm25_min_should_match?: number | null
   bm25_use_phrase?: boolean | null
@@ -36,7 +56,7 @@ export interface CreateKBRequest {
   chunk_size?: number
   chunk_overlap?: number
   upsert_batch_size?: number
-  chunking_strategy?: 'simple' | 'smart' | 'semantic' | 'fixed_size' | 'FIXED_SIZE' | 'paragraph' | 'PARAGRAPH'
+  chunking_strategy?: ChunkingStrategy
   bm25_match_mode?: string | null
   bm25_min_should_match?: number | null
   bm25_use_phrase?: boolean | null

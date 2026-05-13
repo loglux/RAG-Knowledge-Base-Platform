@@ -8,15 +8,15 @@ import { useDocumentPolling } from '../hooks/useDocumentPolling'
 import { FileUpload } from '../components/documents/FileUpload'
 import { DocumentItem } from '../components/documents/DocumentItem'
 import { LLMSelector } from '../components/chat/LLMSelector'
-import type { KnowledgeBase, AppSettings, QAEvalRun, QAEvalRunDetail, KBRetrievalSettingsEnvelope, KBRetrievalSettingsStored } from '../types/index'
+import type { KnowledgeBase, AppSettings, QAEvalRun, QAEvalRunDetail, KBRetrievalSettingsEnvelope, KBRetrievalSettingsStored, ChunkingStrategy } from '../types/index'
 
 export function KBDetailsPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { logout } = useAuth()
 
-  const getChunkingStrategyDisplay = (strategy: string) => {
-    const strategies: Record<string, { icon: string; label: string; description: string }> = {
+  const getChunkingStrategyDisplay = (strategy: ChunkingStrategy) => {
+    const strategies: Record<ChunkingStrategy, { icon: string; label: string; description: string }> = {
       simple: {
         icon: '⚡',
         label: 'Simple (Fixed-Size)',
@@ -32,29 +32,8 @@ export function KBDetailsPage() {
         label: 'Semantic',
         description: 'Advanced semantic boundary detection',
       },
-      // Legacy support
-      fixed_size: {
-        icon: '⚡',
-        label: 'Simple (Fixed-Size)',
-        description: 'Fast chunking at fixed character positions',
-      },
-      FIXED_SIZE: {
-        icon: '⚡',
-        label: 'Simple (Fixed-Size)',
-        description: 'Fast chunking at fixed character positions',
-      },
-      paragraph: {
-        icon: '🧠',
-        label: 'Smart (Recursive)',
-        description: 'Intelligent chunking respecting boundaries',
-      },
-      PARAGRAPH: {
-        icon: '🧠',
-        label: 'Smart (Recursive)',
-        description: 'Intelligent chunking respecting boundaries',
-      },
     }
-    return strategies[strategy] || { icon: '📝', label: strategy, description: 'Unknown strategy' }
+    return strategies[strategy]
   }
 
   const [kb, setKb] = useState<KnowledgeBase | null>(null)
@@ -69,7 +48,7 @@ export function KBDetailsPage() {
     chunk_size: 1000,
     chunk_overlap: 200,
     upsert_batch_size: 256,
-    chunking_strategy: 'smart' as 'simple' | 'smart' | 'semantic',
+    chunking_strategy: 'smart' as ChunkingStrategy,
     contextual_description_mode: 'default' as 'default' | 'enabled' | 'disabled',
   })
   const [settingsErrors, setSettingsErrors] = useState<Record<string, string>>({})
@@ -139,7 +118,7 @@ export function KBDetailsPage() {
       chunk_size: kbData.chunk_size,
       chunk_overlap: kbData.chunk_overlap,
       upsert_batch_size: kbData.upsert_batch_size,
-      chunking_strategy: kbData.chunking_strategy as 'simple' | 'smart' | 'semantic',
+      chunking_strategy: kbData.chunking_strategy as ChunkingStrategy,
       contextual_description_mode:
         kbData.contextual_description_enabled == null
           ? 'default'
@@ -1304,7 +1283,7 @@ export function KBDetailsPage() {
                   id="kb-chunking-strategy"
                   value={settingsData.chunking_strategy}
                   onChange={(e) => {
-                    const newStrategy = e.target.value as 'simple' | 'smart' | 'semantic'
+                    const newStrategy = e.target.value as ChunkingStrategy
                     // Auto-adjust chunk size for semantic chunking
                     const newChunkSize = newStrategy === 'semantic' ? 800 : settingsData.chunk_size
                     setSettingsData({
