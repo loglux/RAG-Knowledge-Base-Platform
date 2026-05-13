@@ -180,6 +180,26 @@ class TestPDFColumnDetection:
         texts = [it[3] for it in sorted_items]
         assert texts == ["TITLE", "L1", "L2", "R1", "R2", "FOOTNOTE"]
 
+    def test_sanitize_chars_preserves_length_for_clean_text(self):
+        """Clean ASCII text passes through _sanitize_chars unchanged."""
+        text = "Hello, world!\nLine 2\tTab here."
+        assert PDFFileHandler._sanitize_chars(text) == text
+
+    def test_sanitize_chars_strips_null_bytes_and_control_chars(self):
+        """Null bytes, BEL/VT/etc are removed; \\n and \\t are kept."""
+        # \x00 null, \x07 BEL (C0), \x9F (C1) — all should be removed
+        # \n (line feed) and \t (tab) — kept
+        raw = "hi\x00\x07\x9f\nworld\t!"
+        assert PDFFileHandler._sanitize_chars(raw) == "hi\nworld\t!"
+
+    def test_sanitize_chars_does_not_strip_edges(self):
+        """Unlike sanitize_text_content, _sanitize_chars preserves leading/trailing whitespace.
+
+        This matters for offset accuracy: a final .strip() would silently
+        shift every recorded heading/page position.
+        """
+        assert PDFFileHandler._sanitize_chars("  hello  ") == "  hello  "
+
     def test_thin_block_crossing_gutter_is_not_spanning(self):
         """A narrow block that just touches the gutter stays in its column."""
         # Block crosses gutter (x=140..160) but is narrow → assigned by center

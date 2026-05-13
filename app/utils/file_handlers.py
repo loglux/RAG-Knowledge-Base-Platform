@@ -652,6 +652,23 @@ class PDFFileHandler(FileHandler):
         return "\n".join(lines)
 
     @staticmethod
+    def _sanitize_chars(text: str) -> str:
+        """Char-level sanitization used while accumulating per-item offsets.
+
+        Performs the same filtering as utils.validators.sanitize_text_content
+        (drop null bytes, drop C0/C1 control chars except \\n and \\t, allow
+        printable ASCII and >U+009F) but without the trailing .strip().
+
+        Applying char filtering per item *before* computing offsets keeps
+        heading/page positions consistent with the final text: any chars
+        removed here are also absent from the offset accumulator.
+        """
+        text = text.replace("\x00", "")
+        return "".join(
+            c for c in text if c == "\n" or c == "\t" or (0x20 <= ord(c) <= 0x7E) or ord(c) > 0x9F
+        )
+
+    @staticmethod
     def _detect_column_gutter(items: List[tuple], page_width: float) -> Optional[float]:
         """Detect the x-coordinate of a vertical gutter on a multi-column page.
 
@@ -972,10 +989,12 @@ class PDFFileHandler(FileHandler):
             # Walk sorted items: accumulate per-page offset, emit headings at
             # correct positions, build page_text.  Each item contributes
             # len(text) + 2 chars to the next item's offset (\n\n separator).
+            # Items are sanitized *before* offset accumulation so positions
+            # remain valid in the final text.
             page_text_parts: List[str] = []
             offset_in_page = 0
             for item in all_items:
-                item_text = item[3]
+                item_text = self._sanitize_chars(item[3])
                 item_heading = item[4]
                 if item_heading is not None:
                     level, heading_text = item_heading
@@ -989,8 +1008,8 @@ class PDFFileHandler(FileHandler):
                 page_text_parts.append(item_text)
                 offset_in_page += len(item_text) + 2
 
-            page_text = "\n\n".join(page_text_parts).strip()
-            if not page_text:
+            page_text = "\n\n".join(page_text_parts)
+            if not page_text.strip():
                 continue
 
             logical_num = self._extract_footer_page_number(page)
@@ -1027,7 +1046,11 @@ class PDFFileHandler(FileHandler):
                 filtered.append(h)
         headings = filtered
 
-        full_text = sanitize_text_content("\n\n".join(text_parts))
+        # Per-item chars were already sanitized inside the page loop so
+        # positions in `headings` / `page_map` map straight into full_text.
+        # Re-applying sanitize_text_content here would strip leading/trailing
+        # whitespace from full_text and silently shift every recorded offset.
+        full_text = "\n\n".join(text_parts)
 
         if len(full_text.strip()) < 100:
             raise ValueError(
