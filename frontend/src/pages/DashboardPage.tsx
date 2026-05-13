@@ -77,8 +77,15 @@ export function DashboardPage() {
                 <span aria-hidden="true">⎋</span>
                 <span>Logout</span>
               </Button>
-              <div className="w-full text-sm text-gray-400 sm:w-auto">
-                {loading ? 'Loading...' : `${total} knowledge base${total !== 1 ? 's' : ''}`}
+              <div
+                className="w-full text-sm text-gray-400 sm:w-auto"
+                aria-live="polite"
+              >
+                {loading ? (
+                  <span className="inline-block h-3 w-32 bg-gray-700/60 rounded animate-pulse align-middle" />
+                ) : (
+                  `${total} knowledge base${total !== 1 ? 's' : ''}`
+                )}
               </div>
             </div>
           </div>

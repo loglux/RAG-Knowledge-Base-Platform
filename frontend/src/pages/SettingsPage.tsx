@@ -3128,7 +3128,7 @@ function PromptsTab(props: any) {
               onClick={onRefreshPrompts}
               disabled={promptsLoading}
             >
-              {promptsLoading ? 'Loading...' : 'Refresh'}
+              {promptsLoading ? 'Refreshing…' : 'Refresh'}
             </button>
           </div>
           <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
@@ -3262,7 +3262,7 @@ function PromptsTab(props: any) {
               onClick={onRefreshSelfCheckPrompts}
               disabled={selfCheckPromptsLoading}
             >
-              {selfCheckPromptsLoading ? 'Loading...' : 'Refresh'}
+              {selfCheckPromptsLoading ? 'Refreshing…' : 'Refresh'}
             </button>
           </div>
           <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">

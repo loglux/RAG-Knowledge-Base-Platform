@@ -12,8 +12,12 @@ const LoginPage = lazy(() => import('./pages/LoginPage').then((module) => ({ def
 
 function FullScreenLoading() {
   return (
-    <div className="flex items-center justify-center h-screen text-lg text-gray-500">
-      Loading...
+    <div
+      role="status"
+      aria-label="Loading"
+      className="flex items-center justify-center h-screen"
+    >
+      <div className="h-10 w-10 rounded-full border-4 border-gray-700 border-t-primary-500 animate-spin" />
     </div>
   )
 }

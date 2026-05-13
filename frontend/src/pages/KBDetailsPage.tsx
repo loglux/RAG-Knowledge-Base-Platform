@@ -1911,7 +1911,11 @@ export function KBDetailsPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-sm text-gray-500">Loading...</div>
+                  <div className="space-y-2" aria-busy="true" aria-live="polite">
+                    <div className="h-3 w-1/2 bg-gray-700/60 rounded animate-pulse" />
+                    <div className="h-3 w-2/3 bg-gray-700/60 rounded animate-pulse" />
+                    <div className="h-3 w-1/3 bg-gray-700/60 rounded animate-pulse" />
+                  </div>
                 )
               )}
             </div>
