@@ -720,7 +720,7 @@ class PDFFileHandler(FileHandler):
         left: List[tuple] = []
         right: List[tuple] = []
         for it in items:
-            _, x0, x1, _ = it
+            x0, x1 = it[1], it[2]
             block_width = x1 - x0
             crosses_gutter = x0 < gutter_x < x1
             if crosses_gutter and block_width >= spanning_threshold:
@@ -807,7 +807,8 @@ class PDFFileHandler(FileHandler):
 
             # ── 1. Detect tables ──────────────────────────────────────────
             table_rects: List[Any] = []  # fitz.Rect objects
-            table_items: List = []  # (y0, x0, x1, markdown_string)
+            # (y0, x0, x1, markdown_string, heading_info_or_None) — tables are never headings
+            table_items: List = []
             try:
                 tabs = page.find_tables(strategy="lines")
                 for tab in tabs.tables:
@@ -816,12 +817,13 @@ class PDFFileHandler(FileHandler):
                         tr = fitz.Rect(tab.bbox)
                         table_rects.append(tr)
                         md = self._rows_to_markdown(rows)
-                        table_items.append((tab.bbox[1], tab.bbox[0], tab.bbox[2], md))
+                        table_items.append((tab.bbox[1], tab.bbox[0], tab.bbox[2], md, None))
             except Exception as exc:
                 logger.warning("PDF table extraction failed on a page: %s", exc)
 
             # ── 2. Extract text blocks, skipping table regions ────────────
-            text_items: List = []  # (y0, x0, x1, text)
+            # (y0, x0, x1, text, heading_info_or_None) where heading_info=(level, text)
+            text_items: List = []
             all_font_sizes: List[float] = []
             # (y0, x0, x1, block_text, max_font_size, first_line_text,
             #  first_line_bold_chars, first_line_total_chars)
@@ -906,9 +908,12 @@ class PDFFileHandler(FileHandler):
                 logger.warning("PDF block parsing failed, falling back to plain text: %s", exc)
                 fallback = page.get_text("text")
                 if fallback.strip():
-                    text_items.append((0.0, 0.0, page.rect.width, fallback))
+                    text_items.append((0.0, 0.0, page.rect.width, fallback, None))
 
             # ── 3. Heading detection: font-size or bold first line ─────────
+            # Heading info is attached to each text item so that, after the
+            # column-aware sort, headings can be emitted with character
+            # offsets matching their actual position in the page text.
             median_size = statistics.median(all_font_sizes) if all_font_sizes else 0.0
 
             for (
@@ -921,8 +926,6 @@ class PDFFileHandler(FileHandler):
                 fl_bold,
                 fl_total,
             ) in block_info:
-                text_items.append((y0, x0, x1, block_text))
-
                 # Size-based: any font in block noticeably larger than median
                 is_size_heading = (
                     median_size > 0 and max_size > median_size * profile.size_ratio_threshold
@@ -936,6 +939,7 @@ class PDFFileHandler(FileHandler):
                     and profile.bold_min_chars <= len(first_line_text) < profile.bold_max_chars
                 )
 
+                heading_info: Optional[tuple] = None
                 if is_size_heading:
                     ratio = max_size / median_size
                     level = 1 if ratio >= 2.0 else (2 if ratio >= 1.5 else 3)
@@ -945,14 +949,16 @@ class PDFFileHandler(FileHandler):
                         and len(heading_text) < 200
                         and not re.fullmatch(r"\d+", heading_text)
                     ):
-                        headings.append({"pos": current_pos, "level": level, "text": heading_text})
+                        heading_info = (level, heading_text)
                 elif is_bold_heading:
                     heading_text = re.sub(r"\s+", " ", first_line_text)
                     # Skip pure-number headings (page numbers, margin section
                     # numbers like "1", "2", "85" that weren't caught by the
                     # header/footer zone filter)
                     if heading_text and not re.fullmatch(r"\d+", heading_text):
-                        headings.append({"pos": current_pos, "level": 2, "text": heading_text})
+                        heading_info = (2, heading_text)
+
+                text_items.append((y0, x0, x1, block_text, heading_info))
 
             # ── 4. Merge items and build page text ────────────────────────
             combined = text_items + table_items
@@ -962,8 +968,28 @@ class PDFFileHandler(FileHandler):
                 multi_column_pages += 1
             else:
                 all_items = sorted(combined, key=lambda x: x[0])
-            page_text = "\n\n".join(item[3] for item in all_items).strip()
 
+            # Walk sorted items: accumulate per-page offset, emit headings at
+            # correct positions, build page_text.  Each item contributes
+            # len(text) + 2 chars to the next item's offset (\n\n separator).
+            page_text_parts: List[str] = []
+            offset_in_page = 0
+            for item in all_items:
+                item_text = item[3]
+                item_heading = item[4]
+                if item_heading is not None:
+                    level, heading_text = item_heading
+                    headings.append(
+                        {
+                            "pos": page_start_pos + offset_in_page,
+                            "level": level,
+                            "text": heading_text,
+                        }
+                    )
+                page_text_parts.append(item_text)
+                offset_in_page += len(item_text) + 2
+
+            page_text = "\n\n".join(page_text_parts).strip()
             if not page_text:
                 continue
 
