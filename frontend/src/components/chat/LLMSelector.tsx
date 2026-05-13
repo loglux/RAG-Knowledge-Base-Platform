@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { apiClient } from '../../services/api'
 
 interface LLMModel {
@@ -29,6 +30,9 @@ export function LLMSelector({ value, onChange }: LLMSelectorProps) {
         setModels(response.models)
       } catch (error) {
         console.error('Failed to fetch LLM models:', error)
+        toast.error('Failed to load LLM models', {
+          description: error instanceof Error ? error.message : undefined,
+        })
       } finally {
         setLoading(false)
       }

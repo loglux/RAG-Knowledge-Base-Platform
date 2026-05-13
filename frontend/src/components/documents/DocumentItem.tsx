@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { toast } from 'sonner'
 import { apiClient } from '../../services/api'
 import type { Document } from '../../types/index'
 
@@ -123,7 +124,9 @@ export function DocumentItem({ document, onReprocess, onDelete, onRecomputeDupli
       await onRecomputeDuplicates(document.id)
     } catch (error) {
       console.error('Failed to recompute duplicates:', error)
-      alert(error instanceof Error ? error.message : 'Failed to recompute duplicates')
+      toast.error('Failed to recompute duplicates', {
+        description: error instanceof Error ? error.message : undefined,
+      })
     } finally {
       setIsRecomputingDup(false)
     }

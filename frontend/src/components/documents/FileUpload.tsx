@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react'
+import { toast } from 'sonner'
 
 interface FileUploadProps {
   onUpload: (files: File[]) => Promise<void>
@@ -62,7 +63,9 @@ export function FileUpload({
     const { valid, errors } = validateFiles(fileArray)
 
     if (errors.length > 0) {
-      alert(errors.join('\n'))
+      toast.error(`${errors.length} file${errors.length === 1 ? '' : 's'} rejected`, {
+        description: errors.join('\n'),
+      })
     }
 
     if (valid.length === 0) return
@@ -72,7 +75,9 @@ export function FileUpload({
       await onUpload(valid)
     } catch (error) {
       console.error('Upload failed:', error)
-      alert(error instanceof Error ? error.message : 'Upload failed')
+      toast.error('Upload failed', {
+        description: error instanceof Error ? error.message : undefined,
+      })
     } finally {
       setIsUploading(false)
     }

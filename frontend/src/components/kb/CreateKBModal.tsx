@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { toast } from 'sonner'
 import { Button } from '../common/Button'
 import { Modal } from '../common/Modal'
 import { apiClient } from '../../services/api'
@@ -47,6 +48,9 @@ export function CreateKBModal({ isOpen, onClose, onSubmit }: CreateKBModalProps)
         setEmbeddingModels(models)
       } catch (error) {
         console.error('Failed to fetch embedding models:', error)
+        toast.error('Failed to load embedding models', {
+          description: error instanceof Error ? error.message : undefined,
+        })
       } finally {
         setLoadingModels(false)
       }

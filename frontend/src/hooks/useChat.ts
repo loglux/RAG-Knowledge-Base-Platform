@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
+import { toast } from 'sonner'
 import { apiClient } from '../services/api'
 import type { ChatMessage, ChatRequest, ConversationSummary } from '../types/index'
 
@@ -70,6 +71,9 @@ export function useChat(kbId: string) {
         }
       } catch (e) {
         console.error('Failed to load conversations:', e)
+        toast.error('Failed to load conversations', {
+          description: e instanceof Error ? e.message : undefined,
+        })
       } finally {
         if (isMounted) {
           setConversationsLoading(false)
@@ -110,6 +114,9 @@ export function useChat(kbId: string) {
         })))
       } catch (e) {
         console.error('Failed to load conversation history:', e)
+        toast.error('Failed to load conversation history', {
+          description: e instanceof Error ? e.message : undefined,
+        })
         if (conversationId) {
           setConversationId(null)
           try {
@@ -298,6 +305,9 @@ export function useChat(kbId: string) {
       setMessages((prev) => prev.filter((msg) => !msg.id || !deletedSet.has(msg.id)))
     } catch (e) {
       console.error('Failed to delete chat message:', e)
+      toast.error('Failed to delete message', {
+        description: e instanceof Error ? e.message : undefined,
+      })
     }
   }, [conversationId])
 
@@ -328,6 +338,9 @@ export function useChat(kbId: string) {
       refreshConversations()
     } catch (e) {
       console.error('Failed to delete conversation:', e)
+      toast.error('Failed to delete conversation', {
+        description: e instanceof Error ? e.message : undefined,
+      })
     }
   }, [conversationId, conversationKey, refreshConversations])
 
@@ -337,6 +350,9 @@ export function useChat(kbId: string) {
       refreshConversations()
     } catch (e) {
       console.error('Failed to rename conversation:', e)
+      toast.error('Failed to rename conversation', {
+        description: e instanceof Error ? e.message : undefined,
+      })
     }
   }, [refreshConversations])
 

@@ -1,7 +1,9 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, useNavigate, useLocation, Outlet, Navigate } from 'react-router-dom'
+import { Toaster } from 'sonner'
 import { getSetupStatus } from './api/setup'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { ErrorBoundary } from './components/common/ErrorBoundary'
 
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then((module) => ({ default: module.DashboardPage })))
 const KBDetailsPage = lazy(() => import('./pages/KBDetailsPage').then((module) => ({ default: module.KBDetailsPage })))
@@ -58,24 +60,35 @@ function SetupRedirect({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <SetupRedirect>
-          <Suspense fallback={<FullScreenLoading />}>
-            <Routes>
-              <Route path="/setup" element={<Setup />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route element={<ProtectedRoute />}>
-                <Route path="/" element={<DashboardPage />} />
-                <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/kb/:id" element={<KBDetailsPage />} />
-                <Route path="/kb/:id/chat" element={<ChatPage />} />
-              </Route>
-            </Routes>
-          </Suspense>
-        </SetupRedirect>
-      </BrowserRouter>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <BrowserRouter>
+          <SetupRedirect>
+            <Suspense fallback={<FullScreenLoading />}>
+              <Routes>
+                <Route path="/setup" element={<Setup />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route element={<ProtectedRoute />}>
+                  <Route path="/" element={<DashboardPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/kb/:id" element={<KBDetailsPage />} />
+                  <Route path="/kb/:id/chat" element={<ChatPage />} />
+                </Route>
+              </Routes>
+            </Suspense>
+          </SetupRedirect>
+        </BrowserRouter>
+      </AuthProvider>
+      <Toaster
+        theme="dark"
+        position="top-right"
+        richColors
+        closeButton
+        toastOptions={{
+          className: 'font-sans',
+        }}
+      />
+    </ErrorBoundary>
   )
 }
 

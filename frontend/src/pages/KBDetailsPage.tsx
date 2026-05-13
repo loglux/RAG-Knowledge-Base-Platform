@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useAuth } from '../context/AuthContext'
 import { apiClient } from '../services/api'
 import { Button } from '../components/common/Button'
@@ -557,6 +558,9 @@ export function KBDetailsPage() {
         await uploadDocument(file, detectDuplicatesOnUpload, contextualOverride)
       } catch (error) {
         console.error(`Failed to upload ${file.name}:`, error)
+        toast.error(`Failed to upload ${file.name}`, {
+          description: error instanceof Error ? error.message : undefined,
+        })
         throw error
       }
     }
@@ -571,7 +575,9 @@ export function KBDetailsPage() {
       await apiClient.deleteKnowledgeBase(kb.id)
       navigate('/')
     } catch (error) {
-      alert(error instanceof Error ? error.message : 'Failed to delete knowledge base')
+      toast.error('Failed to delete knowledge base', {
+        description: error instanceof Error ? error.message : undefined,
+      })
     }
   }
 

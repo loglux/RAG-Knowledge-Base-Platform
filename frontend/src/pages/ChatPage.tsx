@@ -1,5 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useAuth } from '../context/AuthContext'
 import { apiClient } from '../services/api'
 import { useChat } from '../hooks/useChat'
@@ -443,6 +444,9 @@ export function ChatPage() {
         setDocuments(items)
       } catch (err) {
         console.error('Failed to load documents:', err)
+        toast.error('Failed to load documents', {
+          description: err instanceof Error ? err.message : undefined,
+        })
         setDocuments([])
       } finally {
         setDocumentsLoading(false)
@@ -779,6 +783,9 @@ export function ChatPage() {
       }
     } catch (err) {
       console.error('Failed to reset chat defaults:', err)
+      toast.error('Failed to reset chat defaults', {
+        description: err instanceof Error ? err.message : undefined,
+      })
     }
   }
 
