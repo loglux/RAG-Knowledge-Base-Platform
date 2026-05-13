@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { LLMSelector } from './LLMSelector'
 import type { Document } from '../../types/index'
 
