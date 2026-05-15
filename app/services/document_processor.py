@@ -258,7 +258,7 @@ class DocumentProcessor:
                 )
                 await self._update_progress(document, "Indexing BM25...", 90, db)
 
-                lexical_chunks = self._build_lexical_chunks(chunks)
+                lexical_chunks = self._build_lexical_chunks(payloads)
                 await self.lexical_store.index_chunks(
                     knowledge_base_id=str(kb.id),
                     document_id=str(document.id),
@@ -723,16 +723,25 @@ class DocumentProcessor:
         return phys, logical
 
     @staticmethod
-    def _build_lexical_chunks(chunks: List[Chunk]) -> List[Dict[str, Any]]:
-        """Build OpenSearch chunk documents."""
+    def _build_lexical_chunks(payloads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Build OpenSearch chunk documents from already-computed Qdrant payloads.
+
+        Reuses payloads so page/section metadata stays consistent across stores.
+        """
         lexical_chunks = []
-        for chunk in chunks:
+        for payload in payloads:
             lexical_chunks.append(
                 {
-                    "chunk_index": chunk.index,
-                    "text": chunk.content,
-                    "char_count": chunk.char_count,
-                    "word_count": chunk.word_count,
+                    "chunk_index": payload["chunk_index"],
+                    "text": payload["text"],
+                    "char_count": payload.get("char_count"),
+                    "word_count": payload.get("word_count"),
+                    "page_number": payload.get("page_number"),
+                    "page_number_physical": payload.get("page_number_physical"),
+                    "section_heading": payload.get("section_heading"),
+                    "section_path": payload.get("section_path"),
+                    "section_level": payload.get("section_level"),
+                    "contextual_description": payload.get("contextual_description"),
                 }
             )
         return lexical_chunks

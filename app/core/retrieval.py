@@ -413,6 +413,15 @@ class RetrievalEngine:
                         "word_count": payload.get("word_count"),
                         "source_type": "lexical",
                         "lexical_score_raw": float(result.get("score", 0.0)),
+                        # Structural metadata (mirrored from Qdrant payload so
+                        # lexical-only hits carry the same attribution as dense hits)
+                        "section_heading": payload.get("section_heading"),
+                        "section_path": payload.get("section_path"),
+                        "section_level": payload.get("section_level"),
+                        "contextual_description": payload.get("contextual_description"),
+                        # PDF page tracking
+                        "page_number": payload.get("page_number"),
+                        "page_number_physical": payload.get("page_number_physical"),
                     },
                 )
             )

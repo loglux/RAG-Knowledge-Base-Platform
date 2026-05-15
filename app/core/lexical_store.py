@@ -115,6 +115,12 @@ class OpenSearchStore:
                         "content": {"type": "text", "analyzer": "kb_analyzer"},
                         "char_count": {"type": "integer"},
                         "word_count": {"type": "integer"},
+                        "page_number": {"type": "integer"},
+                        "page_number_physical": {"type": "integer"},
+                        "section_heading": {"type": "keyword"},
+                        "section_path": {"type": "keyword"},
+                        "section_level": {"type": "integer"},
+                        "contextual_description": {"type": "text", "index": False},
                         "indexed_at": {"type": "date"},
                     }
                 },
@@ -157,6 +163,12 @@ class OpenSearchStore:
                     "content": chunk["text"],
                     "char_count": chunk.get("char_count"),
                     "word_count": chunk.get("word_count"),
+                    "page_number": chunk.get("page_number"),
+                    "page_number_physical": chunk.get("page_number_physical"),
+                    "section_heading": chunk.get("section_heading"),
+                    "section_path": chunk.get("section_path"),
+                    "section_level": chunk.get("section_level"),
+                    "contextual_description": chunk.get("contextual_description"),
                     "indexed_at": utcnow().isoformat(),
                 }
             )
