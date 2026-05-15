@@ -165,12 +165,18 @@ async def create_document(
     heading_map_json: str | None = None
     page_map_json: str | None = None
     if file_type in (FileType.DOCX, FileType.FB2, FileType.PDF):
+        from app.services.pdf_parsing_settings import resolve_pdf_parsing_overrides
         from app.utils.file_handlers import FileHandlerFactory
 
         type_label = file_type.value.upper()
         handler = FileHandlerFactory.get_handler(file_type)
+        profile_overrides = (
+            await resolve_pdf_parsing_overrides(db, kb) if file_type == FileType.PDF else None
+        )
         try:
-            extracted = handler.extract_all(content_bytes, filename)
+            extracted = handler.extract_all(
+                content_bytes, filename, profile_overrides=profile_overrides
+            )
         except Exception as exc:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

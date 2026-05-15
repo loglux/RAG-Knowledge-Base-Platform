@@ -45,13 +45,22 @@ class FileHandler:
         """Extract metadata from file."""
         raise NotImplementedError
 
-    def extract_all(self, content: Union[str, bytes], filename: str) -> ExtractResult:
+    def extract_all(
+        self,
+        content: Union[str, bytes],
+        filename: str,
+        profile_overrides: Optional[Dict[str, Any]] = None,
+    ) -> ExtractResult:
         """Extract text, metadata, and any structural data in a single logical pass.
 
         Default implementation calls extract_metadata() and extract_text() separately.
         Subclasses with expensive parsing (PDF, DOCX, FB2) override this so that
         the underlying file is parsed exactly once per upload.
+
+        ``profile_overrides`` is accepted on every handler for signature
+        uniformity but only PDFFileHandler currently consumes it.
         """
+        del profile_overrides  # base class: silently ignore — only PDF uses it
         metadata = self.extract_metadata(content, filename)
         text = self.extract_text(content, metadata)
         headings: Optional[List[Dict[str, Any]]] = None

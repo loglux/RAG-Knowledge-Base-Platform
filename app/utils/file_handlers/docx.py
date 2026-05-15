@@ -1,7 +1,7 @@
 """DOCX file handler."""
 
 import io
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 from docx import Document as DocxDocument
 
@@ -91,8 +91,18 @@ class DocxFileHandler(FileHandler):
 
         return headings
 
-    def extract_all(self, content: Union[str, bytes], filename: str) -> ExtractResult:
-        """One-pass DOCX extraction: load the document once, extract everything."""
+    def extract_all(
+        self,
+        content: Union[str, bytes],
+        filename: str,
+        profile_overrides: Optional[Dict[str, Any]] = None,
+    ) -> ExtractResult:
+        """One-pass DOCX extraction: load the document once, extract everything.
+
+        ``profile_overrides`` is accepted for signature uniformity but ignored —
+        DOCX has no tunable extraction params yet.
+        """
+        del profile_overrides
         doc = self._load_document(content)
 
         texts = [p.text for p in doc.paragraphs if p.text and p.text.strip()]

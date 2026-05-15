@@ -37,6 +37,9 @@ export interface KnowledgeBase {
   temperature?: number | null
   use_self_check?: boolean | null
   contextual_description_enabled?: boolean | null
+  pdf_table_strategy?: string | null
+  pdf_heading_size_sensitivity?: number | null
+  pdf_min_doc_length?: number | null
   collection_name: string
   document_count: number
   total_chunks: number
@@ -67,6 +70,9 @@ export interface CreateKBRequest {
   temperature?: number | null
   use_self_check?: boolean | null
   contextual_description_enabled?: boolean | null
+  pdf_table_strategy?: string | null
+  pdf_heading_size_sensitivity?: number | null
+  pdf_min_doc_length?: number | null
 }
 
 export interface EmbeddingModel {
@@ -430,6 +436,9 @@ export interface AppSettings {
   active_self_check_prompt_version_id: string | null
   show_prompt_versions: boolean | null
   contextual_description_enabled: boolean | null
+  pdf_table_strategy: string | null
+  pdf_heading_size_sensitivity: number | null
+  pdf_min_doc_length: number | null
   created_at: string
   updated_at: string
 }
@@ -463,6 +472,9 @@ export interface AppSettingsUpdate {
   active_self_check_prompt_version_id?: string | null
   show_prompt_versions?: boolean | null
   contextual_description_enabled?: boolean | null
+  pdf_table_strategy?: string | null
+  pdf_heading_size_sensitivity?: number | null
+  pdf_min_doc_length?: number | null
 }
 
 export interface PromptVersionSummary {

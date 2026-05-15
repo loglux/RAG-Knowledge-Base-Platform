@@ -13,7 +13,13 @@ logger = get_logger(__name__)
 
 @dataclass
 class PDFExtractionProfile:
-    """Per-document extraction parameters derived by _profile_document()."""
+    """Per-document extraction parameters derived by _profile_document().
+
+    Three fields can be overridden from outside (admin settings → KB → call site):
+    ``table_strategy``, ``size_ratio_threshold`` (heading sensitivity), and
+    ``min_doc_length``. The rest are either auto-derived per page or constants
+    that are not worth surfacing.
+    """
 
     # y0 threshold as fraction of page height — blocks starting above this are headers
     header_zone_fraction: float = 0.04
@@ -30,6 +36,19 @@ class PDFExtractionProfile:
     bold_max_chars: int = 120
     # Heading texts appearing >= this many times kept only at first occurrence
     repeat_threshold: int = 4
+    # PyMuPDF find_tables strategy: 'lines' (visible borders) or 'text' (gaps)
+    table_strategy: str = "lines"
+    # Minimum chars in extracted text before rejecting the PDF as scanned
+    min_doc_length: int = 100
+
+
+# Fields user can override from settings (anything not listed is auto-derived
+# or considered an internal heuristic that is not yet user-facing).
+OVERRIDABLE_PROFILE_FIELDS = (
+    "table_strategy",
+    "size_ratio_threshold",
+    "min_doc_length",
+)
 
 
 class PDFFileHandler(FileHandler):
@@ -73,11 +92,19 @@ class PDFFileHandler(FileHandler):
         return _re.sub(r"\s+", " ", raw).strip()
 
     @staticmethod
-    def _profile_document(doc) -> "PDFExtractionProfile":
+    def _profile_document(
+        doc, overrides: Optional[Dict[str, Any]] = None
+    ) -> "PDFExtractionProfile":
         """Scan document structure to derive per-document extraction parameters.
 
         Detects running headers/footers (text appearing on ≥30% of pages) and
         derives zone fractions that cleanly exclude them from extraction.
+
+        Args:
+            doc: Open fitz.Document instance.
+            overrides: Optional dict with admin/KB-level overrides for
+                ``OVERRIDABLE_PROFILE_FIELDS``. None or missing keys keep
+                built-in defaults.
         """
         from collections import defaultdict
 
@@ -138,10 +165,21 @@ class PDFFileHandler(FileHandler):
             max((footer_y0_min - MARGIN_PT) / median_h, 0.85) if footer_y0_min < median_h else 0.95
         )
 
+        # Apply external overrides on top of auto-derived values.
+        # We only honour keys in OVERRIDABLE_PROFILE_FIELDS so a stray dict
+        # cannot smuggle in arbitrary attributes.
+        override_kwargs: Dict[str, Any] = {}
+        if overrides:
+            for key in OVERRIDABLE_PROFILE_FIELDS:
+                value = overrides.get(key)
+                if value is not None:
+                    override_kwargs[key] = value
+
         return PDFExtractionProfile(
             header_zone_fraction=header_zone_fraction,
             footer_zone_fraction=footer_zone_fraction,
             running_header_texts=frozenset(running_header_texts),
+            **override_kwargs,
         )
 
     @staticmethod
@@ -304,11 +342,16 @@ class PDFFileHandler(FileHandler):
 
         return result
 
-    def _extract_pdf(self, content: bytes):
+    def _extract_pdf(
+        self,
+        content: bytes,
+        profile_overrides: Optional[Dict[str, Any]] = None,
+    ):
         """Extract (text, heading_map, page_map).
 
         For each page:
-          1. Detect tables with find_tables(strategy="lines") → Markdown.
+          1. Detect tables with find_tables(strategy=profile.table_strategy)
+             and render as Markdown.
           2. Extract text blocks via get_text("dict"), skipping blocks that
              overlap ≥40% with a table region.
           3. Detect column layout and merge blocks in reading order:
@@ -317,6 +360,13 @@ class PDFFileHandler(FileHandler):
           4. Detect headings by comparing block font sizes to the page median.
 
         page_map: [[char_offset, physical_page, logical_page_or_null], ...]
+
+        Args:
+            content: Raw PDF bytes.
+            profile_overrides: Optional dict that may override
+                ``table_strategy``, ``size_ratio_threshold``, ``min_doc_length``.
+                None or missing keys fall back to per-document auto-detection
+                or built-in defaults.
         """
         import re
 
@@ -335,7 +385,7 @@ class PDFFileHandler(FileHandler):
                 "It may be a scanned document — OCR is not supported yet."
             )
 
-        profile = self._profile_document(doc)
+        profile = self._profile_document(doc, overrides=profile_overrides)
         logger.info(
             "PDF profile: header_zone=%.3f footer_zone=%.3f running_headers=%d",
             profile.header_zone_fraction,
@@ -358,7 +408,7 @@ class PDFFileHandler(FileHandler):
             # (y0, x0, x1, markdown_string, heading_info_or_None) — tables are never headings
             table_items: List = []
             try:
-                tabs = page.find_tables(strategy="lines")
+                tabs = page.find_tables(strategy=profile.table_strategy)
                 for tab in tabs.tables:
                     rows = tab.extract()
                     if rows and len(rows) >= 2:
@@ -583,9 +633,9 @@ class PDFFileHandler(FileHandler):
         # whitespace from full_text and silently shift every recorded offset.
         full_text = "\n\n".join(text_parts)
 
-        if len(full_text.strip()) < 100:
+        if len(full_text.strip()) < profile.min_doc_length:
             raise ValueError(
-                "Extracted text is too short (< 100 chars). "
+                f"Extracted text is too short (< {profile.min_doc_length} chars). "
                 "This PDF may be a scanned document — OCR is not supported yet."
             )
 
@@ -633,15 +683,26 @@ class PDFFileHandler(FileHandler):
             "creator": meta.get("creator") or None,
         }
 
-    def extract_all(self, content: Union[str, bytes], filename: str) -> ExtractResult:
+    def extract_all(
+        self,
+        content: Union[str, bytes],
+        filename: str,
+        profile_overrides: Optional[Dict[str, Any]] = None,
+    ) -> ExtractResult:
         """One-pass PDF extraction: text + headings + page_map + metadata.
 
         Replaces four separate parses (extract_metadata, extract_text,
         extract_heading_map, extract_page_map) with a single _extract_pdf
         invocation plus a lightweight metadata read.
+
+        Args:
+            content: PDF bytes (or str, decoded).
+            filename: Original filename — recorded in metadata only.
+            profile_overrides: Optional dict with admin/KB overrides for
+                ``OVERRIDABLE_PROFILE_FIELDS``.
         """
         content_bytes = self._to_bytes(content)
-        text, headings, page_map = self._extract_pdf(content_bytes)
+        text, headings, page_map = self._extract_pdf(content_bytes, profile_overrides)
         metadata = self.extract_metadata(content_bytes, filename)
         return ExtractResult(
             text=text,

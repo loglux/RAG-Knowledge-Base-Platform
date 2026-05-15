@@ -1,6 +1,6 @@
 """FB2 (FictionBook 2.0) file handler."""
 
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 from xml.etree import ElementTree
 
 from app.models.enums import FileType
@@ -194,8 +194,18 @@ class FB2FileHandler(FileHandler):
             "word_count": len(raw_content.split()),
         }
 
-    def extract_all(self, content: Union[str, bytes], filename: str) -> ExtractResult:
-        """One-pass FB2 extraction: parse XML once, derive text + headings + metadata."""
+    def extract_all(
+        self,
+        content: Union[str, bytes],
+        filename: str,
+        profile_overrides: Optional[Dict[str, Any]] = None,
+    ) -> ExtractResult:
+        """One-pass FB2 extraction: parse XML once, derive text + headings + metadata.
+
+        ``profile_overrides`` is accepted for signature uniformity but ignored —
+        FB2 has no tunable extraction params yet.
+        """
+        del profile_overrides
         if isinstance(content, bytes):
             content = content.decode("utf-8", errors="replace")
 

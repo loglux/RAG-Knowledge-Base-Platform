@@ -69,6 +69,38 @@ class KnowledgeBaseBase(BaseModel):
         default=None,
         description="KB-level override for contextual description generation during ingestion",
     )
+    # PDF parsing overrides (per-KB)
+    pdf_table_strategy: Optional[str] = Field(
+        default=None,
+        description="PDF table extraction strategy: 'lines' (visible borders) or 'text' (gaps).",
+    )
+    pdf_heading_size_sensitivity: Optional[float] = Field(
+        default=None,
+        ge=1.0,
+        le=2.0,
+        description=(
+            "Font-size ratio above which a block is treated as a heading. "
+            "Lower = more aggressive heading detection. Default 1.15."
+        ),
+    )
+    pdf_min_doc_length: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=10000,
+        description=(
+            "Minimum characters after extraction; below this the PDF is rejected as scanned. "
+            "Default 100."
+        ),
+    )
+
+    @field_validator("pdf_table_strategy")
+    @classmethod
+    def _validate_pdf_table_strategy(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        if v not in ("lines", "text"):
+            raise ValueError("pdf_table_strategy must be 'lines' or 'text'")
+        return v
 
     @field_validator("chunk_overlap")
     @classmethod
@@ -96,6 +128,9 @@ class KnowledgeBaseCreate(KnowledgeBaseBase):
     bm25_analyzer: Optional[str] = None
     use_llm_chat_titles: Optional[bool] = None
     contextual_description_enabled: Optional[bool] = None
+    pdf_table_strategy: Optional[str] = None
+    pdf_heading_size_sensitivity: Optional[float] = Field(None, ge=1.0, le=2.0)
+    pdf_min_doc_length: Optional[int] = Field(None, ge=0, le=10000)
 
 
 class KnowledgeBaseUpdate(BaseModel):
@@ -113,6 +148,9 @@ class KnowledgeBaseUpdate(BaseModel):
     bm25_analyzer: Optional[str] = None
     use_llm_chat_titles: Optional[bool] = None
     contextual_description_enabled: Optional[bool] = None
+    pdf_table_strategy: Optional[str] = None
+    pdf_heading_size_sensitivity: Optional[float] = Field(None, ge=1.0, le=2.0)
+    pdf_min_doc_length: Optional[int] = Field(None, ge=0, le=10000)
 
 
 class KnowledgeBaseResponse(KnowledgeBaseBase):
@@ -526,6 +564,32 @@ class AppSettingsBase(BaseModel):
         default=None,
         description="Global default for contextual description generation during ingestion",
     )
+    # PDF parsing app-wide defaults
+    pdf_table_strategy: Optional[str] = Field(
+        default=None,
+        description="App default PDF table extraction strategy: 'lines' or 'text'.",
+    )
+    pdf_heading_size_sensitivity: Optional[float] = Field(
+        default=None,
+        ge=1.0,
+        le=2.0,
+        description="App default heading-size ratio (default 1.15).",
+    )
+    pdf_min_doc_length: Optional[int] = Field(
+        default=None,
+        ge=0,
+        le=10000,
+        description="App default minimum extracted chars before rejecting as scanned.",
+    )
+
+    @field_validator("pdf_table_strategy")
+    @classmethod
+    def _validate_pdf_table_strategy(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        if v not in ("lines", "text"):
+            raise ValueError("pdf_table_strategy must be 'lines' or 'text'")
+        return v
 
 
 class AppSettingsResponse(AppSettingsBase):

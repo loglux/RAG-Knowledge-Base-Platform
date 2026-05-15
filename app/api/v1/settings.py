@@ -81,6 +81,10 @@ def _default_app_settings() -> dict:
         "use_llm_chat_titles": True,
         "contextual_description_enabled": False,
         "show_prompt_versions": False,
+        # PDF parsing app-wide defaults: None means "use built-in PDFExtractionProfile defaults"
+        "pdf_table_strategy": None,
+        "pdf_heading_size_sensitivity": None,
+        "pdf_min_doc_length": None,
     }
 
 
@@ -153,6 +157,9 @@ async def get_app_settings(db: AsyncSession = Depends(get_db)):
         active_self_check_prompt_version_id=row.active_self_check_prompt_version_id,
         show_prompt_versions=row.show_prompt_versions,
         contextual_description_enabled=row.contextual_description_enabled,
+        pdf_table_strategy=row.pdf_table_strategy,
+        pdf_heading_size_sensitivity=row.pdf_heading_size_sensitivity,
+        pdf_min_doc_length=row.pdf_min_doc_length,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -221,6 +228,9 @@ async def update_app_settings(
         active_self_check_prompt_version_id=row.active_self_check_prompt_version_id,
         show_prompt_versions=row.show_prompt_versions,
         contextual_description_enabled=row.contextual_description_enabled,
+        pdf_table_strategy=row.pdf_table_strategy,
+        pdf_heading_size_sensitivity=row.pdf_heading_size_sensitivity,
+        pdf_min_doc_length=row.pdf_min_doc_length,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )
@@ -287,6 +297,9 @@ async def reset_app_settings(db: AsyncSession = Depends(get_db)):
         active_self_check_prompt_version_id=row.active_self_check_prompt_version_id,
         show_prompt_versions=row.show_prompt_versions,
         contextual_description_enabled=row.contextual_description_enabled,
+        pdf_table_strategy=row.pdf_table_strategy,
+        pdf_heading_size_sensitivity=row.pdf_heading_size_sensitivity,
+        pdf_min_doc_length=row.pdf_min_doc_length,
         created_at=row.created_at,
         updated_at=row.updated_at,
     )

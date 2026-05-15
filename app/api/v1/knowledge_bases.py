@@ -128,6 +128,9 @@ async def create_knowledge_base(
             else default_use_llm_chat_titles
         ),
         contextual_description_enabled=kb.contextual_description_enabled,
+        pdf_table_strategy=kb.pdf_table_strategy,
+        pdf_heading_size_sensitivity=kb.pdf_heading_size_sensitivity,
+        pdf_min_doc_length=kb.pdf_min_doc_length,
         user_id=user_id,
     )
 

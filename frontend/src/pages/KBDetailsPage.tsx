@@ -51,6 +51,9 @@ export function KBDetailsPage() {
     upsert_batch_size: 256,
     chunking_strategy: 'smart' as ChunkingStrategy,
     contextual_description_mode: 'default' as 'default' | 'enabled' | 'disabled',
+    pdf_table_strategy_mode: 'default' as 'default' | 'lines' | 'text',
+    pdf_heading_sensitivity: '' as string,
+    pdf_min_doc_length: '' as string,
   })
   const [settingsErrors, setSettingsErrors] = useState<Record<string, string>>({})
   const [settingsSaving, setSettingsSaving] = useState(false)
@@ -121,12 +124,25 @@ export function KBDetailsPage() {
         : kbData.contextual_description_enabled
         ? 'enabled'
         : 'disabled'
+    const pdfStrategyMode: 'default' | 'lines' | 'text' =
+      kbData.pdf_table_strategy === 'lines'
+        ? 'lines'
+        : kbData.pdf_table_strategy === 'text'
+        ? 'text'
+        : 'default'
     return {
       chunk_size: kbData.chunk_size,
       chunk_overlap: kbData.chunk_overlap,
       upsert_batch_size: kbData.upsert_batch_size,
       chunking_strategy: kbData.chunking_strategy as ChunkingStrategy,
       contextual_description_mode: mode,
+      pdf_table_strategy_mode: pdfStrategyMode,
+      pdf_heading_sensitivity:
+        kbData.pdf_heading_size_sensitivity != null
+          ? String(kbData.pdf_heading_size_sensitivity)
+          : '',
+      pdf_min_doc_length:
+        kbData.pdf_min_doc_length != null ? String(kbData.pdf_min_doc_length) : '',
     }
   }
 
@@ -387,6 +403,21 @@ export function KBDetailsPage() {
       newErrors.upsert_batch_size = 'Batch size must be between 64 and 1024'
     }
 
+    const headingSens = settingsData.pdf_heading_sensitivity.trim()
+    if (headingSens !== '') {
+      const parsed = parseFloat(headingSens)
+      if (Number.isNaN(parsed) || parsed < 1.0 || parsed > 2.0) {
+        newErrors.pdf_heading_sensitivity = 'Heading sensitivity must be between 1.0 and 2.0'
+      }
+    }
+
+    const minLen = settingsData.pdf_min_doc_length.trim()
+    if (minLen !== '') {
+      const parsed = parseInt(minLen)
+      if (Number.isNaN(parsed) || parsed < 0 || parsed > 10000) {
+        newErrors.pdf_min_doc_length = 'Min doc length must be between 0 and 10000'
+      }
+    }
 
     setSettingsErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -398,6 +429,8 @@ export function KBDetailsPage() {
 
     setSettingsSaving(true)
     try {
+      const headingSens = settingsData.pdf_heading_sensitivity.trim()
+      const minLen = settingsData.pdf_min_doc_length.trim()
       const updated = await apiClient.updateKnowledgeBase(kb.id, {
         chunk_size: settingsData.chunk_size,
         chunk_overlap: settingsData.chunk_overlap,
@@ -407,6 +440,12 @@ export function KBDetailsPage() {
           settingsData.contextual_description_mode === 'default'
             ? null
             : settingsData.contextual_description_mode === 'enabled',
+        pdf_table_strategy:
+          settingsData.pdf_table_strategy_mode === 'default'
+            ? null
+            : settingsData.pdf_table_strategy_mode,
+        pdf_heading_size_sensitivity: headingSens === '' ? null : parseFloat(headingSens),
+        pdf_min_doc_length: minLen === '' ? null : parseInt(minLen),
       })
       setKb(updated)
       setIsEditingSettings(false)
@@ -1402,6 +1441,105 @@ export function KBDetailsPage() {
                 <p className="mt-1 text-xs text-gray-500">
                   Enable for quality-focused KBs with long/complex documents; disable for fast or cost-sensitive ingestion.
                 </p>
+              </div>
+
+              <div className="border-t border-gray-700 pt-4">
+                <h4 className="text-gray-200 font-medium mb-1">PDF Parsing Overrides</h4>
+                <p className="text-xs text-gray-500 mb-4">
+                  Override app-wide defaults for this KB. Leave on “Inherit” to use the global value.
+                </p>
+
+                <div className="space-y-4">
+                  <div>
+                    <label
+                      htmlFor="kb-pdf-table-strategy"
+                      className="block text-gray-400 mb-2 text-sm"
+                    >
+                      Table Extraction Strategy
+                    </label>
+                    <select
+                      id="kb-pdf-table-strategy"
+                      value={settingsData.pdf_table_strategy_mode}
+                      onChange={(e) =>
+                        setSettingsData({
+                          ...settingsData,
+                          pdf_table_strategy_mode: e.target.value as 'default' | 'lines' | 'text',
+                        })
+                      }
+                      className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100"
+                      disabled={settingsSaving}
+                    >
+                      <option value="default">
+                        Inherit global default ({appDefaults?.pdf_table_strategy || 'lines'})
+                      </option>
+                      <option value="lines">Lines (visible borders)</option>
+                      <option value="text">Text (detect by gaps)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="kb-pdf-heading-sensitivity"
+                      className="block text-gray-400 mb-2 text-sm"
+                    >
+                      Heading Size Sensitivity (1.00–2.00)
+                    </label>
+                    <input
+                      id="kb-pdf-heading-sensitivity"
+                      type="number"
+                      step="0.05"
+                      min="1.0"
+                      max="2.0"
+                      placeholder={`Inherit (${
+                        appDefaults?.pdf_heading_size_sensitivity ?? 1.15
+                      })`}
+                      value={settingsData.pdf_heading_sensitivity}
+                      onChange={(e) =>
+                        setSettingsData({
+                          ...settingsData,
+                          pdf_heading_sensitivity: e.target.value,
+                        })
+                      }
+                      className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100"
+                      disabled={settingsSaving}
+                    />
+                    {settingsErrors.pdf_heading_sensitivity && (
+                      <p className="mt-1 text-sm text-red-500">
+                        {settingsErrors.pdf_heading_sensitivity}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="kb-pdf-min-doc-length"
+                      className="block text-gray-400 mb-2 text-sm"
+                    >
+                      Minimum Document Length (chars)
+                    </label>
+                    <input
+                      id="kb-pdf-min-doc-length"
+                      type="number"
+                      min="0"
+                      max="10000"
+                      placeholder={`Inherit (${appDefaults?.pdf_min_doc_length ?? 100})`}
+                      value={settingsData.pdf_min_doc_length}
+                      onChange={(e) =>
+                        setSettingsData({
+                          ...settingsData,
+                          pdf_min_doc_length: e.target.value,
+                        })
+                      }
+                      className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100"
+                      disabled={settingsSaving}
+                    />
+                    {settingsErrors.pdf_min_doc_length && (
+                      <p className="mt-1 text-sm text-red-500">
+                        {settingsErrors.pdf_min_doc_length}
+                      </p>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div>

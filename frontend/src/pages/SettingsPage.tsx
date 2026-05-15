@@ -94,6 +94,9 @@ export function SettingsPage() {
   const [kbChunkSize, setKbChunkSize] = useState(1000)
   const [kbChunkOverlap, setKbChunkOverlap] = useState(200)
   const [kbUpsertBatchSize, setKbUpsertBatchSize] = useState(256)
+  const [pdfTableStrategy, setPdfTableStrategy] = useState('lines')
+  const [pdfHeadingSensitivity, setPdfHeadingSensitivity] = useState(1.15)
+  const [pdfMinDocLength, setPdfMinDocLength] = useState(100)
 
   // Prompt Versions
   const [promptVersions, setPromptVersions] = useState<PromptVersionSummary[]>([])
@@ -271,6 +274,11 @@ export function SettingsPage() {
       if (appSettings.kb_chunk_size !== null) setKbChunkSize(appSettings.kb_chunk_size)
       if (appSettings.kb_chunk_overlap !== null) setKbChunkOverlap(appSettings.kb_chunk_overlap)
       if (appSettings.kb_upsert_batch_size !== null) setKbUpsertBatchSize(appSettings.kb_upsert_batch_size)
+      if (appSettings.pdf_table_strategy) setPdfTableStrategy(appSettings.pdf_table_strategy)
+      if (appSettings.pdf_heading_size_sensitivity !== null) {
+        setPdfHeadingSensitivity(appSettings.pdf_heading_size_sensitivity)
+      }
+      if (appSettings.pdf_min_doc_length !== null) setPdfMinDocLength(appSettings.pdf_min_doc_length)
 
       // Load system settings (API keys, databases)
       const systemSettings = await apiClient.getSystemSettings()
@@ -672,6 +680,9 @@ export function SettingsPage() {
         kb_chunk_size: kbChunkSize,
         kb_chunk_overlap: kbChunkOverlap,
         kb_upsert_batch_size: kbUpsertBatchSize,
+        pdf_table_strategy: pdfTableStrategy,
+        pdf_heading_size_sensitivity: pdfHeadingSensitivity,
+        pdf_min_doc_length: pdfMinDocLength,
       })
 
       setSuccess('KB defaults saved successfully!')
@@ -1182,6 +1193,12 @@ export function SettingsPage() {
             setKbChunkOverlap={setKbChunkOverlap}
             kbUpsertBatchSize={kbUpsertBatchSize}
             setKbUpsertBatchSize={setKbUpsertBatchSize}
+            pdfTableStrategy={pdfTableStrategy}
+            setPdfTableStrategy={setPdfTableStrategy}
+            pdfHeadingSensitivity={pdfHeadingSensitivity}
+            setPdfHeadingSensitivity={setPdfHeadingSensitivity}
+            pdfMinDocLength={pdfMinDocLength}
+            setPdfMinDocLength={setPdfMinDocLength}
             onSave={handleSaveKBDefaults}
             saving={saving}
           />
@@ -2706,6 +2723,12 @@ type KBDefaultsTabProps = {
   setKbChunkOverlap: (value: number) => void
   kbUpsertBatchSize: number
   setKbUpsertBatchSize: (value: number) => void
+  pdfTableStrategy: string
+  setPdfTableStrategy: (value: string) => void
+  pdfHeadingSensitivity: number
+  setPdfHeadingSensitivity: (value: number) => void
+  pdfMinDocLength: number
+  setPdfMinDocLength: (value: number) => void
   onSave: () => void
   saving: boolean
 }
@@ -2714,6 +2737,9 @@ function KBDefaultsTab({
   kbChunkSize, setKbChunkSize,
   kbChunkOverlap, setKbChunkOverlap,
   kbUpsertBatchSize, setKbUpsertBatchSize,
+  pdfTableStrategy, setPdfTableStrategy,
+  pdfHeadingSensitivity, setPdfHeadingSensitivity,
+  pdfMinDocLength, setPdfMinDocLength,
   onSave, saving
 }: KBDefaultsTabProps) {
 
@@ -2778,6 +2804,70 @@ function KBDefaultsTab({
             <span className="min-w-[4rem] text-right text-gray-200">{kbUpsertBatchSize}</span>
           </div>
           <p className="text-xs text-gray-400 mt-1">Vectors per batch for Qdrant upload (higher = faster but more memory)</p>
+        </div>
+      </div>
+
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
+        <h3 className="text-lg font-semibold text-gray-100 mb-1">PDF Parsing Defaults</h3>
+        <p className="text-xs text-gray-400 mb-4">
+          Applied at document upload. KB-level overrides take precedence over these values.
+        </p>
+
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">Table Extraction Strategy</label>
+          <select
+            value={pdfTableStrategy}
+            onChange={(e) => setPdfTableStrategy(e.target.value)}
+            className="w-full rounded border-gray-600 bg-gray-900 text-gray-100 px-3 py-2"
+          >
+            <option value="lines">Lines (visible borders) — default</option>
+            <option value="text">Text (detect by gaps)</option>
+          </select>
+          <p className="text-xs text-gray-400 mt-1">
+            Use “Text” if your PDFs have tables without visible cell borders.
+          </p>
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-300 mb-2">
+            Heading Size Sensitivity
+          </label>
+          <div className="flex items-center gap-4">
+            <input
+              type="range"
+              className="w-full"
+              value={pdfHeadingSensitivity}
+              onChange={(e) => setPdfHeadingSensitivity(parseFloat(e.target.value))}
+              min="1.0"
+              max="2.0"
+              step="0.05"
+            />
+            <span className="min-w-[4rem] text-right text-gray-200">
+              {pdfHeadingSensitivity.toFixed(2)}×
+            </span>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            Font-size ratio above which a block becomes a heading. Lower = more aggressive (default 1.15).
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">Minimum Document Length</label>
+          <div className="flex items-center gap-4">
+            <input
+              type="number"
+              className="w-32 rounded border-gray-600 bg-gray-900 text-gray-100 px-3 py-2"
+              value={pdfMinDocLength}
+              onChange={(e) => setPdfMinDocLength(parseInt(e.target.value) || 0)}
+              min="0"
+              max="10000"
+              step="50"
+            />
+            <span className="text-xs text-gray-500">chars</span>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            Reject the PDF if extracted text is shorter than this — guards against scanned/image-only docs (default 100).
+          </p>
         </div>
       </div>
 

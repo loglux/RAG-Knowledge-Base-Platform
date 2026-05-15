@@ -100,6 +100,23 @@ class KnowledgeBase(Base):
         comment="KB-level toggle for contextual description generation during ingestion",
     )
 
+    # PDF parsing overrides (None = inherit from app_settings, then built-in defaults)
+    pdf_table_strategy: Mapped[Optional[str]] = mapped_column(
+        String(10),
+        nullable=True,
+        comment="PyMuPDF find_tables strategy: 'lines' or 'text'",
+    )
+    pdf_heading_size_sensitivity: Mapped[Optional[float]] = mapped_column(
+        sa.Float,
+        nullable=True,
+        comment="Font-size ratio above which a block becomes a heading (default 1.15)",
+    )
+    pdf_min_doc_length: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="Minimum chars after extraction; below this PDF is rejected as scanned",
+    )
+
     # Statistics
     document_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_chunks: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -450,6 +467,23 @@ class AppSettings(Base):
         Boolean,
         nullable=True,
         comment="Global default for contextual description generation during ingestion",
+    )
+
+    # PDF parsing app-wide defaults (KB-level overrides take precedence)
+    pdf_table_strategy: Mapped[Optional[str]] = mapped_column(
+        String(10),
+        nullable=True,
+        comment="App default for PyMuPDF find_tables strategy: 'lines' or 'text'",
+    )
+    pdf_heading_size_sensitivity: Mapped[Optional[float]] = mapped_column(
+        sa.Float,
+        nullable=True,
+        comment="App default for heading detection font-size ratio (default 1.15)",
+    )
+    pdf_min_doc_length: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="App default for min extracted chars before rejecting as scanned",
     )
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)

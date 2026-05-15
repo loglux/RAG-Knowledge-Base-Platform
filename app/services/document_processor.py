@@ -393,8 +393,22 @@ class DocumentProcessor:
                     try:
                         file_bytes = _file_path.read_bytes()
                         handler = FileHandlerFactory.get_handler(document.file_type)
+                        from app.models.enums import FileType as _FileType
+                        from app.services.pdf_parsing_settings import (
+                            resolve_pdf_parsing_overrides,
+                        )
+
+                        _profile_overrides = (
+                            await resolve_pdf_parsing_overrides(db, kb)
+                            if document.file_type == _FileType.PDF
+                            else None
+                        )
                         try:
-                            extracted = handler.extract_all(file_bytes, document.filename or "")
+                            extracted = handler.extract_all(
+                                file_bytes,
+                                document.filename or "",
+                                profile_overrides=_profile_overrides,
+                            )
                             if extracted.text and extracted.text.strip():
                                 document.content = extracted.text
                                 logger.info(f"Re-extracted content: {len(extracted.text)} chars")
