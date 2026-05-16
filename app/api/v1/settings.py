@@ -69,6 +69,12 @@ def _default_app_settings() -> dict:
         "rerank_min_score": None,
         "retrieval_mode": "dense",
         "lexical_top_k": 20,
+        # Balanced hybrid mix. Slightly dense-tilted (paraphrase queries are
+        # the common case) but with enough lexical weight that BM25 hits on
+        # exact tokens still influence ranking. Identifier-style queries
+        # (e.g. "Question 6", "Section 5.3") are auto-boosted to a higher
+        # lexical floor by the query classifier — see
+        # app/services/query_classifier.py.
         "hybrid_dense_weight": 0.6,
         "hybrid_lexical_weight": 0.4,
         "bm25_match_mode": app_settings.BM25_DEFAULT_MATCH_MODE,

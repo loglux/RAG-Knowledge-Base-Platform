@@ -104,6 +104,30 @@ class RetrievalEngine:
         if not query or not query.strip():
             raise ValueError("Query cannot be empty")
 
+        # Identifier-style queries ("Question 6 from EMA", "Section 5.3",
+        # "page 42") are dominated by their literal token, not their
+        # semantic meaning. Boost lexical weight for those so the chunk
+        # that *contains* the identifier outranks topically-similar
+        # front-matter chunks. apply_lexical_floor() is a no-op when
+        # the caller already passed a sufficiently high weight.
+        from app.services.query_classifier import apply_lexical_floor, classify_query
+
+        classification = classify_query(query)
+        if classification.is_identifier_query:
+            adjusted = apply_lexical_floor(lexical_weight, classification.lexical_floor)
+            if adjusted != lexical_weight:
+                logger.info(
+                    "Identifier-style query detected (matched %r); "
+                    "lifting lexical_weight %.2f → %.2f, dense_weight %.2f → %.2f",
+                    classification.matched_pattern,
+                    lexical_weight,
+                    adjusted,
+                    dense_weight,
+                    1.0 - adjusted,
+                )
+                lexical_weight = adjusted
+                dense_weight = 1.0 - adjusted
+
         dense_limit = dense_top_k or max(top_k, 10)
         lexical_limit = lexical_top_k or max(top_k, 10)
 
