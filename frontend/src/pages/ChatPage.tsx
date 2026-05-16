@@ -1101,6 +1101,30 @@ export function ChatPage() {
                           showPromptVersion={showPromptVersions}
                           sourceAnchorPrefix={sourceAnchorPrefix}
                         />
+                        {message.hint && (
+                          <div
+                            className="mt-3 p-3 rounded-md border border-yellow-500/30 bg-yellow-500/10 text-yellow-100 text-sm flex items-start gap-3"
+                            role="status"
+                          >
+                            <span aria-hidden className="text-yellow-300 mt-0.5">💡</span>
+                            <div className="flex-1">
+                              <p className="leading-snug">{message.hint.message}</p>
+                              {message.hint.suggestions.length > 0 && (
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {message.hint.suggestions.map((s) => (
+                                    <span
+                                      key={s.action}
+                                      className="inline-flex items-center px-2 py-0.5 text-xs rounded border border-yellow-500/40 bg-yellow-500/20 text-yellow-100"
+                                      title={s.action}
+                                    >
+                                      {s.label}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       {message.sources && message.sources.length > 0 && (
                         <details className="mt-4 space-y-2">
                           <summary className="text-xs text-gray-500 font-medium cursor-pointer select-none sources-summary">

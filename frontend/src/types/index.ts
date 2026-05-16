@@ -273,6 +273,7 @@ export interface ChatMessage {
   use_conversation_history?: boolean
   conversation_history_limit?: number
   prompt_version_id?: string | null
+  hint?: RetrievalHint | null
 }
 
 export interface SourceChunk {
@@ -325,6 +326,18 @@ export interface ChatRequest {
   context_window?: number | null
 }
 
+export interface RetrievalHintSuggestion {
+  action: string
+  label: string
+  value?: string | null
+}
+
+export interface RetrievalHint {
+  type: string
+  message: string
+  suggestions: RetrievalHintSuggestion[]
+}
+
 export interface ChatResponse {
   answer: string
   sources: SourceChunk[]
@@ -339,6 +352,7 @@ export interface ChatResponse {
   use_mmr?: boolean
   mmr_diversity?: number
   use_self_check?: boolean
+  hint?: RetrievalHint | null
 }
 
 export interface ConversationSummary {

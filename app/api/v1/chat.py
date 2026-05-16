@@ -488,6 +488,14 @@ async def chat_query(
             for chunk in rag_response.sources
         ]
 
+        # Generate a UX hint when retrieval signals look weak for an
+        # identifier-style query (see app/services/retrieval_hints.py).
+        # No hint is attached for ordinary queries — the field stays None.
+        from app.services.retrieval_hints import build_hint_for_response
+
+        hint_obj = build_hint_for_response(request.question, rag_response.sources)
+        hint_payload = hint_obj.to_dict() if hint_obj is not None else None
+
         response = ChatResponse(
             answer=rag_response.answer,
             sources=sources,
@@ -502,6 +510,7 @@ async def chat_query(
             use_mmr=effective.get("use_mmr") if effective.get("use_mmr") else None,
             mmr_diversity=effective.get("mmr_diversity") if effective.get("use_mmr") else None,
             use_self_check=bool(use_self_check) if use_self_check else None,
+            hint=hint_payload,
         )
 
         logger.info(
