@@ -447,6 +447,33 @@ Query: *"Tell me about rounding methods"*
 
 When you first enable hybrid search on an existing KB, use **Reindex for BM25** to populate the lexical index.
 
+### Tuning for query patterns
+
+The default hybrid mix (dense 0.6 / lexical 0.4) and Top K 10 are tuned for **explanatory queries** — "what is X", "how does Y work", "explain Z". For other query patterns the defaults can underperform; the table below maps observed query types to the tweaks that usually fix them.
+
+| Query pattern | Example | Why default mix struggles | Tweak |
+|---|---|---|---|
+| **Find by identifier** | `"Open Question 6 from EMA"`, `"What does Activity 14 cover?"`, `"Раздел 5.3"` | Identifier tokens have **strong BM25 signal but weak semantic signal**. The chunk that contains the identifier is usually about a specific topic (e.g. autism statistics, not "questions in general"), so dense similarity ranks general front-matter higher. | Raise `hybrid_lexical_weight` to 0.6+; **or** keep weights and bump Top K to 20–25; **or** add a domain noun to the query (`"Question 6 autism 20 marks"`). |
+| **Paraphrase / concept search** | `"how do I handle missing values"`, `"что значит antifragile"` | Works well already — dense embedding handles synonyms. | Keep defaults. Optionally enable MMR if results cluster on a single section. |
+| **Long compositional question** | `"Compare the methods used in Question 5 and Question 6 of the EMA"` | The query mentions multiple identifiers AND asks for synthesis. Both Q5 and Q6 chunks must end up in context, but each may compete with front-matter for slots. | Increase Top K to 20+; consider Document filter scoped to the one PDF. |
+| **Exact phrase / quotation lookup** | `"the antifragile gets better"` | Quotation is unambiguous lexically. | Set `hybrid_lexical_weight` 0.7+; or temporarily switch to lexical-only retrieval. |
+| **"Show me all of X"** enumerations | `"List every TMA cut-off date"`, `"All Activity 6 instances"` | Single retrieval pass returns Top K, not "everything". | Raise Top K to 50; use Document filter; or split into separate questions per source. |
+
+#### Why this is currently a knob, not magic
+
+The retriever sees only the literal query string and your default weights — it has no way to know that `"Question 6"` is an identifier and `"how does autism research work"` is a concept query. So it applies the same dense/lexical blend to both.
+
+**Symptom diagnosis recipe**: if a chunk you *know* exists doesn't surface, query OpenSearch directly with `match_phrase` over `kb_chunks`. If it returns a hit with score > 10, your data is fine — the issue is purely how the **hybrid score blend** ranked it. Lift Top K or `hybrid_lexical_weight`, retry, and the chunk will appear.
+
+#### Systemic improvements on the roadmap
+
+Two planned features address this without manual tuning per query:
+
+- **Query-type-aware weighting** — pre-classify the query with a small regex (identifier patterns like `Question \d+`, `page \d+`, section codes) and lift lexical weight automatically for that one query. No model changes.
+- **Section-heading boost** — when the query contains a phrase that exactly matches a chunk's `metadata.section_heading`, add a bounded bonus to that chunk's combined score. Uses the per-chunk section metadata already stored in both Qdrant and OpenSearch.
+
+Until those land, the table above is the manual playbook.
+
 ## KB settings (UI)
 
 KB‑level configuration (chunk size/overlap, batch size, chunking strategy, and enrichment toggles) is set per KB and affects only new or reprocessed documents.
