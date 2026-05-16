@@ -150,6 +150,24 @@ The platform supports three chunking strategies with different trade-offs:
 - Smart: LangChain
 - Semantic: NLTK, NumPy, scikit-learn
 
+## PDF parsing (tunable)
+
+PDFs are parsed with [PyMuPDF](https://pymupdf.readthedocs.io/) at upload time. Three parameters are exposed to admins, with app-wide defaults and per-KB overrides (resolution order: KB → app defaults → built-in):
+
+| Parameter | Default | What it does | When to override |
+|---|---|---|---|
+| `pdf_table_strategy` | `lines` | How `find_tables()` detects tables — by visible borders (`lines`) or by text alignment / column gaps (`text`). | Switch to `text` when retrieval misses obviously tabular data (TOCs, schedules, borderless tables, OCRed PDFs). |
+| `pdf_heading_size_sensitivity` | `1.15` | Font-size ratio above which a block becomes a heading (relative to page median). Lower → more aggressive detection. | Lower (e.g. `1.08`) for documents where headings are only slightly bigger than body text. Raise for false positives from emphasised paragraphs. |
+| `pdf_min_doc_length` | `100` | Minimum extracted chars; below this the PDF is rejected as likely scanned/OCR-only. | Lower for short legitimate docs (certificates, single-page memos). Raise to be stricter about junk PDFs. |
+
+These also coexist with auto-derived per-document parameters (running header/footer zones, repeat-threshold heading dedup) that don't need tuning.
+
+UI:
+- App defaults — **Settings → KB Defaults → PDF Parsing Defaults**
+- Per-KB overrides — **KB Details → Settings → Chunking → Edit → PDF Parsing Overrides**
+
+Changing parameters only affects new uploads and reprocessed documents; existing chunks are not auto-rebuilt.
+
 ## Quick start (Docker)
 
 This starts the full stack (API + DB + Qdrant + OpenSearch + frontend).
@@ -315,6 +333,7 @@ Global Settings define defaults for new chats and retrieval behavior:
 - **Top K / Max context / Score threshold / Temperature**
 - **General Knowledge Base Configuration** (chunk size/overlap, batch size, chunking strategy)
 - **Ingestion enrichment defaults** (`contextual_description_enabled`)
+- **PDF Parsing Defaults** — table strategy, heading-size sensitivity, min doc length (see [PDF parsing](#pdf-parsing-tunable))
 
 These defaults are applied unless a specific knowledge base overrides them.
 They are saved in the backend and used to initialize new chats and KBs.

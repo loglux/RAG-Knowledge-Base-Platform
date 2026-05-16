@@ -1475,6 +1475,13 @@ export function KBDetailsPage() {
                       <option value="lines">Lines (visible borders)</option>
                       <option value="text">Text (detect by gaps)</option>
                     </select>
+                    <p className="mt-2 text-xs text-gray-500">
+                      <span className="text-gray-300">Lines</span> finds tables by visible
+                      borders (typical reports, books).{' '}
+                      <span className="text-gray-300">Text</span> finds them by column
+                      alignment and gaps (borderless / OCRed PDFs). Override only if the
+                      default misses obvious tables in this KB.
+                    </p>
                   </div>
 
                   <div>

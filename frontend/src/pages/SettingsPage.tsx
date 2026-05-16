@@ -2823,9 +2823,25 @@ function KBDefaultsTab({
             <option value="lines">Lines (visible borders) — default</option>
             <option value="text">Text (detect by gaps)</option>
           </select>
-          <p className="text-xs text-gray-400 mt-1">
-            Use “Text” if your PDFs have tables without visible cell borders.
-          </p>
+          <div className="mt-2 space-y-1 text-xs text-gray-400">
+            <p>
+              <span className="text-gray-200 font-medium">Lines</span> — finds tables by
+              detecting drawn borders/rules in the PDF. Best for typical reports, scientific
+              papers, financial statements, books with bordered tables. Misses tables that
+              look like tables visually but have no actual line elements.
+            </p>
+            <p>
+              <span className="text-gray-200 font-medium">Text</span> — finds tables by
+              analysing text alignment and whitespace gaps between columns. Best for
+              borderless tables (TOCs, schedules, spreadsheet-style PDFs, OCRed pages
+              where borders weren’t preserved). Can produce false positives on
+              multi-column layouts that aren’t actually tables.
+            </p>
+            <p className="text-gray-500 italic">
+              Rule of thumb: leave on “Lines” unless retrieval over your PDFs is missing
+              data that was clearly tabular in the source.
+            </p>
+          </div>
         </div>
 
         <div className="mb-6">

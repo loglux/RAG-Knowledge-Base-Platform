@@ -29,14 +29,14 @@ These are local conventions only—ports can be changed if needed (including the
 - Health: `http://<host>:8004/api/v1/health`
 - OpenSearch: `http://<host>:9200`
 
-### Critical: Docker port binding for NAS + router nginx
+### Critical: Docker port binding behind an external reverse proxy
 
-For this deployment, service ports that must be reachable from LAN/router **must not** be bound to loopback.
+When an external reverse proxy (nginx, Caddy, Traefik, router-level proxy, …) sits in front of this stack, container ports that must be reachable from the proxy host **must not** be bound to loopback.
 
 - Correct: `0.0.0.0:PORT:PORT`
 - Wrong for this setup: `127.0.0.1:PORT:PORT`
 
-If `db/qdrant/opensearch` are bound to `127.0.0.1`, external reverse proxy paths can fail with `502 Bad Gateway` even when containers look healthy locally.
+If `db/qdrant/opensearch` are bound to `127.0.0.1`, the external reverse proxy can fail with `502 Bad Gateway` even when containers look healthy locally — the proxy resolves to the host's external interface, which sees nothing on a loopback-only bind. This bites NAS deployments, multi-host Docker setups, and any reverse-proxy-on-different-machine topology.
 
 ---
 
@@ -196,8 +196,8 @@ Fix:
 
 ### `502 Bad Gateway` on `<PUBLIC_DOMAIN>`
 Cause:
-- Router nginx cannot reach upstream on NAS
-- Docker service published to loopback (`127.0.0.1`) instead of LAN (`0.0.0.0`)
+- External reverse proxy cannot reach the upstream host
+- Docker service published to loopback (`127.0.0.1`) instead of all interfaces (`0.0.0.0`)
 - API healthcheck endpoint returns redirect and container never reaches `healthy`
 
 Fix:
