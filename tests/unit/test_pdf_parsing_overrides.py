@@ -59,6 +59,24 @@ class TestPDFExtractionProfile:
         assert p.size_ratio_threshold == 1.15
         assert p.min_doc_length == 100
 
+    def test_default_zones_do_not_filter_anything(self):
+        """No running headers/footers detected → no blanket top/bottom strip.
+
+        Regression guard: an earlier version set header_zone_fraction=0.04 as
+        a "just in case" default, which silently dropped real headings sitting
+        in the top ~33 pt of pages (e.g. "Question N" labels in OU exam PDFs).
+        The contract is now: the zones only filter when running headers were
+        actually confirmed.
+        """
+        p = PDFExtractionProfile()
+        assert p.header_zone_fraction == 0.0, (
+            "header_zone_fraction default must be 0.0; non-zero default eats "
+            "real top-of-page content in documents with no repeating headers"
+        )
+        assert (
+            p.footer_zone_fraction == 1.0
+        ), "footer_zone_fraction default must be 1.0 by the same reasoning"
+
     def test_can_construct_with_overrides(self):
         p = PDFExtractionProfile(
             table_strategy="text", size_ratio_threshold=1.25, min_doc_length=50

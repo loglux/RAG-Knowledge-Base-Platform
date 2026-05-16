@@ -21,10 +21,14 @@ class PDFExtractionProfile:
     that are not worth surfacing.
     """
 
-    # y0 threshold as fraction of page height — blocks starting above this are headers
-    header_zone_fraction: float = 0.04
-    # y0 threshold as fraction of page height — blocks starting here or below are footers
-    footer_zone_fraction: float = 0.95
+    # y0 threshold as fraction of page height — blocks starting above this are
+    # treated as headers and dropped. 0.0 means "don't filter top". The real
+    # value is derived per-document from confirmed running headers; this
+    # default applies only when no running headers were detected.
+    header_zone_fraction: float = 0.0
+    # y0 threshold as fraction of page height — blocks starting here or below are
+    # treated as footers and dropped. 1.0 means "don't filter bottom".
+    footer_zone_fraction: float = 1.0
     # Normalised texts of confirmed running headers — excluded from text and headings
     running_header_texts: frozenset = field(default_factory=frozenset)
     # Font size ratio above which a block qualifies as a size-based heading
@@ -151,8 +155,13 @@ class PDFFileHandler(FileHandler):
                 running_header_texts.add(text)
                 header_y1_max = max(header_y1_max, max(y1 for _, y1 in coords))
 
+        # When no running headers were confirmed, do NOT apply a blanket
+        # top-of-page filter. The earlier 0.04 default would silently eat real
+        # headings sitting in the top ~33 pt strip (e.g. "Question N – X marks"
+        # in OU exam papers), with no benefit when there is nothing repetitive
+        # to remove. Same reasoning for the footer zone.
         header_zone_fraction = (
-            min((header_y1_max + MARGIN_PT) / median_h, 0.10) if running_header_texts else 0.04
+            min((header_y1_max + MARGIN_PT) / median_h, 0.10) if running_header_texts else 0.0
         )
 
         # Derive footer zone from confirmed running footers
@@ -162,7 +171,7 @@ class PDFFileHandler(FileHandler):
                 footer_y0_min = min(footer_y0_min, min(y0 for y0, _ in coords))
 
         footer_zone_fraction = (
-            max((footer_y0_min - MARGIN_PT) / median_h, 0.85) if footer_y0_min < median_h else 0.95
+            max((footer_y0_min - MARGIN_PT) / median_h, 0.85) if footer_y0_min < median_h else 1.0
         )
 
         # Apply external overrides on top of auto-derived values.
