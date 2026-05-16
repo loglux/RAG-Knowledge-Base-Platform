@@ -65,6 +65,17 @@ _IDENTIFIER_PATTERNS: Sequence[re.Pattern] = (
 # ~0.30 dense advantage on the "Question 6 from EMA" case).
 DEFAULT_IDENTIFIER_LEXICAL_FLOOR: float = 0.7
 
+# When an identifier is present, BM25 must return the chunk containing it
+# even if most other query tokens don't appear there. The identifier
+# itself is a strong signal; surrounding query words ("from", "the",
+# "in", document name) are often absent from the target chunk's body.
+# Setting min_should_match=1 (and disabling balanced/strict modes) makes
+# BM25 return any chunk that hits ≥1 query token, so the phrase-match
+# boost on the identifier itself can rank chunk 15 to the top — instead
+# of being filtered out by a 50-60% token-coverage threshold.
+IDENTIFIER_BM25_MIN_SHOULD_MATCH: int = 1
+IDENTIFIER_BM25_MATCH_MODE: Optional[str] = None  # cancel "strict"/"balanced"
+
 
 @dataclass(frozen=True)
 class QueryClassification:

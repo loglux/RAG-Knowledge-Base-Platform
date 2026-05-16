@@ -106,27 +106,41 @@ class RetrievalEngine:
 
         # Identifier-style queries ("Question 6 from EMA", "Section 5.3",
         # "page 42") are dominated by their literal token, not their
-        # semantic meaning. Boost lexical weight for those so the chunk
-        # that *contains* the identifier outranks topically-similar
-        # front-matter chunks. apply_lexical_floor() is a no-op when
-        # the caller already passed a sufficiently high weight.
-        from app.services.query_classifier import apply_lexical_floor, classify_query
+        # semantic meaning. Two adjustments fire together when one is
+        # detected:
+        #
+        #   1. Lift hybrid lexical weight so the BM25 signal wins the blend
+        #      against topically-similar front-matter chunks.
+        #   2. Relax BM25 token-coverage threshold (min_should_match) so the
+        #      chunk that *contains* the identifier is not filtered out of
+        #      the lexical candidate pool just because surrounding query
+        #      words ("from", document name, etc.) don't appear in it.
+        #      Without this, a strict balanced/60% setting can drop the
+        #      target chunk before hybrid blending has a chance to see it.
+        from app.services.query_classifier import (
+            IDENTIFIER_BM25_MATCH_MODE,
+            IDENTIFIER_BM25_MIN_SHOULD_MATCH,
+            apply_lexical_floor,
+            classify_query,
+        )
 
         classification = classify_query(query)
         if classification.is_identifier_query:
             adjusted = apply_lexical_floor(lexical_weight, classification.lexical_floor)
-            if adjusted != lexical_weight:
-                logger.info(
-                    "Identifier-style query detected (matched %r); "
-                    "lifting lexical_weight %.2f → %.2f, dense_weight %.2f → %.2f",
-                    classification.matched_pattern,
-                    lexical_weight,
-                    adjusted,
-                    dense_weight,
-                    1.0 - adjusted,
-                )
-                lexical_weight = adjusted
-                dense_weight = 1.0 - adjusted
+            logger.info(
+                "Identifier-style query detected (matched %r); "
+                "lifting lexical_weight %.2f → %.2f, "
+                "relaxing bm25 min_should_match %s → %s",
+                classification.matched_pattern,
+                lexical_weight,
+                adjusted,
+                bm25_min_should_match,
+                IDENTIFIER_BM25_MIN_SHOULD_MATCH,
+            )
+            lexical_weight = adjusted
+            dense_weight = 1.0 - adjusted
+            bm25_min_should_match = IDENTIFIER_BM25_MIN_SHOULD_MATCH
+            bm25_match_mode = IDENTIFIER_BM25_MATCH_MODE
 
         dense_limit = dense_top_k or max(top_k, 10)
         lexical_limit = lexical_top_k or max(top_k, 10)
