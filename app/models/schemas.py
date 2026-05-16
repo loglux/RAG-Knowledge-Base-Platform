@@ -776,27 +776,6 @@ class ChatRequest(BaseModel):
     )
 
 
-class RetrievalHintSuggestion(BaseModel):
-    """One actionable suggestion attached to a retrieval hint."""
-
-    action: str = Field(..., description="Machine-readable suggestion id (matched by UI)")
-    label: str = Field(..., description="Human-readable label for the suggestion chip")
-    value: Optional[str] = Field(
-        default=None,
-        description="Optional payload (e.g. recommended top_k value for the action)",
-    )
-
-
-class RetrievalHint(BaseModel):
-    """Structured UX hint surfaced when retrieval signals look suspicious."""
-
-    type: str = Field(..., description="Stable identifier for the hint type")
-    message: str = Field(..., description="Human-readable message")
-    suggestions: List[RetrievalHintSuggestion] = Field(
-        default_factory=list, description="Ordered list of quick-action chips"
-    )
-
-
 class ChatResponse(BaseModel):
     """Schema for chat/query response."""
 
@@ -820,10 +799,6 @@ class ChatResponse(BaseModel):
     )
     use_self_check: Optional[bool] = Field(
         default=None, description="Whether self-check was applied"
-    )
-    hint: Optional[RetrievalHint] = Field(
-        default=None,
-        description="Optional UX hint when retrieval signals suggest a tuning issue",
     )
 
 

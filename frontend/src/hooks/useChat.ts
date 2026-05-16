@@ -264,7 +264,6 @@ export function useChat(kbId: string) {
           mmr_diversity: response.mmr_diversity,
           use_self_check: response.use_self_check,
           prompt_version_id: response.prompt_version_id,
-          hint: response.hint ?? null,
         }
 
         setMessages((prev) => {
