@@ -273,6 +273,8 @@ export interface ChatMessage {
   use_conversation_history?: boolean
   conversation_history_limit?: number
   prompt_version_id?: string | null
+  rating?: number
+  rating_comment?: string | null
 }
 
 export interface SourceChunk {
@@ -404,6 +406,8 @@ export interface ChatMessageResponse {
   model?: string
   use_self_check?: boolean
   prompt_version_id?: string | null
+  rating?: number
+  rating_comment?: string | null
 }
 
 export interface AppSettings {

@@ -111,6 +111,8 @@ export function useChat(kbId: string) {
           model: msg.model,
           use_self_check: msg.use_self_check,
           prompt_version_id: msg.prompt_version_id,
+          rating: msg.rating ?? 0,
+          rating_comment: msg.rating_comment ?? null,
         })))
       } catch (e) {
         console.error('Failed to load conversation history:', e)
@@ -356,6 +358,38 @@ export function useChat(kbId: string) {
     }
   }, [refreshConversations])
 
+  const rateMessage = useCallback(
+    async (messageId: string, rating: -1 | 0 | 1) => {
+      if (!conversationId) return
+      // Optimistic local update — the click feels instant and the API call
+      // either confirms or reverts.
+      const previous = messages.find((m) => m.id === messageId)?.rating ?? 0
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, rating } : m))
+      )
+      try {
+        const updated = await apiClient.rateMessage(conversationId, messageId, rating)
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? { ...m, rating: updated.rating ?? 0, rating_comment: updated.rating_comment ?? null }
+              : m
+          )
+        )
+      } catch (e) {
+        // Revert on failure.
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, rating: previous } : m))
+        )
+        console.error('Failed to set message rating:', e)
+        toast.error('Failed to save rating', {
+          description: e instanceof Error ? e.message : undefined,
+        })
+      }
+    },
+    [conversationId, messages]
+  )
+
   return {
     conversations,
     conversationsLoading,
@@ -369,6 +403,7 @@ export function useChat(kbId: string) {
     deleteConversation,
     renameConversation,
     selectConversation,
+    rateMessage,
     conversationId,
   }
 }

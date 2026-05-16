@@ -146,6 +146,7 @@ export function ChatPage() {
     deleteConversation,
     renameConversation,
     selectConversation,
+    rateMessage,
     conversationId,
   } = useChat(id!)
 
@@ -1100,6 +1101,7 @@ export function ChatPage() {
                           onDelete={handleDelete}
                           showPromptVersion={showPromptVersions}
                           sourceAnchorPrefix={sourceAnchorPrefix}
+                          onRate={rateMessage}
                         />
                       {message.sources && message.sources.length > 0 && (
                         <details className="mt-4 space-y-2">

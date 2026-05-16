@@ -11,9 +11,10 @@ interface MessageBubbleProps {
   onDelete?: () => void
   showPromptVersion?: boolean
   sourceAnchorPrefix?: string
+  onRate?: (messageId: string, rating: -1 | 0 | 1) => void | Promise<void>
 }
 
-export function MessageBubble({ message, onDelete, showPromptVersion, sourceAnchorPrefix }: MessageBubbleProps) {
+export function MessageBubble({ message, onDelete, showPromptVersion, sourceAnchorPrefix, onRate }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const timestamp = new Date(message.timestamp).toLocaleTimeString('en-US', {
     hour: '2-digit',
@@ -100,6 +101,36 @@ export function MessageBubble({ message, onDelete, showPromptVersion, sourceAnch
             <span className="text-xs opacity-50">{timestamp}</span>
           </div>
           <div className="flex items-center gap-2">
+            {!isUser && onRate && message.id && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onRate(message.id!, message.rating === 1 ? 0 : 1)}
+                  className={`text-base leading-none transition-colors ${
+                    message.rating === 1
+                      ? 'text-emerald-400'
+                      : 'text-gray-500 hover:text-emerald-300'
+                  }`}
+                  aria-label={message.rating === 1 ? 'Clear thumbs up' : 'Thumbs up'}
+                  title="Helpful answer — promote to gold corpus"
+                >
+                  👍
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRate(message.id!, message.rating === -1 ? 0 : -1)}
+                  className={`text-base leading-none transition-colors ${
+                    message.rating === -1
+                      ? 'text-rose-400'
+                      : 'text-gray-500 hover:text-rose-300'
+                  }`}
+                  aria-label={message.rating === -1 ? 'Clear thumbs down' : 'Thumbs down'}
+                  title="Bad answer — flag for review"
+                >
+                  👎
+                </button>
+              </>
+            )}
             {onDelete && (
               <button
                 type="button"

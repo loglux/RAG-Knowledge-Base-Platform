@@ -26,6 +26,7 @@ from app.models.schemas import (
     ConversationSettings,
     ConversationSummary,
     ConversationTitleUpdate,
+    MessageRatingUpdate,
     SourceChunk,
 )
 from app.services.chat_titles import build_conversation_title
@@ -764,12 +765,85 @@ async def get_conversation_messages(
                 model=msg.model,
                 use_self_check=msg.use_self_check,
                 prompt_version_id=msg.prompt_version_id,
+                rating=msg.rating,
+                rating_comment=msg.rating_comment,
                 timestamp=msg.created_at,
                 message_index=msg.message_index,
             )
         )
 
     return response_messages
+
+
+@router.put(
+    "/conversations/{conversation_id}/messages/{message_id}/rating",
+    response_model=ChatMessageResponse,
+)
+async def set_message_rating(
+    conversation_id: UUID,
+    message_id: UUID,
+    payload: MessageRatingUpdate,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """
+    Set or clear a 👍/👎 rating on a stored chat message.
+
+    Ratings are the chat → eval bridge: thumbs-up messages can later be
+    promoted into the qa_eval gold corpus and thumbs-down ones surfaced
+    for review. A rating of 0 clears any previous rating and its comment.
+    User-role messages can also be rated (e.g. to flag a confusing
+    question) — we do not restrict by role here.
+    """
+    convo_query = select(ConversationModel).where(
+        ConversationModel.id == conversation_id,
+        ConversationModel.is_deleted == False,
+    )
+    conversation = (await db.execute(convo_query)).scalar_one_or_none()
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Conversation {conversation_id} not found",
+        )
+
+    msg_query = select(ChatMessageModel).where(
+        ChatMessageModel.id == message_id,
+        ChatMessageModel.conversation_id == conversation_id,
+    )
+    message = (await db.execute(msg_query)).scalar_one_or_none()
+    if not message:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Message {message_id} not found",
+        )
+
+    message.rating = payload.rating
+    # Clearing the rating also clears any stale comment so the two
+    # never disagree.
+    message.rating_comment = payload.comment if payload.rating != 0 else None
+    conversation.updated_at = utcnow()
+
+    sources_payload: Optional[list[SourceChunk]] = None
+    if message.sources_json:
+        try:
+            raw_sources = json.loads(message.sources_json)
+            sources_payload = [SourceChunk(**source) for source in raw_sources]
+        except Exception:
+            sources_payload = None
+
+    return ChatMessageResponse(
+        id=message.id,
+        role=message.role,
+        content=message.content,
+        sources=sources_payload,
+        model=message.model,
+        use_self_check=message.use_self_check,
+        prompt_version_id=message.prompt_version_id,
+        rating=message.rating,
+        rating_comment=message.rating_comment,
+        timestamp=message.created_at,
+        message_index=message.message_index,
+    )
 
 
 @router.delete(

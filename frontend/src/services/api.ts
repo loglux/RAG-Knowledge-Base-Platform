@@ -611,6 +611,19 @@ class APIClient {
     return response.data
   }
 
+  async rateMessage(
+    conversationId: string,
+    messageId: string,
+    rating: -1 | 0 | 1,
+    comment?: string | null
+  ): Promise<ChatMessageResponse> {
+    const response = await this.client.put<ChatMessageResponse>(
+      `/chat/conversations/${conversationId}/messages/${messageId}/rating`,
+      { rating, comment: comment ?? null }
+    )
+    return response.data
+  }
+
   async getConversation(conversationId: string): Promise<ConversationDetail> {
     const response = await this.client.get<ConversationDetail>(
       `/chat/conversations/${conversationId}`

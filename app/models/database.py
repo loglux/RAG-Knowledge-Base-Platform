@@ -407,6 +407,23 @@ class ChatMessage(Base):
     )
     message_index: Mapped[int] = mapped_column(Integer, nullable=False)
 
+    # Feedback signal: -1 thumbs down, 0 unrated, +1 thumbs up. Optional
+    # free-text comment for the rater. Closes the chat ↔ eval loop:
+    # later, +1 rated assistant messages can be promoted into the
+    # qa_samples gold corpus and -1 ones surfaced for review.
+    rating: Mapped[int] = mapped_column(
+        sa.SmallInteger,
+        default=0,
+        nullable=False,
+        server_default="0",
+        comment="-1 = thumbs down, 0 = no rating, +1 = thumbs up",
+    )
+    rating_comment: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="Optional free-text feedback attached to the rating",
+    )
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
     conversation: Mapped["Conversation"] = relationship("Conversation", back_populates="messages")

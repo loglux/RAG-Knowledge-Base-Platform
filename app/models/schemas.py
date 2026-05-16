@@ -454,8 +454,23 @@ class ChatMessageResponse(BaseModel):
         default=None, description="Whether self-check was applied"
     )
     prompt_version_id: Optional[UUID] = Field(default=None, description="Prompt version used")
+    rating: int = Field(default=0, description="-1 thumbs down, 0 unrated, +1 thumbs up")
+    rating_comment: Optional[str] = Field(
+        default=None, description="Optional free-text feedback attached to the rating"
+    )
     timestamp: datetime
     message_index: int
+
+
+class MessageRatingUpdate(BaseModel):
+    """Payload for setting a 👍/👎 rating on a chat message."""
+
+    rating: int = Field(
+        ..., ge=-1, le=1, description="-1 thumbs down, 0 clears rating, +1 thumbs up"
+    )
+    comment: Optional[str] = Field(
+        default=None, max_length=2000, description="Optional free-text feedback (max 2000 chars)"
+    )
 
 
 class ConversationSummary(BaseModel):
