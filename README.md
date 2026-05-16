@@ -458,21 +458,25 @@ The default hybrid mix (dense 0.6 / lexical 0.4) and Top K 10 are tuned for **ex
 | **Long compositional question** | `"Compare the methods used in Question 5 and Question 6 of the EMA"` | The query mentions multiple identifiers AND asks for synthesis. Both Q5 and Q6 chunks must end up in context, but each may compete with front-matter for slots. | Increase Top K to 20+; consider Document filter scoped to the one PDF. |
 | **Exact phrase / quotation lookup** | `"the antifragile gets better"` | Quotation is unambiguous lexically. | Set `hybrid_lexical_weight` 0.7+; or temporarily switch to lexical-only retrieval. |
 | **"Show me all of X"** enumerations | `"List every TMA cut-off date"`, `"All Activity 6 instances"` | Single retrieval pass returns Top K, not "everything". | Raise Top K to 50; use Document filter; or split into separate questions per source. |
+| **Identifier search in a homogeneous KB** | `"Question 6 from EMA"` in a KB of textbook units / exam papers that share boilerplate (covers, plagiarism warnings, GMC sections) | The target chunk has weak token overlap with the query body; *cover-style chunks across many docs* have stronger overlap and saturate BM25 top-K, so the target never even enters the candidate pool. Lifting the weight blend alone is not enough. | Scope to the specific document via the Document filter; raise `lexical_top_k` to 50+ and Top K to 20+. Until the section-heading boost ships, this is the only fully reliable manual workaround for this corpus shape. |
 
-#### Why this is currently a knob, not magic
+#### Built-in: query-type-aware weighting (shipped)
 
-The retriever sees only the literal query string and your default weights — it has no way to know that `"Question 6"` is an identifier and `"how does autism research work"` is a concept query. So it applies the same dense/lexical blend to both.
+The retriever auto-detects identifier-style queries (`Question N`, `Section N.N`, `Activity N`, `page N`, etc., and Russian equivalents) and lifts `hybrid_lexical_weight` to at least 0.7 for that one query. So the first row in the table above is mostly already handled — you usually do not need to flip weights manually. The classifier only raises the weight, never lowers it; an explicit user/KB setting that is already more lexical-leaning still wins.
 
-**Symptom diagnosis recipe**: if a chunk you *know* exists doesn't surface, query OpenSearch directly with `match_phrase` over `kb_chunks`. If it returns a hit with score > 10, your data is fine — the issue is purely how the **hybrid score blend** ranked it. Lift Top K or `hybrid_lexical_weight`, retry, and the chunk will appear.
+This helps when the right chunk is *in* the lexical candidate pool but ranked too low by the blend. It does **not** help when the chunk is missing from the pool entirely (the "homogeneous KB" row above) — for that, the workaround in the table or the planned section-heading boost is needed.
 
-#### Systemic improvements on the roadmap
+#### Symptom diagnosis recipe
 
-Two planned features address this without manual tuning per query:
+If a chunk you *know* exists doesn't surface, query OpenSearch directly with `match_phrase` over `kb_chunks`. If it returns the chunk with a high BM25 score (10+), your data is fine and the chunk *is* indexed correctly. From there:
 
-- **Query-type-aware weighting** — pre-classify the query with a small regex (identifier patterns like `Question \d+`, `page \d+`, section codes) and lift lexical weight automatically for that one query. No model changes.
-- **Section-heading boost** — when the query contains a phrase that exactly matches a chunk's `metadata.section_heading`, add a bounded bonus to that chunk's combined score. Uses the per-chunk section metadata already stored in both Qdrant and OpenSearch.
+- Chunk shows up in top results when scoped to its document → ranking issue, not indexing. Raise Top K or scope your chat search to the document.
+- Chunk does not appear even scoped to its own document → either query phrasing leaves it tied with cover-style chunks (try a more-specific query containing words from the chunk body), or the classifier did not pick up the identifier (check API logs for `Identifier-style query detected`).
 
-Until those land, the table above is the manual playbook.
+#### Systemic improvements still on the roadmap
+
+- **Section-heading boost** — when the query contains a phrase that exactly matches a chunk's `metadata.section_heading`, add a strong, bounded bonus to that chunk's score before the lexical top-K cutoff. This is the real fix for homogeneous-KB identifier search; the section metadata is already populated in both Qdrant and OpenSearch.
+- **Identifier-query UX hint** — when classifier fires and top-1 confidence is low, return a structured hint so the chat UI can show "Scope to document" / "Raise Top K" chips next to the result.
 
 ## KB settings (UI)
 
