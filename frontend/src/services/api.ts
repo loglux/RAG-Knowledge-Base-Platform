@@ -34,6 +34,7 @@ import type {
   QAEvalRunConfig,
   QAEvalRunDetail,
   QAGoldCountResponse,
+  FeedbackItem,
   KBExportRequest,
   KBImportOptions,
   KBImportResponse,
@@ -620,6 +621,21 @@ class APIClient {
     const response = await this.client.put<ChatMessageResponse>(
       `/chat/conversations/${conversationId}/messages/${messageId}/rating`,
       { rating, comment: comment ?? null }
+    )
+    return response.data
+  }
+
+  async listKbFeedback(
+    kbId: string,
+    rating?: -1 | 0 | 1,
+    limit = 100
+  ): Promise<FeedbackItem[]> {
+    const params = new URLSearchParams()
+    if (rating !== undefined) params.set('rating', String(rating))
+    params.set('limit', String(limit))
+    const qs = params.toString()
+    const response = await this.client.get<FeedbackItem[]>(
+      `/chat/knowledge-bases/${kbId}/feedback${qs ? '?' + qs : ''}`
     )
     return response.data
   }

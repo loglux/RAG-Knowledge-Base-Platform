@@ -376,6 +376,12 @@ export function useChat(kbId: string) {
               : m
           )
         )
+        // Brief confirmation so the user actually sees the click did something —
+        // emojis on Windows/Linux don't always honour CSS color, so the border
+        // and background change might still be subtle.
+        if (rating === 1) toast.success('Marked as helpful 👍')
+        else if (rating === -1) toast('Flagged for review 👎')
+        else toast('Rating cleared')
       } catch (e) {
         // Revert on failure.
         setMessages((prev) =>

@@ -736,6 +736,15 @@ class QASample(Base):
         comment="gold | synthetic | self_consistency",
     )
 
+    # Optional back-link to the chat message this sample was promoted from
+    # (👍 rating in chat). Lets us upsert/delete the sample as the rating
+    # changes. NULL for samples uploaded via the CSV/JSON path.
+    source_message_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("chat_messages.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
     def __repr__(self) -> str:

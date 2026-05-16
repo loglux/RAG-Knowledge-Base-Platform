@@ -473,6 +473,28 @@ class MessageRatingUpdate(BaseModel):
     )
 
 
+class FeedbackItem(BaseModel):
+    """One rated assistant message exposed for admin review.
+
+    Shape is denormalised on purpose: each item carries the question
+    that prompted the answer plus a short answer preview, so the UI can
+    render the row without a second round-trip.
+    """
+
+    message_id: UUID
+    conversation_id: UUID
+    rating: int
+    rating_comment: Optional[str]
+    question: Optional[str] = Field(
+        default=None, description="The user question that prompted this answer, if pairable"
+    )
+    answer: str
+    rated_at: datetime
+    promoted_to_gold_sample_id: Optional[UUID] = Field(
+        default=None, description="qa_sample id if this 👍 has already been promoted"
+    )
+
+
 class ConversationSummary(BaseModel):
     """Conversation list item."""
 

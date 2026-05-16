@@ -26,6 +26,7 @@ from app.models.schemas import (
     ConversationSettings,
     ConversationSummary,
     ConversationTitleUpdate,
+    FeedbackItem,
     MessageRatingUpdate,
     SourceChunk,
 )
@@ -823,6 +824,20 @@ async def set_message_rating(
     message.rating_comment = payload.comment if payload.rating != 0 else None
     conversation.updated_at = utcnow()
 
+    # Close the chat → eval loop. 👍 promotes the message into the
+    # qa_eval gold corpus; anything else removes the corresponding
+    # sample if one existed.
+    from app.services.feedback_promotion import (
+        demote_message_from_gold,
+        promote_message_to_gold,
+    )
+
+    if message.rating == 1:
+        await promote_message_to_gold(db, message, conversation)
+    else:
+        await demote_message_from_gold(db, message)
+    await db.flush()
+
     sources_payload: Optional[list[SourceChunk]] = None
     if message.sources_json:
         try:
@@ -844,6 +859,98 @@ async def set_message_rating(
         timestamp=message.created_at,
         message_index=message.message_index,
     )
+
+
+@router.get(
+    "/knowledge-bases/{kb_id}/feedback",
+    response_model=list[FeedbackItem],
+)
+async def list_kb_feedback(
+    kb_id: UUID,
+    rating: Optional[int] = None,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """
+    List rated chat messages across all conversations of a KB.
+
+    ``rating``: filter by exact value (-1 for review queue, +1 for
+    already-promoted gold candidates, or omitted for both). Default
+    ``limit`` 100, capped at 500.
+
+    For each rated assistant message we also fetch the user message
+    that prompted it (same conversation, ``message_index - 1``) and
+    the linked ``qa_samples.id`` if the message has already been
+    promoted to gold. The UI uses this to drive the "Recent feedback"
+    section under Evaluation.
+    """
+    if rating is not None and rating not in (-1, 0, 1):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="rating must be -1, 0, or 1",
+        )
+    limit = max(1, min(limit, 500))
+
+    # Pull rated assistant messages for this KB. We restrict to role=assistant
+    # because the UX only surfaces rated answers.
+    base_query = (
+        select(ChatMessageModel, ConversationModel.id.label("convo_id"))
+        .join(ConversationModel, ConversationModel.id == ChatMessageModel.conversation_id)
+        .where(
+            ConversationModel.knowledge_base_id == kb_id,
+            ConversationModel.is_deleted == False,
+            ChatMessageModel.role == "assistant",
+        )
+    )
+    if rating is None:
+        base_query = base_query.where(ChatMessageModel.rating != 0)
+    else:
+        base_query = base_query.where(ChatMessageModel.rating == rating)
+    base_query = base_query.order_by(ChatMessageModel.created_at.desc()).limit(limit)
+
+    rows = (await db.execute(base_query)).all()
+    if not rows:
+        return []
+
+    # Batch-load paired user messages and gold-sample ids to avoid N+1.
+    from app.models.database import QASample as QASampleModel
+
+    message_ids = [row[0].id for row in rows]
+    pair_keys = [(row[1], row[0].message_index - 1) for row in rows if row[0].message_index > 0]
+    paired_lookup: dict[tuple[UUID, int], ChatMessageModel] = {}
+    if pair_keys:
+        convo_ids = {k[0] for k in pair_keys}
+        indices = {k[1] for k in pair_keys}
+        paired_q = select(ChatMessageModel).where(
+            ChatMessageModel.conversation_id.in_(convo_ids),
+            ChatMessageModel.message_index.in_(indices),
+            ChatMessageModel.role == "user",
+        )
+        for p in (await db.execute(paired_q)).scalars().all():
+            paired_lookup[(p.conversation_id, p.message_index)] = p
+
+    gold_q = select(QASampleModel.id, QASampleModel.source_message_id).where(
+        QASampleModel.source_message_id.in_(message_ids)
+    )
+    gold_lookup = {sid: sid_value for sid_value, sid in (await db.execute(gold_q)).all()}
+
+    items: list[FeedbackItem] = []
+    for msg, convo_id in rows:
+        paired = paired_lookup.get((convo_id, msg.message_index - 1))
+        items.append(
+            FeedbackItem(
+                message_id=msg.id,
+                conversation_id=convo_id,
+                rating=msg.rating,
+                rating_comment=msg.rating_comment,
+                question=paired.content if paired else None,
+                answer=msg.content,
+                rated_at=msg.created_at,
+                promoted_to_gold_sample_id=gold_lookup.get(msg.id),
+            )
+        )
+    return items
 
 
 @router.delete(

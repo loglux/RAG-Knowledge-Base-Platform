@@ -410,6 +410,17 @@ export interface ChatMessageResponse {
   rating_comment?: string | null
 }
 
+export interface FeedbackItem {
+  message_id: string
+  conversation_id: string
+  rating: number
+  rating_comment?: string | null
+  question?: string | null
+  answer: string
+  rated_at: string
+  promoted_to_gold_sample_id?: string | null
+}
+
 export interface AppSettings {
   id: number
   llm_model: string | null

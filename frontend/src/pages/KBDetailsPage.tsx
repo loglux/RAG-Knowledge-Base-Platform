@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useAuth } from '../context/AuthContext'
@@ -9,7 +9,7 @@ import { useDocumentPolling } from '../hooks/useDocumentPolling'
 import { FileUpload } from '../components/documents/FileUpload'
 import { DocumentItem } from '../components/documents/DocumentItem'
 import { LLMSelector } from '../components/chat/LLMSelector'
-import type { KnowledgeBase, AppSettings, QAEvalRun, QAEvalRunDetail, KBRetrievalSettingsEnvelope, KBRetrievalSettingsStored, ChunkingStrategy } from '../types/index'
+import type { KnowledgeBase, AppSettings, QAEvalRun, QAEvalRunDetail, KBRetrievalSettingsEnvelope, KBRetrievalSettingsStored, ChunkingStrategy, FeedbackItem } from '../types/index'
 
 export function KBDetailsPage() {
   const { id } = useParams<{ id: string }>()
@@ -106,6 +106,8 @@ export function KBDetailsPage() {
   const [qaOnlyLow, setQaOnlyLow] = useState(false)
   const [qaDeleting, setQaDeleting] = useState(false)
   const [qaDetailsSeed, setQaDetailsSeed] = useState(0)
+  const [feedbackItems, setFeedbackItems] = useState<FeedbackItem[]>([])
+  const [feedbackLoading, setFeedbackLoading] = useState(false)
 
   const loadRetrievalSettings = async (kbId: string) => {
     try {
@@ -219,6 +221,25 @@ export function KBDetailsPage() {
 
     loadRuns()
   }, [id])
+
+  const loadFeedback = useCallback(async () => {
+    if (!id) return
+    setFeedbackLoading(true)
+    try {
+      const items = await apiClient.listKbFeedback(id)
+      setFeedbackItems(items)
+    } catch (err) {
+      console.error('Failed to load feedback:', err)
+    } finally {
+      setFeedbackLoading(false)
+    }
+  }, [id])
+
+  useEffect(() => {
+    if (mainTab === 'evaluation') {
+      loadFeedback()
+    }
+  }, [mainTab, loadFeedback])
 
   useEffect(() => {
     if (!id) return
@@ -1235,6 +1256,74 @@ export function KBDetailsPage() {
               </div>
             </div>
           )}
+
+          {/* ── Recent Feedback (chat ↔ eval bridge) ── */}
+          <div className="mt-8 pt-6 border-t border-gray-700">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h4 className="text-sm font-semibold text-gray-200">Recent Feedback from Chat</h4>
+                <p className="text-xs text-gray-400 mt-1">
+                  👍 messages auto-promote to gold samples. 👎 messages collect here for review.
+                </p>
+              </div>
+              <Button onClick={loadFeedback} disabled={feedbackLoading} size="xs">
+                {feedbackLoading ? 'Refreshing…' : 'Refresh'}
+              </Button>
+            </div>
+
+            {feedbackItems.length === 0 ? (
+              <div className="text-xs text-gray-500">
+                No rated messages yet. Rate answers with 👍/👎 in chat to see them here.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {feedbackItems.map((item) => {
+                  const ratedAt = new Date(item.rated_at).toLocaleString()
+                  const isUp = item.rating === 1
+                  const isDown = item.rating === -1
+                  return (
+                    <div
+                      key={item.message_id}
+                      className={`p-3 rounded border text-sm ${
+                        isUp
+                          ? 'border-emerald-500/40 bg-emerald-500/5'
+                          : isDown
+                          ? 'border-rose-500/40 bg-rose-500/5'
+                          : 'border-gray-700 bg-gray-800'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span>{isUp ? '👍' : isDown ? '👎' : '·'}</span>
+                          <span className="text-xs text-gray-500">{ratedAt}</span>
+                          {item.promoted_to_gold_sample_id && (
+                            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/40">
+                              Promoted to gold
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {item.question && (
+                        <div className="text-gray-400 text-xs mb-1">
+                          <span className="text-gray-500">Q:</span>{' '}
+                          <span className="line-clamp-2">{item.question}</span>
+                        </div>
+                      )}
+                      <div className="text-gray-200 text-xs">
+                        <span className="text-gray-500">A:</span>{' '}
+                        <span className="line-clamp-3">{item.answer}</span>
+                      </div>
+                      {item.rating_comment && (
+                        <div className="mt-1 text-xs text-gray-400 italic">
+                          “{item.rating_comment}”
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
         )}
 

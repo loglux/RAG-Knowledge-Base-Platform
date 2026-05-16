@@ -106,28 +106,30 @@ export function MessageBubble({ message, onDelete, showPromptVersion, sourceAnch
                 <button
                   type="button"
                   onClick={() => onRate(message.id!, message.rating === 1 ? 0 : 1)}
-                  className={`text-base leading-none transition-colors ${
+                  className={`inline-flex items-center justify-center w-7 h-7 rounded border text-base leading-none transition-colors ${
                     message.rating === 1
-                      ? 'text-emerald-400'
-                      : 'text-gray-500 hover:text-emerald-300'
+                      ? 'border-emerald-400 bg-emerald-500/25 ring-1 ring-emerald-400'
+                      : 'border-transparent bg-gray-700/40 hover:bg-emerald-500/20 hover:border-emerald-400/50'
                   }`}
                   aria-label={message.rating === 1 ? 'Clear thumbs up' : 'Thumbs up'}
+                  aria-pressed={message.rating === 1}
                   title="Helpful answer — promote to gold corpus"
                 >
-                  👍
+                  <span>👍</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => onRate(message.id!, message.rating === -1 ? 0 : -1)}
-                  className={`text-base leading-none transition-colors ${
+                  className={`inline-flex items-center justify-center w-7 h-7 rounded border text-base leading-none transition-colors ${
                     message.rating === -1
-                      ? 'text-rose-400'
-                      : 'text-gray-500 hover:text-rose-300'
+                      ? 'border-rose-400 bg-rose-500/25 ring-1 ring-rose-400'
+                      : 'border-transparent bg-gray-700/40 hover:bg-rose-500/20 hover:border-rose-400/50'
                   }`}
                   aria-label={message.rating === -1 ? 'Clear thumbs down' : 'Thumbs down'}
+                  aria-pressed={message.rating === -1}
                   title="Bad answer — flag for review"
                 >
-                  👎
+                  <span>👎</span>
                 </button>
               </>
             )}
