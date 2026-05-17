@@ -243,6 +243,16 @@ class Document(Base):
         String(10), nullable=True, comment="ISO 639-1 language code"
     )
 
+    # Web import metadata (populated for URL-imported documents only)
+    source_url: Mapped[Optional[str]] = mapped_column(
+        String(2048), nullable=True, comment="Original URL for web-imported documents"
+    )
+    web_metadata: Mapped[Optional[str]] = mapped_column(
+        Text,
+        nullable=True,
+        comment="JSON: author, publish_date, sitename, description, canonical_url",
+    )
+
     # Future: User ownership (nullable for MVP)
     user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), nullable=True, index=True, comment="Owner user ID - nullable for MVP"

@@ -27,6 +27,7 @@ from app.models.database import Document as DocumentModel
 from app.models.database import KnowledgeBase as KnowledgeBaseModel
 from app.models.enums import DocumentStatus, FileType
 from app.models.schemas import (
+    DocumentFromUrlRequest,
     DocumentList,
     DocumentResponse,
     DocumentWithContent,
@@ -277,6 +278,159 @@ async def create_document(
     logger.info(f"[UPLOAD] Background task added successfully for document {doc_model.id}")
 
     logger.info(f"Document {doc_model.id} ({filename}) uploaded and queued for processing")
+
+    return doc_model
+
+
+@router.post("/from-url", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
+async def create_document_from_url(
+    request: DocumentFromUrlRequest,
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """
+    Import a document from a URL.
+
+    Fetches the page via the url2md extraction service, converts it to Markdown,
+    then indexes it like any other document. The raw HTML is preserved on disk so
+    the document can be reprocessed without re-fetching.
+
+    Returns 503 if url2md is not running, 400 if the URL is invalid/blocked,
+    422 if the page has no extractable text (JS-rendered / paywalled).
+    """
+    from app.services.url_extractor_client import (
+        Url2mdEmptyResult,
+        Url2mdExtractionError,
+        Url2mdUnavailable,
+        extract_url,
+    )
+
+    # Verify KB exists
+    kb_query = select(KnowledgeBaseModel).where(
+        KnowledgeBaseModel.id == request.knowledge_base_id,
+        KnowledgeBaseModel.is_deleted == False,
+    )
+    kb_result = await db.execute(kb_query)
+    kb = kb_result.scalar_one_or_none()
+
+    if not kb:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Knowledge base {request.knowledge_base_id} not found",
+        )
+
+    # Check for duplicate source URL in this KB
+    url_dup_query = select(DocumentModel).where(
+        DocumentModel.knowledge_base_id == request.knowledge_base_id,
+        DocumentModel.source_url == request.url,
+        DocumentModel.is_deleted == False,
+    )
+    url_dup_result = await db.execute(url_dup_query)
+    if url_dup_result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A document from this URL already exists in this knowledge base",
+        )
+
+    # Fetch and extract via url2md
+    try:
+        page = await extract_url(request.url)
+    except Url2mdUnavailable as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
+    except Url2mdExtractionError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except Url2mdEmptyResult as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+
+    content = page.content_md
+    content_bytes = content.encode("utf-8")
+    content_hash = hashlib.sha256(content_bytes).hexdigest()
+
+    # Check for duplicate content in this KB
+    dup_query = select(DocumentModel).where(
+        DocumentModel.knowledge_base_id == request.knowledge_base_id,
+        DocumentModel.content_hash == content_hash,
+        DocumentModel.is_deleted == False,
+    )
+    dup_result = await db.execute(dup_query)
+    if dup_result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Document with identical content already exists in this knowledge base",
+        )
+
+    # Derive a filename from title or hostname
+    from urllib.parse import urlparse as _urlparse
+
+    if page.title:
+        safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in page.title)[:80]
+        filename = f"{safe_title.strip()}.md"
+    else:
+        hostname = _urlparse(request.url).hostname or "web"
+        filename = f"{hostname}.md"
+
+    # Build web_metadata JSON
+    web_metadata_dict = {
+        k: v
+        for k, v in {
+            "author": page.author,
+            "publish_date": page.publish_date,
+            "sitename": page.sitename,
+            "description": page.description,
+            "canonical_url": page.canonical_url,
+        }.items()
+        if v is not None
+    }
+
+    doc_model = DocumentModel(
+        knowledge_base_id=request.knowledge_base_id,
+        filename=filename,
+        file_type=FileType.MD,
+        file_size=len(content_bytes),
+        content=content,
+        content_hash=content_hash,
+        status=DocumentStatus.PENDING,
+        user_id=user_id,
+        language=page.language,
+        source_url=request.url,
+        web_metadata=(
+            json.dumps(web_metadata_dict, ensure_ascii=False) if web_metadata_dict else None
+        ),
+    )
+
+    db.add(doc_model)
+    await db.flush()
+
+    # Save raw HTML to disk so reprocess works offline
+    if page.raw_html:
+        html_path = Path("/app/uploads") / str(request.knowledge_base_id) / f"{doc_model.id}.html"
+        try:
+            html_path.parent.mkdir(parents=True, exist_ok=True)
+            html_path.write_text(page.raw_html, encoding="utf-8")
+            doc_model.file_path = str(html_path)
+        except Exception as exc:
+            logger.warning(f"Failed to save raw HTML to disk: {exc}")
+
+    # Recalculate KB document count
+    doc_count = await db.scalar(
+        select(func.count(DocumentModel.id)).where(
+            DocumentModel.knowledge_base_id == kb.id, DocumentModel.is_deleted == False
+        )
+    )
+    kb.document_count = doc_count or 0
+
+    await db.commit()
+    await db.refresh(doc_model)
+
+    background_tasks.add_task(
+        _process_document_background,
+        document_id=doc_model.id,
+        detect_duplicates=request.detect_duplicates,
+        contextual_description_enabled_override=request.contextual_description_enabled,
+    )
+
+    logger.info(f"Document {doc_model.id} imported from {request.url} and queued for processing")
 
     return doc_model
 

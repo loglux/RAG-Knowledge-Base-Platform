@@ -63,6 +63,12 @@ class Settings(BaseSettings):
         default=None, description="OpenSearch password (optional)"
     )
     OPENSEARCH_VERIFY_CERTS: bool = Field(default=False, description="Verify OpenSearch TLS certs")
+
+    # url2md extraction service
+    URL2MD_URL: str = Field(
+        default="http://url2md:8010", description="url2md extraction service URL"
+    )
+    URL2MD_TIMEOUT: int = Field(default=30, description="url2md request timeout in seconds")
     BM25_MATCH_MODES: List[str] = Field(
         default=["strict", "balanced", "loose"], description="Allowed BM25 match modes"
     )

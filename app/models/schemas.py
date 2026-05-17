@@ -222,6 +222,17 @@ class DocumentCreate(DocumentBase):
             raise ValueError(f"Unsupported file type: .{extension}. Supported: txt, md, fb2, docx")
 
 
+class DocumentFromUrlRequest(BaseModel):
+    """Schema for importing a document from a URL."""
+
+    knowledge_base_id: UUID = Field(..., description="Knowledge base ID")
+    url: str = Field(..., description="URL to fetch and extract")
+    detect_duplicates: bool = Field(False, description="Enable duplicate chunk detection")
+    contextual_description_enabled: Optional[bool] = Field(
+        None, description="Override contextual description generation for this import"
+    )
+
+
 class DocumentUpload(BaseModel):
     """Schema for document file upload."""
 
@@ -251,8 +262,21 @@ class DocumentResponse(DocumentBase):
     processed_at: Optional[datetime] = None
     is_deleted: bool
     duplicate_chunks: Optional[dict] = None
+    source_url: Optional[str] = None
+    web_metadata: Optional[dict] = None
 
     model_config = {"from_attributes": True}
+
+    @classmethod
+    def model_validate(cls, obj, **kwargs):
+        if hasattr(obj, "web_metadata") and isinstance(obj.web_metadata, str):
+            import json
+
+            try:
+                obj.__dict__["web_metadata"] = json.loads(obj.web_metadata)
+            except Exception:
+                obj.__dict__["web_metadata"] = None
+        return super().model_validate(obj, **kwargs)
 
 
 class DocumentList(BaseModel):
