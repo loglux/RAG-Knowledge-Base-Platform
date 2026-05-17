@@ -340,7 +340,6 @@ async def preview_url(request: UrlPreviewRequest):
 
     content = page.content_md or ""
     word_count = len(content.split())
-    content_preview = content[:600] + ("…" if len(content) > 600 else "")
     clean_url = _clean_url(request.url, page.canonical_url)
 
     return UrlPreviewResponse(
@@ -352,7 +351,7 @@ async def preview_url(request: UrlPreviewRequest):
         publish_date=page.publish_date,
         language=page.language,
         canonical_url=page.canonical_url,
-        content_preview=content_preview,
+        content_md=content,
         word_count=word_count,
     )
 

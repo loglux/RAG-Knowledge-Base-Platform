@@ -246,7 +246,7 @@ class UrlPreviewResponse(BaseModel):
     publish_date: Optional[str] = None
     language: Optional[str] = None
     canonical_url: Optional[str] = None
-    content_preview: str = Field(..., description="First ~600 chars of extracted markdown")
+    content_md: str = Field(..., description="Full extracted markdown content")
     word_count: int
 
 

@@ -129,7 +129,7 @@ export interface UrlPreview {
   publish_date: string | null
   language: string | null
   canonical_url: string | null
-  content_preview: string
+  content_md: string
   word_count: number
 }
 
