@@ -41,6 +41,36 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+_TRACKING_PREFIXES = ("utm_", "cx_", "mc_", "yclid")
+_TRACKING_PARAMS = frozenset({"fbclid", "gclid", "gclsrc", "msclkid", "igshid", "_ga", "twclid"})
+
+
+def _clean_url(raw: str, canonical: str | None = None) -> str:
+    """Prefer canonical URL from page; otherwise strip known tracking params and fragment."""
+    from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+
+    if canonical:
+        try:
+            raw_p = urlparse(raw)
+            can_p = urlparse(canonical)
+            if can_p.scheme in ("http", "https") and can_p.netloc == raw_p.netloc:
+                return canonical
+        except Exception:
+            pass
+
+    try:
+        parsed = urlparse(raw)
+        params = parse_qs(parsed.query, keep_blank_values=True)
+        clean = {
+            k: v
+            for k, v in params.items()
+            if not any(k.lower().startswith(p) for p in _TRACKING_PREFIXES)
+            and k.lower() not in _TRACKING_PARAMS
+        }
+        return urlunparse(parsed._replace(query=urlencode(clean, doseq=True), fragment=""))
+    except Exception:
+        return raw
+
 
 async def _process_document_background(
     document_id: UUID,
@@ -311,9 +341,10 @@ async def preview_url(request: UrlPreviewRequest):
     content = page.content_md or ""
     word_count = len(content.split())
     content_preview = content[:600] + ("…" if len(content) > 600 else "")
+    clean_url = _clean_url(request.url, page.canonical_url)
 
     return UrlPreviewResponse(
-        url=request.url,
+        url=clean_url,
         title=page.title,
         description=page.description,
         sitename=page.sitename,
@@ -364,19 +395,6 @@ async def create_document_from_url(
             detail=f"Knowledge base {request.knowledge_base_id} not found",
         )
 
-    # Check for duplicate source URL in this KB
-    url_dup_query = select(DocumentModel).where(
-        DocumentModel.knowledge_base_id == request.knowledge_base_id,
-        DocumentModel.source_url == request.url,
-        DocumentModel.is_deleted == False,
-    )
-    url_dup_result = await db.execute(url_dup_query)
-    if url_dup_result.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="A document from this URL already exists in this knowledge base",
-        )
-
     # Fetch and extract via url2md
     try:
         page = await extract_url(request.url)
@@ -386,6 +404,21 @@ async def create_document_from_url(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     except Url2mdEmptyResult as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+
+    clean_url = _clean_url(request.url, page.canonical_url)
+
+    # Check for duplicate source URL in this KB (using cleaned URL)
+    url_dup_query = select(DocumentModel).where(
+        DocumentModel.knowledge_base_id == request.knowledge_base_id,
+        DocumentModel.source_url == clean_url,
+        DocumentModel.is_deleted == False,
+    )
+    url_dup_result = await db.execute(url_dup_query)
+    if url_dup_result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A document from this URL already exists in this knowledge base",
+        )
 
     content = page.content_md
     content_bytes = content.encode("utf-8")
@@ -437,7 +470,7 @@ async def create_document_from_url(
         status=DocumentStatus.PENDING,
         user_id=user_id,
         language=page.language,
-        source_url=request.url,
+        source_url=clean_url,
         web_metadata=(
             json.dumps(web_metadata_dict, ensure_ascii=False) if web_metadata_dict else None
         ),
@@ -474,7 +507,7 @@ async def create_document_from_url(
         contextual_description_enabled_override=request.contextual_description_enabled,
     )
 
-    logger.info(f"Document {doc_model.id} imported from {request.url} and queued for processing")
+    logger.info(f"Document {doc_model.id} imported from {clean_url} and queued for processing")
 
     return doc_model
 
