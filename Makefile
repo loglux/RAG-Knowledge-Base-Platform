@@ -18,12 +18,13 @@ API_PORT := 8004
         lint format check \
         docker-up docker-down docker-logs docker-restart \
         docker-build docker-rebuild docker-rebuild-nocache docker-ps \
+        url2md-build url2md-up url2md-rebuild url2md-logs \
         migrate migrate-create migrate-down \
         frontend-dev frontend-build frontend-lint frontend-test
 
 help:  ## Show this help message
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
-		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
+		| awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-24s\033[0m %s\n", $$1, $$2}'
 
 # ---- Setup ----------------------------------------------------------------
 
@@ -90,6 +91,17 @@ docker-rebuild-nocache:  ## Full no-cache rebuild + roll (slow, use after deps c
 
 docker-ps:  ## Show service status
 	docker compose ps
+
+url2md-build:  ## Build url2md image
+	docker compose --profile url2md build url2md
+
+url2md-up:  ## Start url2md service
+	docker compose --profile url2md up -d url2md
+
+url2md-rebuild: url2md-build url2md-up  ## Rebuild and restart url2md
+
+url2md-logs:  ## Tail url2md logs
+	docker compose --profile url2md logs -f url2md
 
 # ---- Database -------------------------------------------------------------
 
