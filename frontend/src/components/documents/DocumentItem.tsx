@@ -150,6 +150,20 @@ export function DocumentItem({ document, onReprocess, onDelete, onRecomputeDupli
               <span>{formatFileSize(document.file_size)}</span>
               <span>•</span>
               <span>📅 {formatDate(document.created_at)}</span>
+              {document.source_url && (
+                <>
+                  <span>•</span>
+                  <a
+                    href={document.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary-400 hover:text-primary-300 truncate max-w-[240px]"
+                    title={document.source_url}
+                  >
+                    🌐 source
+                  </a>
+                </>
+              )}
             </div>
 
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">

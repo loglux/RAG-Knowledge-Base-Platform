@@ -568,6 +568,24 @@ class APIClient {
     return response.data
   }
 
+  async importDocumentFromUrl(
+    kbId: string,
+    url: string,
+    detectDuplicates = false,
+    contextualDescriptionEnabled: boolean | null = null
+  ): Promise<Document> {
+    const body: Record<string, unknown> = {
+      knowledge_base_id: kbId,
+      url,
+      detect_duplicates: detectDuplicates,
+    }
+    if (contextualDescriptionEnabled !== null) {
+      body.contextual_description_enabled = contextualDescriptionEnabled
+    }
+    const response = await this.client.post<Document>('/documents/from-url', body)
+    return response.data
+  }
+
   async reprocessDocument(
     id: string,
     detectDuplicates = false,

@@ -80,6 +80,9 @@ export function KBDetailsPage() {
   const [contextualDescriptionRequestMode, setContextualDescriptionRequestMode] = useState<
     'inherit' | 'enabled' | 'disabled'
   >('inherit')
+  const [addMode, setAddMode] = useState<'file' | 'url'>('file')
+  const [importUrl, setImportUrl] = useState('')
+  const [urlImporting, setUrlImporting] = useState(false)
   const [regenTitlesLoading, setRegenTitlesLoading] = useState(false)
   const [regenTitlesMessage, setRegenTitlesMessage] = useState<string | null>(null)
   const [regenIncludeExisting, setRegenIncludeExisting] = useState(false)
@@ -170,6 +173,7 @@ export function KBDetailsPage() {
     loading: docsLoading,
     error: docsError,
     uploadDocument,
+    importDocumentFromUrl,
     deleteDocument,
     reprocessDocument,
     updateDocumentStatus,
@@ -627,6 +631,27 @@ export function KBDetailsPage() {
   }
 
 
+  const handleImportUrl = async () => {
+    const url = importUrl.trim()
+    if (!url) return
+    const contextualOverride =
+      contextualDescriptionRequestMode === 'inherit'
+        ? null
+        : contextualDescriptionRequestMode === 'enabled'
+    setUrlImporting(true)
+    try {
+      await importDocumentFromUrl(url, detectDuplicatesOnUpload, contextualOverride)
+      toast.success('Page imported successfully')
+      setImportUrl('')
+    } catch (error) {
+      toast.error('Failed to import URL', {
+        description: error instanceof Error ? error.message : undefined,
+      })
+    } finally {
+      setUrlImporting(false)
+    }
+  }
+
   const handleDelete = async () => {
     if (!kb) return
     if (!confirm(`Delete "${kb.name}" and all its documents? This cannot be undone.`)) return
@@ -810,9 +835,55 @@ export function KBDetailsPage() {
           </div>
 
 
-          {/* Upload Area */}
+          {/* Add Document Area */}
           <div className="mb-6">
-            <FileUpload onUpload={handleUpload} accept=".txt,.md,.fb2,.docx,.pdf" maxSize={50} multiple />
+            {/* Mode toggle */}
+            <div className="flex gap-1 mb-4 bg-gray-800 rounded-lg p-1 w-fit">
+              <button
+                onClick={() => setAddMode('file')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  addMode === 'file'
+                    ? 'bg-gray-700 text-white'
+                    : 'text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                📁 Upload File
+              </button>
+              <button
+                onClick={() => setAddMode('url')}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  addMode === 'url'
+                    ? 'bg-gray-700 text-white'
+                    : 'text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                🌐 Import URL
+              </button>
+            </div>
+
+            {addMode === 'file' ? (
+              <FileUpload onUpload={handleUpload} accept=".txt,.md,.fb2,.docx,.pdf" maxSize={50} multiple />
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={importUrl}
+                  onChange={(e) => setImportUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && !urlImporting && handleImportUrl()}
+                  placeholder="https://example.com/article"
+                  className="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm placeholder-gray-500 focus:outline-none focus:border-primary-500"
+                  disabled={urlImporting}
+                />
+                <Button
+                  onClick={handleImportUrl}
+                  disabled={urlImporting || !importUrl.trim()}
+                  size="sm"
+                >
+                  {urlImporting ? 'Importing…' : 'Import'}
+                </Button>
+              </div>
+            )}
+
             <label className="mt-2 flex items-center gap-2 text-sm text-gray-400">
               <input
                 type="checkbox"
@@ -840,7 +911,7 @@ export function KBDetailsPage() {
                 <option value="disabled">Force disabled for this operation</option>
               </select>
               <p className="mt-1 text-xs text-gray-500">
-                Applies to uploads and reprocess/reindex actions from this tab.
+                Applies to uploads, URL imports and reprocess/reindex actions from this tab.
               </p>
               <p className="mt-1 text-xs text-gray-500">
                 Use <strong>Force enabled</strong> for one-time quality-focused reindex.

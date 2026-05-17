@@ -38,6 +38,24 @@ export function useDocuments(kbId: string) {
     [kbId]
   )
 
+  const importDocumentFromUrl = useCallback(
+    async (
+      url: string,
+      detectDuplicates = false,
+      contextualDescriptionEnabled: boolean | null = null
+    ): Promise<Document> => {
+      const newDoc = await apiClient.importDocumentFromUrl(
+        kbId,
+        url,
+        detectDuplicates,
+        contextualDescriptionEnabled
+      )
+      setDocuments((prev) => [newDoc, ...prev])
+      return newDoc
+    },
+    [kbId]
+  )
+
   const deleteDocument = useCallback(async (id: string) => {
     await apiClient.deleteDocument(id)
     setDocuments((prev) => prev.filter((doc) => doc.id !== id))
@@ -83,6 +101,7 @@ export function useDocuments(kbId: string) {
     error,
     refresh: fetchDocuments,
     uploadDocument,
+    importDocumentFromUrl,
     deleteDocument,
     reprocessDocument,
     updateDocumentStatus,
