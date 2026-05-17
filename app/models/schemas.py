@@ -284,16 +284,17 @@ class DocumentResponse(DocumentBase):
 
     model_config = {"from_attributes": True}
 
+    @field_validator("web_metadata", mode="before")
     @classmethod
-    def model_validate(cls, obj, **kwargs):
-        if hasattr(obj, "web_metadata") and isinstance(obj.web_metadata, str):
-            import json
+    def _parse_web_metadata(cls, v):
+        import json
 
+        if isinstance(v, str):
             try:
-                obj.__dict__["web_metadata"] = json.loads(obj.web_metadata)
+                return json.loads(v)
             except Exception:
-                obj.__dict__["web_metadata"] = None
-        return super().model_validate(obj, **kwargs)
+                return None
+        return v
 
 
 class DocumentList(BaseModel):
