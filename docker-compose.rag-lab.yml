@@ -1,0 +1,180 @@
+services:
+  # Frontend - React + Vite (Production Build)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.production
+    container_name: rag-lab-frontend
+    restart: always
+    ports:
+      - "5175:80"
+    networks:
+      - kb-network
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # PostgreSQL Database (required for application bootstrap)
+  # Credentials MUST be available before first run
+  # Override with environment variables: POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
+  db:
+    image: postgres:16-alpine
+    container_name: rag-lab-db
+    restart: always
+    ports:
+      - "5436:5432"
+    environment:
+      # Default credentials for quick start
+      # Change via Setup Wizard → Database Security step
+      - POSTGRES_USER=kb_user
+      - POSTGRES_DB=knowledge_base
+      - POSTGRES_PASSWORD_FILE=/run/secrets/db_password
+    volumes:
+      - kb_postgres_data:/var/lib/postgresql/data
+    secrets:
+      - db_password
+    networks:
+      - kb-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kb_user -d knowledge_base"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Qdrant Vector Database (configurable via Setup Wizard)
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: rag-lab-qdrant
+    restart: always
+    ports:
+      - "6336:6333"  # HTTP API
+      - "6337:6334"  # gRPC
+    volumes:
+      - kb_qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    networks:
+      - kb-network
+
+  # OpenSearch (BM25 lexical search, configurable via Setup Wizard)
+  opensearch:
+    image: opensearchproject/opensearch:2
+    container_name: rag-lab-opensearch
+    restart: always
+    ports:
+      - "9202:9200"
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - DISABLE_SECURITY_PLUGIN=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - kb_opensearch_data:/usr/share/opensearch/data
+    networks:
+      - kb-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # FastAPI Application
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: rag-lab-api
+    restart: always
+    ports:
+      - "8005:8000"
+    environment:
+      # Application settings
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - API_PREFIX=/api/v1
+
+      # Database connection
+      # Prefer Docker secret for password; entrypoint constructs DATABASE_URL
+      - DB_HOST=db
+      - DB_PORT=5432
+      - POSTGRES_USER=kb_user
+      - POSTGRES_DB=knowledge_base
+
+      # Vector databases (defaults, can be overridden via Setup Wizard)
+      - QDRANT_URL=http://qdrant:6333
+      - QDRANT_GRPC_URL=qdrant:6334
+      - OPENSEARCH_URL=http://opensearch:9200
+
+      # url2md web extraction service (optional — start with: make url2md-up-raglab)
+      - URL2MD_URL=http://url2md:8010
+
+      # CORS (adjust for your domain if needed)
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://localhost:5175
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+      - ./docker/entrypoint.sh:/entrypoint.sh:ro
+    secrets:
+      - db_password
+    depends_on:
+      db:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+      opensearch:
+        condition: service_healthy
+    networks:
+      - kb-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  url2md:
+    build:
+      context: ../../url2md
+      dockerfile: Dockerfile
+    container_name: rag-lab-url2md
+    restart: unless-stopped
+    ports:
+      - "8011:8010"
+    profiles:
+      - url2md
+    networks:
+      - kb-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8010/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  kb_postgres_data:
+    driver: local
+  kb_qdrant_data:
+    driver: local
+  kb_opensearch_data:
+    driver: local
+  # db_password secret file is stored outside the repo
+secrets:
+  db_password:
+    file: ./secrets/db_password
+
+networks:
+  kb-network:
+    driver: bridge

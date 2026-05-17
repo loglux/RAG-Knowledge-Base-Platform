@@ -19,6 +19,7 @@ API_PORT := 8004
         docker-up docker-down docker-logs docker-restart \
         docker-build docker-rebuild docker-rebuild-nocache docker-ps \
         url2md-build url2md-up url2md-rebuild url2md-logs \
+        url2md-build-raglab url2md-up-raglab url2md-rebuild-raglab \
         migrate migrate-create migrate-down \
         frontend-dev frontend-build frontend-lint frontend-test
 
@@ -102,6 +103,14 @@ url2md-rebuild: url2md-build url2md-up  ## Rebuild and restart url2md
 
 url2md-logs:  ## Tail url2md logs
 	docker compose --profile url2md logs -f url2md
+
+url2md-build-raglab:  ## Build url2md image for rag-lab
+	docker compose -p raglab -f docker-compose.rag-lab.yml --profile url2md build url2md
+
+url2md-up-raglab:  ## Start url2md for rag-lab
+	docker compose -p raglab -f docker-compose.rag-lab.yml --profile url2md up -d url2md
+
+url2md-rebuild-raglab: url2md-build-raglab url2md-up-raglab  ## Rebuild and restart url2md for rag-lab
 
 # ---- Database -------------------------------------------------------------
 
