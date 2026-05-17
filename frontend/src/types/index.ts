@@ -120,6 +120,19 @@ export interface Document {
   } | null
 }
 
+export interface UrlPreview {
+  url: string
+  title: string | null
+  description: string | null
+  sitename: string | null
+  author: string | null
+  publish_date: string | null
+  language: string | null
+  canonical_url: string | null
+  content_preview: string
+  word_count: number
+}
+
 export interface DocumentStatusResponse {
   id: string
   filename: string

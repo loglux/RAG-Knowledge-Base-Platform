@@ -31,6 +31,8 @@ from app.models.schemas import (
     DocumentList,
     DocumentResponse,
     DocumentWithContent,
+    UrlPreviewRequest,
+    UrlPreviewResponse,
 )
 from app.services.document_processor import get_document_processor
 from app.services.duplicate_chunks import compute_duplicate_chunks_for_document, json_dumps
@@ -280,6 +282,48 @@ async def create_document(
     logger.info(f"Document {doc_model.id} ({filename}) uploaded and queued for processing")
 
     return doc_model
+
+
+@router.post("/from-url/preview", response_model=UrlPreviewResponse)
+async def preview_url(request: UrlPreviewRequest):
+    """
+    Fetch and extract a URL without saving anything.
+
+    Returns title, metadata, and a short content preview so the user can
+    confirm the content before importing it into a knowledge base.
+    """
+    from app.services.url_extractor_client import (
+        Url2mdEmptyResult,
+        Url2mdExtractionError,
+        Url2mdUnavailable,
+        extract_url,
+    )
+
+    try:
+        page = await extract_url(request.url)
+    except Url2mdUnavailable as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
+    except Url2mdExtractionError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except Url2mdEmptyResult as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+
+    content = page.content_md or ""
+    word_count = len(content.split())
+    content_preview = content[:600] + ("…" if len(content) > 600 else "")
+
+    return UrlPreviewResponse(
+        url=request.url,
+        title=page.title,
+        description=page.description,
+        sitename=page.sitename,
+        author=page.author,
+        publish_date=page.publish_date,
+        language=page.language,
+        canonical_url=page.canonical_url,
+        content_preview=content_preview,
+        word_count=word_count,
+    )
 
 
 @router.post("/from-url", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)

@@ -233,6 +233,23 @@ class DocumentFromUrlRequest(BaseModel):
     )
 
 
+class UrlPreviewRequest(BaseModel):
+    url: str = Field(..., description="URL to preview")
+
+
+class UrlPreviewResponse(BaseModel):
+    url: str
+    title: Optional[str] = None
+    description: Optional[str] = None
+    sitename: Optional[str] = None
+    author: Optional[str] = None
+    publish_date: Optional[str] = None
+    language: Optional[str] = None
+    canonical_url: Optional[str] = None
+    content_preview: str = Field(..., description="First ~600 chars of extracted markdown")
+    word_count: int
+
+
 class DocumentUpload(BaseModel):
     """Schema for document file upload."""
 

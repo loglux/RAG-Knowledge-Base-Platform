@@ -568,6 +568,11 @@ class APIClient {
     return response.data
   }
 
+  async previewDocumentFromUrl(url: string): Promise<import('../types').UrlPreview> {
+    const response = await this.client.post('/documents/from-url/preview', { url })
+    return response.data
+  }
+
   async importDocumentFromUrl(
     kbId: string,
     url: string,

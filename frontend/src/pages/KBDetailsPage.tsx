@@ -8,8 +8,9 @@ import { useDocuments } from '../hooks/useDocuments'
 import { useDocumentPolling } from '../hooks/useDocumentPolling'
 import { FileUpload } from '../components/documents/FileUpload'
 import { DocumentItem } from '../components/documents/DocumentItem'
+import { UrlImportModal } from '../components/documents/UrlImportModal'
 import { LLMSelector } from '../components/chat/LLMSelector'
-import type { KnowledgeBase, AppSettings, QAEvalRun, QAEvalRunDetail, KBRetrievalSettingsEnvelope, KBRetrievalSettingsStored, ChunkingStrategy, FeedbackItem } from '../types/index'
+import type { KnowledgeBase, AppSettings, QAEvalRun, QAEvalRunDetail, KBRetrievalSettingsEnvelope, KBRetrievalSettingsStored, ChunkingStrategy, FeedbackItem, UrlPreview } from '../types/index'
 
 export function KBDetailsPage() {
   const { id } = useParams<{ id: string }>()
@@ -82,6 +83,9 @@ export function KBDetailsPage() {
   >('inherit')
   const [addMode, setAddMode] = useState<'file' | 'url'>('file')
   const [importUrl, setImportUrl] = useState('')
+  const [urlPreviewing, setUrlPreviewing] = useState(false)
+  const [urlPreview, setUrlPreview] = useState<UrlPreview | null>(null)
+  const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [urlImporting, setUrlImporting] = useState(false)
   const [regenTitlesLoading, setRegenTitlesLoading] = useState(false)
   const [regenTitlesMessage, setRegenTitlesMessage] = useState<string | null>(null)
@@ -631,17 +635,35 @@ export function KBDetailsPage() {
   }
 
 
-  const handleImportUrl = async () => {
+  const handlePreviewUrl = async () => {
     const url = importUrl.trim()
     if (!url) return
+    setUrlPreviewing(true)
+    try {
+      const preview = await apiClient.previewDocumentFromUrl(url)
+      setUrlPreview(preview)
+      setShowPreviewModal(true)
+    } catch (error) {
+      toast.error('Failed to fetch URL', {
+        description: error instanceof Error ? error.message : undefined,
+      })
+    } finally {
+      setUrlPreviewing(false)
+    }
+  }
+
+  const handleConfirmImport = async () => {
+    if (!urlPreview) return
     const contextualOverride =
       contextualDescriptionRequestMode === 'inherit'
         ? null
         : contextualDescriptionRequestMode === 'enabled'
     setUrlImporting(true)
     try {
-      await importDocumentFromUrl(url, detectDuplicatesOnUpload, contextualOverride)
+      await importDocumentFromUrl(urlPreview.url, detectDuplicatesOnUpload, contextualOverride)
       toast.success('Page imported successfully')
+      setShowPreviewModal(false)
+      setUrlPreview(null)
       setImportUrl('')
     } catch (error) {
       toast.error('Failed to import URL', {
@@ -869,17 +891,17 @@ export function KBDetailsPage() {
                   type="url"
                   value={importUrl}
                   onChange={(e) => setImportUrl(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && !urlImporting && handleImportUrl()}
+                  onKeyDown={(e) => e.key === 'Enter' && !urlPreviewing && handlePreviewUrl()}
                   placeholder="https://example.com/article"
                   className="flex-1 bg-gray-900 border border-gray-700 rounded px-3 py-2 text-gray-100 text-sm placeholder-gray-500 focus:outline-none focus:border-primary-500"
-                  disabled={urlImporting}
+                  disabled={urlPreviewing}
                 />
                 <Button
-                  onClick={handleImportUrl}
-                  disabled={urlImporting || !importUrl.trim()}
+                  onClick={handlePreviewUrl}
+                  disabled={urlPreviewing || !importUrl.trim()}
                   size="sm"
                 >
-                  {urlImporting ? 'Importing…' : 'Import'}
+                  {urlPreviewing ? 'Fetching…' : 'Preview'}
                 </Button>
               </div>
             )}
@@ -1397,6 +1419,15 @@ export function KBDetailsPage() {
           </div>
         </div>
         )}
+
+        {/* URL Import Preview Modal */}
+        <UrlImportModal
+          isOpen={showPreviewModal}
+          onClose={() => { setShowPreviewModal(false); setUrlPreview(null) }}
+          onImport={handleConfirmImport}
+          preview={urlPreview}
+          importing={urlImporting}
+        />
 
         {/* ── Settings Tab ── */}
         {mainTab === 'settings' && (
