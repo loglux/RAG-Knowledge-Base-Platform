@@ -75,7 +75,7 @@ class OllamaEmbeddingService(BaseEmbeddingService):
             max_keepalive_connections=1,  # Keep only one connection alive
         )
         self.client = httpx.AsyncClient(
-            timeout=60.0, limits=limits  # Increased timeout for slow models
+            timeout=180.0, limits=limits  # Increased timeout for slow/thinking models
         )
 
         logger.info(
