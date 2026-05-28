@@ -39,6 +39,7 @@ class SystemSettingsManager:
         "anthropic_api_key": "ANTHROPIC_API_KEY",
         "deepseek_api_key": "DEEPSEEK_API_KEY",
         "ollama_base_url": "OLLAMA_BASE_URL",
+        "ollama_timeout": "OLLAMA_TIMEOUT_SECONDS",
         "mcp_enabled": "MCP_ENABLED",
         "mcp_path": "MCP_PATH",
         "mcp_public_base_url": "MCP_PUBLIC_BASE_URL",

@@ -75,7 +75,7 @@ class OllamaEmbeddingService(BaseEmbeddingService):
             max_keepalive_connections=1,  # Keep only one connection alive
         )
         self.client = httpx.AsyncClient(
-            timeout=180.0, limits=limits  # Increased timeout for slow/thinking models
+            timeout=httpx.Timeout(settings.OLLAMA_TIMEOUT_SECONDS), limits=limits
         )
 
         logger.info(
@@ -116,6 +116,7 @@ class OllamaEmbeddingService(BaseEmbeddingService):
                     "model": self.model,
                     "input": text,
                 },
+                timeout=httpx.Timeout(settings.OLLAMA_TIMEOUT_SECONDS),
             )
             if response.status_code >= 400:
                 logger.error(

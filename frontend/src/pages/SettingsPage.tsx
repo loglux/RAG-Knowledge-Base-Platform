@@ -122,6 +122,7 @@ export function SettingsPage() {
   const [anthropicApiKey, setAnthropicApiKey] = useState('')
   const [deepseekApiKey, setDeepseekApiKey] = useState('')
   const [ollamaBaseUrl, setOllamaBaseUrl] = useState('')
+  const [ollamaTimeout, setOllamaTimeout] = useState(180)
   const [showOpenaiKey, setShowOpenaiKey] = useState(false)
   const [showVoyageKey, setShowVoyageKey] = useState(false)
   const [showCohereKey, setShowCohereKey] = useState(false)
@@ -288,6 +289,7 @@ export function SettingsPage() {
       if (systemSettings.anthropic_api_key) setAnthropicApiKey(systemSettings.anthropic_api_key)
       if (systemSettings.deepseek_api_key) setDeepseekApiKey(systemSettings.deepseek_api_key)
       if (systemSettings.ollama_base_url) setOllamaBaseUrl(systemSettings.ollama_base_url)
+      if (systemSettings.ollama_timeout) setOllamaTimeout(Number(systemSettings.ollama_timeout))
       if (systemSettings.mcp_enabled !== null && systemSettings.mcp_enabled !== undefined) {
         setMcpEnabled(systemSettings.mcp_enabled)
       }
@@ -888,6 +890,7 @@ export function SettingsPage() {
       if (anthropicApiKey && !anthropicApiKey.startsWith('*')) payload.anthropic_api_key = anthropicApiKey
       if (deepseekApiKey && !deepseekApiKey.startsWith('*')) payload.deepseek_api_key = deepseekApiKey
       if (ollamaBaseUrl) payload.ollama_base_url = ollamaBaseUrl
+      if (ollamaTimeout > 0) payload.ollama_timeout = String(ollamaTimeout)
       if (systemName) payload.system_name = systemName
       if (maxFileSizeMb) payload.max_file_size_mb = maxFileSizeMb
 
@@ -3091,6 +3094,17 @@ function AIProvidersTab(props: any) {
             <p className="text-xs text-gray-400">Ollama server URL (local or cloud-hosted)</p>
             {renderTestStatus('ollama')}
           </div>
+        </Field>
+
+        <Field label="Ollama Timeout (seconds)" hint="Per-request timeout for embedding and chat calls (default: 180)">
+          <Input
+            type="number"
+            min={10}
+            max={600}
+            step={10}
+            value={ollamaTimeout}
+            onChange={(e) => setOllamaTimeout(Number(e.target.value))}
+          />
         </Field>
       </div>
 
