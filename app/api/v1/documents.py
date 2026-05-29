@@ -518,7 +518,7 @@ async def list_documents(
         None, alias="status", description="Filter by status"
     ),
     page: int = Query(1, ge=1, description="Page number"),
-    page_size: int = Query(10, ge=1, le=100, description="Items per page"),
+    page_size: int = Query(10, ge=1, le=500, description="Items per page"),
     db: AsyncSession = Depends(get_db),
     user_id: Optional[UUID] = Depends(get_current_user_id),
 ):
