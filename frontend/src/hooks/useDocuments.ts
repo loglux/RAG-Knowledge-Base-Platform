@@ -11,7 +11,7 @@ export function useDocuments(kbId: string) {
     try {
       setLoading(true)
       setError(null)
-      const data = await apiClient.getDocuments(kbId)
+      const data = await apiClient.getDocuments(kbId, 1, 200)
       setDocuments(data.items)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch documents')
