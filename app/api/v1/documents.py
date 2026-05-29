@@ -544,7 +544,11 @@ async def list_documents(
     total = await db.scalar(count_query)
 
     # Apply pagination
-    query = query.offset((page - 1) * page_size).limit(page_size)
+    query = (
+        query.order_by(DocumentModel.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
 
     # Execute
     result = await db.execute(query)

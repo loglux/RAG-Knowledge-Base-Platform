@@ -1,20 +1,27 @@
 """FastMCP server exposing RAG tools."""
 
+import asyncio
+import hashlib
 import json
 import logging
+import uuid as _uuid
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from fastmcp import FastMCP
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.config import settings
+from app.core.embeddings_base import EMBEDDING_MODELS
 from app.core.retrieval import get_retrieval_engine
 from app.core.system_settings import SystemSettingsManager
+from app.core.vector_store import get_vector_store
 from app.db.session import get_db_session
 from app.models.database import AppSettings as AppSettingsModel
 from app.models.database import Document as DocumentModel
 from app.models.database import KnowledgeBase as KnowledgeBaseModel
+from app.models.enums import DocumentStatus, FileType
+from app.services.document_processor import get_document_processor
 from app.services.rag import get_rag_service
 from app.services.retrieval_settings import (
     load_kb_retrieval_settings,
@@ -33,6 +40,9 @@ MCP_TOOL_NAMES = [
     "set_kb_retrieval_settings",
     "clear_kb_retrieval_settings",
     "get_kb_effective_settings",
+    "create_knowledge_base",
+    "ingest_url",
+    "ingest_text",
 ]
 
 
@@ -478,6 +488,293 @@ def build_mcp_app() -> FastMCP:
             }
 
         return json.dumps(payload, ensure_ascii=False, indent=2)
+
+    # ------------------------------------------------------------------ #
+    # Ingestion tools                                                       #
+    # ------------------------------------------------------------------ #
+
+    async def _background_process(document_id: UUID) -> None:
+        from app.db.session import AsyncSessionLocal
+
+        try:
+            async with AsyncSessionLocal() as db:
+                processor = get_document_processor()
+                await processor.process_document(document_id, db)
+        except Exception as exc:
+            logger.error("MCP background processing failed for %s: %s", document_id, exc)
+            from app.db.session import AsyncSessionLocal
+
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(
+                    select(DocumentModel).where(DocumentModel.id == document_id)
+                )
+                doc = result.scalar_one_or_none()
+                if doc:
+                    doc.status = DocumentStatus.FAILED
+                    doc.error_message = str(exc)
+                    await db.commit()
+
+    @mcp.tool()
+    async def create_knowledge_base(
+        name: str,
+        description: Optional[str] = None,
+        embedding_model: Optional[str] = None,
+        chunk_size: Optional[int] = None,
+        chunk_overlap: Optional[int] = None,
+    ) -> str:
+        """Create a new knowledge base. Returns the new KB id and name."""
+        disabled = await _ensure_tool_enabled("create_knowledge_base")
+        if disabled:
+            return disabled
+
+        model = embedding_model or "text-embedding-3-large"
+        if model not in EMBEDDING_MODELS:
+            return f"Error: unknown embedding_model '{model}'. Available: {', '.join(EMBEDDING_MODELS)}"
+
+        model_config = EMBEDDING_MODELS[model]
+
+        async with get_db_session() as db:
+            settings_result = await db.execute(
+                select(AppSettingsModel).order_by(AppSettingsModel.id).limit(1)
+            )
+            app_settings = settings_result.scalar_one_or_none()
+
+            default_chunk_size = (
+                app_settings.kb_chunk_size if app_settings and app_settings.kb_chunk_size else 1000
+            )
+            default_chunk_overlap = (
+                app_settings.kb_chunk_overlap
+                if app_settings and app_settings.kb_chunk_overlap
+                else 200
+            )
+            default_batch = (
+                app_settings.kb_upsert_batch_size
+                if app_settings and app_settings.kb_upsert_batch_size
+                else 256
+            )
+
+            kb_id = _uuid.uuid4()
+            from app.core.vector_store import kb_id_to_collection_name
+
+            collection_name = kb_id_to_collection_name(kb_id)
+
+            kb_model = KnowledgeBaseModel(
+                id=kb_id,
+                name=name,
+                description=description,
+                collection_name=collection_name,
+                embedding_model=model,
+                embedding_provider=model_config.provider.value,
+                embedding_dimension=model_config.dimension,
+                chunk_size=chunk_size or default_chunk_size,
+                chunk_overlap=chunk_overlap or default_chunk_overlap,
+                upsert_batch_size=default_batch,
+            )
+            db.add(kb_model)
+            await db.commit()
+
+            try:
+                vector_store = get_vector_store()
+                await vector_store.create_collection(
+                    collection_name=collection_name,
+                    vector_size=model_config.dimension,
+                )
+            except Exception as exc:
+                await db.delete(kb_model)
+                await db.commit()
+                return f"Error: failed to create vector collection: {exc}"
+
+        return f"Created knowledge base '{name}' (id={kb_id}, model={model})"
+
+    @mcp.tool()
+    async def ingest_url(url: str, knowledge_base_id: str) -> str:
+        """Fetch a URL, extract its text, and add it as a document to a knowledge base."""
+        disabled = await _ensure_tool_enabled("ingest_url")
+        if disabled:
+            return disabled
+
+        async with get_db_session() as db:
+            kb = await _get_kb(db, knowledge_base_id)
+            if not kb:
+                return "Error: knowledge_base_id not found."
+
+            from app.services.url_extractor_client import (
+                Url2mdEmptyResult,
+                Url2mdExtractionError,
+                Url2mdUnavailable,
+                extract_url,
+            )
+
+            try:
+                page = await extract_url(url)
+            except Url2mdUnavailable as exc:
+                return f"Error: url2md service unavailable — {exc}"
+            except Url2mdExtractionError as exc:
+                return f"Error: extraction failed — {exc}"
+            except Url2mdEmptyResult as exc:
+                return f"Error: no content extracted — {exc}"
+
+            from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+
+            def _clean(raw: str, canonical: Optional[str]) -> str:
+                _TRACKING_PREFIXES = ("utm_", "cx_", "mc_", "yclid")
+                _TRACKING_PARAMS = frozenset({"fbclid", "gclid", "gclsrc", "msclkid", "_ga"})
+                if canonical:
+                    try:
+                        rp, cp = urlparse(raw), urlparse(canonical)
+                        if cp.scheme in ("http", "https") and cp.netloc == rp.netloc:
+                            return canonical
+                    except Exception:
+                        pass
+                try:
+                    parsed = urlparse(raw)
+                    params = parse_qs(parsed.query, keep_blank_values=True)
+                    clean = {
+                        k: v
+                        for k, v in params.items()
+                        if not any(k.lower().startswith(p) for p in _TRACKING_PREFIXES)
+                        and k.lower() not in _TRACKING_PARAMS
+                    }
+                    return urlunparse(
+                        parsed._replace(query=urlencode(clean, doseq=True), fragment="")
+                    )
+                except Exception:
+                    return raw
+
+            clean_url = _clean(url, page.canonical_url)
+            content = page.content_md
+            content_bytes = content.encode("utf-8")
+            content_hash = hashlib.sha256(content_bytes).hexdigest()
+
+            dup = await db.scalar(
+                select(DocumentModel).where(
+                    DocumentModel.knowledge_base_id == kb.id,
+                    DocumentModel.source_url == clean_url,
+                    DocumentModel.is_deleted == False,
+                )
+            )
+            if dup:
+                return f"Error: a document from this URL already exists (id={dup.id})."
+
+            dup_content = await db.scalar(
+                select(DocumentModel).where(
+                    DocumentModel.knowledge_base_id == kb.id,
+                    DocumentModel.content_hash == content_hash,
+                    DocumentModel.is_deleted == False,
+                )
+            )
+            if dup_content:
+                return f"Error: identical content already indexed (id={dup_content.id})."
+
+            if page.title:
+                safe = "".join(c if c.isalnum() or c in " -_" else "_" for c in page.title)[:80]
+                filename = f"{safe.strip()}.md"
+            else:
+                from urllib.parse import urlparse as _up
+
+                filename = f"{_up(url).hostname or 'web'}.md"
+
+            web_meta = {
+                k: v
+                for k, v in {
+                    "author": page.author,
+                    "publish_date": page.publish_date,
+                    "sitename": page.sitename,
+                    "description": page.description,
+                    "canonical_url": page.canonical_url,
+                }.items()
+                if v is not None
+            }
+
+            doc = DocumentModel(
+                knowledge_base_id=kb.id,
+                filename=filename,
+                file_type=FileType.MD,
+                file_size=len(content_bytes),
+                content=content,
+                content_hash=content_hash,
+                status=DocumentStatus.PENDING,
+                language=page.language,
+                source_url=clean_url,
+                web_metadata=json.dumps(web_meta, ensure_ascii=False) if web_meta else None,
+            )
+            db.add(doc)
+            count = await db.scalar(
+                select(func.count(DocumentModel.id)).where(
+                    DocumentModel.knowledge_base_id == kb.id, DocumentModel.is_deleted == False
+                )
+            )
+            kb.document_count = (count or 0) + 1
+            await db.commit()
+            await db.refresh(doc)
+            doc_id = doc.id
+
+        asyncio.create_task(_background_process(doc_id))
+        return f"Ingested '{filename}' from {clean_url} (id={doc_id}). Processing started."
+
+    @mcp.tool()
+    async def ingest_text(
+        knowledge_base_id: str,
+        content: str,
+        filename: Optional[str] = None,
+        title: Optional[str] = None,
+    ) -> str:
+        """Add a plain-text or markdown document directly to a knowledge base."""
+        disabled = await _ensure_tool_enabled("ingest_text")
+        if disabled:
+            return disabled
+
+        if not content or not content.strip():
+            return "Error: content cannot be empty."
+
+        fname = filename
+        if not fname:
+            if title:
+                safe = "".join(c if c.isalnum() or c in " -_" else "_" for c in title)[:80]
+                fname = f"{safe.strip()}.md"
+            else:
+                fname = "document.md"
+
+        content_bytes = content.encode("utf-8")
+        content_hash = hashlib.sha256(content_bytes).hexdigest()
+
+        async with get_db_session() as db:
+            kb = await _get_kb(db, knowledge_base_id)
+            if not kb:
+                return "Error: knowledge_base_id not found."
+
+            dup = await db.scalar(
+                select(DocumentModel).where(
+                    DocumentModel.knowledge_base_id == kb.id,
+                    DocumentModel.content_hash == content_hash,
+                    DocumentModel.is_deleted == False,
+                )
+            )
+            if dup:
+                return f"Error: identical content already indexed (id={dup.id})."
+
+            doc = DocumentModel(
+                knowledge_base_id=kb.id,
+                filename=fname,
+                file_type=FileType.MD,
+                file_size=len(content_bytes),
+                content=content,
+                content_hash=content_hash,
+                status=DocumentStatus.PENDING,
+            )
+            db.add(doc)
+            count = await db.scalar(
+                select(func.count(DocumentModel.id)).where(
+                    DocumentModel.knowledge_base_id == kb.id, DocumentModel.is_deleted == False
+                )
+            )
+            kb.document_count = (count or 0) + 1
+            await db.commit()
+            await db.refresh(doc)
+            doc_id = doc.id
+
+        asyncio.create_task(_background_process(doc_id))
+        return f"Ingested '{fname}' (id={doc_id}, {len(content_bytes)} bytes). Processing started."
 
     return mcp
 
