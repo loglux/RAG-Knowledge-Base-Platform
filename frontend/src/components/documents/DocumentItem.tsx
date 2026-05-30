@@ -268,7 +268,7 @@ export function DocumentItem({ document, onReprocess, onDelete, onRecomputeDupli
         </div>
 
         <div className="flex items-center space-x-2 ml-4">
-          {document.file_path && (
+          {!document.source_url && (
             <a
               href={apiClient.downloadDocumentUrl(document.id)}
               download={document.filename}
