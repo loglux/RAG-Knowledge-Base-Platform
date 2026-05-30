@@ -615,6 +615,10 @@ class APIClient {
     await this.client.delete(`/documents/${id}`)
   }
 
+  downloadDocumentUrl(id: string): string {
+    return `/api/v1/documents/${id}/download`
+  }
+
   // Chat
   async chat(data: ChatRequest): Promise<ChatResponse> {
     const response = await this.client.post<ChatResponse>('/chat/', data)

@@ -279,6 +279,7 @@ class DocumentResponse(DocumentBase):
     processed_at: Optional[datetime] = None
     is_deleted: bool
     duplicate_chunks: Optional[dict] = None
+    file_path: Optional[str] = None
     source_url: Optional[str] = None
     web_metadata: Optional[dict] = None
 

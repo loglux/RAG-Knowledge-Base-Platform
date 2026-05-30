@@ -268,6 +268,18 @@ export function DocumentItem({ document, onReprocess, onDelete, onRecomputeDupli
         </div>
 
         <div className="flex items-center space-x-2 ml-4">
+          {document.file_path && (
+            <a
+              href={apiClient.downloadDocumentUrl(document.id)}
+              download={document.filename}
+              className="text-gray-400 hover:text-blue-400 p-2 rounded transition-colors"
+              aria-label="Download original file"
+              title="Download original file"
+            >
+              ⬇️
+            </a>
+          )}
+
           {document.status === 'completed' && onRecomputeDuplicates && (
             <button
               onClick={handleRecomputeDuplicates}

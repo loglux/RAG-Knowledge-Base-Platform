@@ -3,6 +3,7 @@
 import hashlib
 import json
 import logging
+import mimetypes
 from pathlib import Path
 from typing import Optional
 from uuid import UUID
@@ -18,6 +19,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -590,6 +592,37 @@ async def get_document(
     # Future: Check user ownership
 
     return doc
+
+
+@router.get("/{doc_id}/download")
+async def download_document(
+    doc_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user_id: Optional[UUID] = Depends(get_current_user_id),
+):
+    """Download original uploaded file."""
+    result = await db.execute(
+        select(DocumentModel).where(
+            DocumentModel.id == doc_id,
+            DocumentModel.is_deleted == False,
+        )
+    )
+    doc = result.scalar_one_or_none()
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    if not doc.file_path or not Path(doc.file_path).exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Original file not available",
+        )
+
+    media_type, _ = mimetypes.guess_type(doc.filename)
+    return FileResponse(
+        path=doc.file_path,
+        filename=doc.filename,
+        media_type=media_type or "application/octet-stream",
+    )
 
 
 @router.delete("/{doc_id}", status_code=status.HTTP_204_NO_CONTENT)

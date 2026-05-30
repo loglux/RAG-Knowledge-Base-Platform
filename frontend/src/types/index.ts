@@ -110,6 +110,7 @@ export interface Document {
     groups: Array<{ hash: string; chunks: number[]; count: number }>
   } | null
   heading_map?: Array<{ pos: number; level: number; text: string }> | null
+  file_path?: string | null
   source_url?: string | null
   web_metadata?: {
     author?: string | null
