@@ -1231,6 +1231,8 @@ export function SettingsPage() {
             setShowDeepseekKey={setShowDeepseekKey}
             ollamaBaseUrl={ollamaBaseUrl}
             setOllamaBaseUrl={setOllamaBaseUrl}
+            ollamaTimeout={ollamaTimeout}
+            setOllamaTimeout={setOllamaTimeout}
             systemName={systemName}
             setSystemName={setSystemName}
             maxFileSizeMb={maxFileSizeMb}
@@ -2910,6 +2912,7 @@ function AIProvidersTab(props: any) {
     anthropicApiKey, setAnthropicApiKey, showAnthropicKey, setShowAnthropicKey,
     deepseekApiKey, setDeepseekApiKey, showDeepseekKey, setShowDeepseekKey,
     ollamaBaseUrl, setOllamaBaseUrl,
+    ollamaTimeout, setOllamaTimeout,
     systemName, setSystemName,
     maxFileSizeMb, setMaxFileSizeMb,
     onSave, saving,
