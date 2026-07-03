@@ -1712,12 +1712,13 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
             </label>
           ))}
         </div>
+      </div>
 
-        <div className="flex justify-end pt-2">
-          <Button variant="primary" onClick={onSave} disabled={saving}>
-            {saving ? 'Saving...' : 'Save MCP Settings'}
-          </Button>
-        </div>
+      <div className="flex items-center justify-end gap-3">
+        <span className="text-sm text-gray-400">Saves endpoint settings, auth mode and available tools together</span>
+        <Button variant="primary" onClick={onSave} disabled={saving}>
+          {saving ? 'Saving...' : 'Save MCP Settings'}
+        </Button>
       </div>
 
       {mcpAuthMode === 'bearer' && (
