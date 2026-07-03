@@ -29,6 +29,10 @@ const MCP_TOOL_OPTIONS = [
   { id: 'get_kb_retrieval_settings', label: 'get_kb_retrieval_settings', description: 'Read KB retrieval settings.' },
   { id: 'set_kb_retrieval_settings', label: 'set_kb_retrieval_settings', description: 'Update KB retrieval settings.' },
   { id: 'clear_kb_retrieval_settings', label: 'clear_kb_retrieval_settings', description: 'Clear KB retrieval settings.' },
+  { id: 'get_kb_effective_settings', label: 'get_kb_effective_settings', description: 'Return full KB config and effective retrieval settings.' },
+  { id: 'create_knowledge_base', label: 'create_knowledge_base', description: 'Create a new knowledge base.' },
+  { id: 'ingest_url', label: 'ingest_url', description: 'Fetch a URL and add it as a document to a knowledge base.' },
+  { id: 'ingest_text', label: 'ingest_text', description: 'Add a plain-text or markdown document to a knowledge base.' },
 ]
 
 type TabType = 'query' | 'kb-defaults' | 'ai-providers' | 'databases' | 'prompts' | 'kb-transfer' | 'mcp'
