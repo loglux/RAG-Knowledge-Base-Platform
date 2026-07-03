@@ -1693,11 +1693,6 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
           </div>
         </div>
 
-        <div className="flex justify-end">
-          <Button variant="primary" onClick={onSave} disabled={saving}>
-            {saving ? 'Saving...' : 'Save MCP Settings'}
-          </Button>
-        </div>
       </div>
 
       <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 space-y-3">
@@ -1716,6 +1711,12 @@ function MCPSettingsTab(props: MCPSettingsTabProps) {
               </span>
             </label>
           ))}
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <Button variant="primary" onClick={onSave} disabled={saving}>
+            {saving ? 'Saving...' : 'Save MCP Settings'}
+          </Button>
         </div>
       </div>
 
