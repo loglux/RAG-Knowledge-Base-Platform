@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   backend:
-    name: Backend (ruff + black + pytest)
+    name: Backend (ruff + black + mypy + pytest)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,6 +35,9 @@ jobs:
 
       - name: Lint (ruff + black --check)
         run: make lint
+
+      - name: Type check (mypy)
+        run: make typecheck
 
       - name: Unit tests
         run: make test-unit

@@ -5,6 +5,7 @@ PYTHON := $(VENV)/bin/python
 PIP := $(VENV)/bin/pip
 RUFF := $(VENV)/bin/ruff
 BLACK := $(VENV)/bin/black
+MYPY := $(VENV)/bin/mypy
 PYTEST := $(VENV)/bin/pytest
 ALEMBIC := $(VENV)/bin/alembic
 UVICORN := $(VENV)/bin/uvicorn
@@ -32,8 +33,8 @@ help:  ## Show this help message
 install:  ## Install runtime dependencies
 	$(PIP) install -r requirements.txt
 
-install-dev: install  ## Install runtime + dev tools (ruff, black, pytest-cov)
-	$(PIP) install ruff black pytest pytest-cov pytest-asyncio
+install-dev: install  ## Install runtime + dev tools (ruff, black, mypy, pytest-cov)
+	$(PIP) install ruff black mypy pytest pytest-cov pytest-asyncio
 
 # ---- Development ----------------------------------------------------------
 
@@ -61,11 +62,14 @@ lint:  ## Run ruff + black --check
 	$(RUFF) check app/ tests/
 	$(BLACK) --check app/ tests/
 
+typecheck:  ## Run mypy (see pyproject.toml for the pre-existing-debt baseline)
+	$(MYPY) app/
+
 format:  ## Auto-fix with ruff and reformat with black
 	$(RUFF) check --fix app/ tests/
 	$(BLACK) app/ tests/
 
-check: lint test  ## Run lint + tests (use as the local CI gate)
+check: lint typecheck test  ## Run lint + typecheck + tests (use as the local CI gate)
 
 # ---- Docker ---------------------------------------------------------------
 

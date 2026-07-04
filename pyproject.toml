@@ -46,6 +46,45 @@ module = [
 ]
 ignore_missing_imports = true
 
+# Baseline of pre-existing type errors (152 errors as of 2026-07-04).
+# New/changed modules are checked strictly; pay these down and remove
+# entries as they're fixed rather than adding new ones.
+[[tool.mypy.overrides]]
+module = [
+    "app.api.oauth",
+    "app.api.v1.auth",
+    "app.api.v1.chat",
+    "app.api.v1.documents",
+    "app.api.v1.knowledge_bases",
+    "app.api.v1.ollama",
+    "app.api.v1.retrieve",
+    "app.api.v1.settings",
+    "app.api.v1.system_settings",
+    "app.config",
+    "app.core.auth",
+    "app.core.embeddings_ollama",
+    "app.core.embeddings_voyage",
+    "app.core.lexical_store",
+    "app.core.llm_anthropic",
+    "app.core.llm_base",
+    "app.core.llm_deepseek",
+    "app.core.llm_ollama",
+    "app.core.llm_openai",
+    "app.core.vector_store",
+    "app.db.session",
+    "app.mcp.middleware",
+    "app.models.schemas",
+    "app.services.chunking",
+    "app.services.document_processor",
+    "app.services.duplicate_chunks",
+    "app.services.kb_export_import",
+    "app.services.qa_eval",
+    "app.services.rag",
+    "app.utils.file_handlers.docx",
+    "app.utils.file_handlers.pdf",
+]
+ignore_errors = true
+
 [tool.pytest.ini_options]
 minversion = "7.0"
 testpaths = ["tests"]

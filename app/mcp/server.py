@@ -5,7 +5,7 @@ import hashlib
 import json
 import logging
 import uuid as _uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 from uuid import UUID
 
 from fastmcp import FastMCP
@@ -54,7 +54,7 @@ async def _get_enabled_tools() -> List[str]:
     raw = raw.strip()
     if raw.startswith("["):
         try:
-            return json.loads(raw)
+            return cast(List[str], json.loads(raw))
         except Exception:
             return settings.MCP_TOOLS_ENABLED
     return [item.strip() for item in raw.split(",") if item.strip()]
@@ -76,7 +76,7 @@ async def _get_kb(db, kb_id: Optional[str]) -> Optional[KnowledgeBaseModel]:
         kb_uuid = UUID(str(kb_id))
     except Exception:
         return None
-    return await db.get(KnowledgeBaseModel, kb_uuid)
+    return cast(Optional[KnowledgeBaseModel], await db.get(KnowledgeBaseModel, kb_uuid))
 
 
 def _format_sources(sources: List[Dict[str, Any]]) -> str:
@@ -277,8 +277,7 @@ def build_mcp_app() -> FastMCP:
 
             retrieval_engine = get_retrieval_engine()
             mode = effective.get("retrieval_mode")
-            if hasattr(mode, "value"):
-                mode = mode.value
+            mode = getattr(mode, "value", mode)
 
             if mode == "hybrid":
                 retrieval_result = await retrieval_engine.retrieve_hybrid(
@@ -496,6 +495,7 @@ def build_mcp_app() -> FastMCP:
     async def _background_process(document_id: UUID) -> None:
         from app.db.session import AsyncSessionLocal
 
+        assert AsyncSessionLocal is not None, "DB engine not initialized"
         try:
             async with AsyncSessionLocal() as db:
                 processor = get_document_processor()
@@ -504,6 +504,7 @@ def build_mcp_app() -> FastMCP:
             logger.error("MCP background processing failed for %s: %s", document_id, exc)
             from app.db.session import AsyncSessionLocal
 
+            assert AsyncSessionLocal is not None, "DB engine not initialized"
             async with AsyncSessionLocal() as db:
                 result = await db.execute(
                     select(DocumentModel).where(DocumentModel.id == document_id)
