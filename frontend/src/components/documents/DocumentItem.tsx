@@ -14,9 +14,29 @@ const STRUCTURED_TYPES = ['fb2', 'docx', 'pdf', 'md']
 
 export function DocumentItem({ document, onReprocess, onDelete, onRecomputeDuplicates }: DocumentItemProps) {
   const [isRecomputingDup, setIsRecomputingDup] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
   const [headingMap, setHeadingMap] = useState<Array<{ pos: number; level: number; text: string }> | null>(null)
   const [headingMapLoading, setHeadingMapLoading] = useState(false)
   const [headingMapLoaded, setHeadingMapLoaded] = useState(false)
+
+  const handleDownload = async () => {
+    setIsDownloading(true)
+    try {
+      const { blob, filename } = await apiClient.downloadDocument(document.id, document.filename)
+      const url = URL.createObjectURL(blob)
+      const link = window.document.createElement('a')
+      link.href = url
+      link.download = filename
+      window.document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error('Failed to download original file')
+    } finally {
+      setIsDownloading(false)
+    }
+  }
 
   const handleStructureToggle = async (e: React.MouseEvent<HTMLDetailsElement>) => {
     const details = e.currentTarget
@@ -269,15 +289,15 @@ export function DocumentItem({ document, onReprocess, onDelete, onRecomputeDupli
 
         <div className="flex items-center space-x-2 ml-4">
           {!document.source_url && (
-            <a
-              href={apiClient.downloadDocumentUrl(document.id)}
-              download={document.filename}
-              className="text-gray-400 hover:text-blue-400 p-2 rounded transition-colors"
+            <button
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="text-gray-400 hover:text-blue-400 p-2 rounded transition-colors disabled:opacity-50"
               aria-label="Download original file"
-              title="Download original file"
+              title={isDownloading ? 'Downloading...' : 'Download original file'}
             >
-              ⬇️
-            </a>
+              {isDownloading ? '⏳' : '⬇️'}
+            </button>
           )}
 
           {document.status === 'completed' && onRecomputeDuplicates && (

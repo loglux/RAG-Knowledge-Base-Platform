@@ -615,8 +615,12 @@ class APIClient {
     await this.client.delete(`/documents/${id}`)
   }
 
-  downloadDocumentUrl(id: string): string {
-    return `/api/v1/documents/${id}/download`
+  async downloadDocument(id: string, fallbackFilename: string): Promise<{ blob: Blob; filename: string }> {
+    const response = await this.client.get(`/documents/${id}/download`, { responseType: 'blob' })
+    const disposition = response.headers?.['content-disposition'] || ''
+    const match = disposition.match(/filename="?([^";]+)"?/i)
+    const filename = match?.[1] || fallbackFilename
+    return { blob: response.data as Blob, filename }
   }
 
   // Chat
