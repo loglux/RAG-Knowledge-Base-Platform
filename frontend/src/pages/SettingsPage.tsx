@@ -35,6 +35,7 @@ const MCP_TOOL_OPTIONS = [
   { id: 'delete_knowledge_base', label: 'delete_knowledge_base', description: 'Soft-delete a knowledge base, its documents, and their vectors.' },
   { id: 'ingest_url', label: 'ingest_url', description: 'Fetch a URL and add it as a document to a knowledge base.' },
   { id: 'ingest_text', label: 'ingest_text', description: 'Add a plain-text or markdown document to a knowledge base.' },
+  { id: 'upload_document', label: 'upload_document', description: 'Upload a binary document (pdf, docx, fb2, txt, md) as base64-encoded content.' },
   { id: 'delete_document', label: 'delete_document', description: 'Soft-delete a document and remove its vectors.' },
 ]
 

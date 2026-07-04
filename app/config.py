@@ -189,6 +189,7 @@ class Settings(BaseSettings):
             "delete_knowledge_base",
             "ingest_url",
             "ingest_text",
+            "upload_document",
             "delete_document",
         ],
         description="Enabled MCP tool names",

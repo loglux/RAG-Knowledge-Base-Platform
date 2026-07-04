@@ -7,6 +7,7 @@ at the test engine (see the mcp_db fixture below).
 """
 
 import asyncio
+import base64
 import json
 from uuid import uuid4
 
@@ -448,6 +449,109 @@ class TestIngestUrl:
             url="https://example.com/broken",
         )
         assert text == "Error: extraction failed — boom"
+
+
+# ============================================================================
+# upload_document
+# ============================================================================
+
+
+def _make_test_pdf_base64(text: str = "Hello PDF World") -> str:
+    import fitz
+
+    # PDFFileHandler rejects extractions under 100 chars as likely-scanned, so
+    # pad short marker text with enough filler to clear that threshold.
+    body = f"{text}. " + "Lorem ipsum dolor sit amet padding text. " * 4
+
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_textbox(fitz.Rect(72, 72, 500, 700), body)
+    data = doc.tobytes()
+    doc.close()
+    return base64.b64encode(data).decode("ascii")
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+class TestUploadDocument:
+    async def test_missing_kb(self, mcp_app):
+        text = await _call(
+            mcp_app,
+            "upload_document",
+            knowledge_base_id=str(uuid4()),
+            filename="report.pdf",
+            content_base64=_make_test_pdf_base64(),
+        )
+        assert text.startswith("Error:")
+        assert "not found" in text
+
+    async def test_invalid_base64(self, mcp_app, sample_kb: KnowledgeBase):
+        text = await _call(
+            mcp_app,
+            "upload_document",
+            knowledge_base_id=str(sample_kb.id),
+            filename="report.pdf",
+            content_base64="not-valid-base64!!!",
+        )
+        assert text == "Error: content_base64 is not valid base64."
+
+    async def test_unsupported_extension(self, mcp_app, sample_kb: KnowledgeBase):
+        text = await _call(
+            mcp_app,
+            "upload_document",
+            knowledge_base_id=str(sample_kb.id),
+            filename="archive.zip",
+            content_base64=base64.b64encode(b"whatever").decode("ascii"),
+        )
+        assert text.startswith("Error:")
+        assert "Unsupported file type" in text
+
+    async def test_uploads_pdf_and_extracts_structure(
+        self, mcp_app, sample_kb: KnowledgeBase, mcp_db
+    ):
+        text = await _call(
+            mcp_app,
+            "upload_document",
+            knowledge_base_id=str(sample_kb.id),
+            filename="report.pdf",
+            content_base64=_make_test_pdf_base64("Hello PDF World"),
+        )
+        assert text.startswith("Uploaded 'report.pdf'")
+        await _drain_background_tasks(mcp_app)
+
+        async with mcp_db() as db:
+            result = await db.execute(
+                select(Document).where(Document.knowledge_base_id == sample_kb.id)
+            )
+            doc = result.scalar_one()
+            assert doc.file_type == "pdf"
+            assert "Hello PDF World" in doc.content
+            # doc.file_path (saved to /app/uploads for reprocess/download) is
+            # environment-dependent — not writable outside the container, so
+            # it's not asserted here; create_document already logs and
+            # swallows that failure without affecting ingestion.
+
+    async def test_duplicate_content_rejected(self, mcp_app, sample_kb: KnowledgeBase):
+        content_b64 = _make_test_pdf_base64("Duplicate check")
+        first = await _call(
+            mcp_app,
+            "upload_document",
+            knowledge_base_id=str(sample_kb.id),
+            filename="a.pdf",
+            content_base64=content_b64,
+        )
+        assert first.startswith("Uploaded")
+        await _drain_background_tasks(mcp_app)
+
+        second = await _call(
+            mcp_app,
+            "upload_document",
+            knowledge_base_id=str(sample_kb.id),
+            filename="b.pdf",
+            content_base64=content_b64,
+        )
+        assert second.startswith("Error:")
+        assert "already exists" in second
 
 
 # ============================================================================

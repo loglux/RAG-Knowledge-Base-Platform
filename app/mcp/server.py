@@ -46,6 +46,7 @@ MCP_TOOL_NAMES = [
     "delete_knowledge_base",
     "ingest_url",
     "ingest_text",
+    "upload_document",
     "delete_document",
 ]
 
@@ -849,6 +850,64 @@ def build_mcp_app() -> FastMCP:
 
         asyncio.create_task(_background_process(doc_id))
         return f"Ingested '{fname}' (id={doc_id}, {len(content_bytes)} bytes). Processing started."
+
+    @mcp.tool()
+    async def upload_document(
+        knowledge_base_id: str,
+        filename: str,
+        content_base64: str,
+    ) -> str:
+        """Upload a binary document (pdf, docx, fb2, txt, or md) as base64-encoded content.
+
+        Use this instead of ingest_text/ingest_url when the original file format
+        matters — PDF page numbers, DOCX/FB2 structural headings, or when the
+        original file needs to stay downloadable. For plain text/markdown that
+        the agent authored itself, prefer ingest_text (no base64 overhead).
+        """
+        disabled = await _ensure_tool_enabled("upload_document")
+        if disabled:
+            return disabled
+
+        try:
+            kb_uuid = UUID(str(knowledge_base_id))
+        except Exception:
+            return "Error: invalid knowledge_base_id."
+
+        import base64
+        import binascii
+        from io import BytesIO
+
+        try:
+            content_bytes = base64.b64decode(content_base64, validate=True)
+        except (binascii.Error, ValueError):
+            return "Error: content_base64 is not valid base64."
+
+        from fastapi import BackgroundTasks, UploadFile
+
+        from app.api.v1.documents import create_document as _api_create_document
+
+        upload_file = UploadFile(BytesIO(content_bytes), filename=filename, size=len(content_bytes))
+        background_tasks = BackgroundTasks()
+
+        async with get_db_session() as db:
+            try:
+                doc = await _api_create_document(
+                    file=upload_file,
+                    knowledge_base_id=kb_uuid,
+                    detect_duplicates=False,
+                    contextual_description_enabled=None,
+                    background_tasks=background_tasks,
+                    db=db,
+                    user_id=None,
+                )
+            except HTTPException as exc:
+                return f"Error: {exc.detail}"
+
+        asyncio.create_task(background_tasks())
+        return (
+            f"Uploaded '{filename}' (id={doc.id}, {len(content_bytes)} bytes). "
+            "Processing started."
+        )
 
     @mcp.tool()
     async def delete_document(document_id: str) -> str:
