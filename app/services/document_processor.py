@@ -583,6 +583,12 @@ class DocumentProcessor:
         file_type_str = str(document.file_type).lower().replace("filetype.", "")
         if file_type_str == "md":
             heading_map = self._extract_md_heading_map(document.content)
+            # Persist so GET /documents/{id} (UI "Structure" toggle / preview) can
+            # show it too — unlike DOCX/FB2/PDF, markdown never goes through
+            # FileHandlerFactory.extract_all(), so heading_map_json was never set here.
+            document.heading_map_json = (
+                json.dumps(heading_map, ensure_ascii=False) if heading_map else None
+            )
         elif file_type_str in ("docx", "fb2", "pdf") and document.heading_map_json:
             try:
                 heading_map = json.loads(document.heading_map_json)
