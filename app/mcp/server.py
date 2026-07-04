@@ -554,7 +554,7 @@ def build_mcp_app() -> FastMCP:
             )
 
             kb_id = _uuid.uuid4()
-            from app.core.vector_store import kb_id_to_collection_name
+            from app.api.v1.knowledge_bases import kb_id_to_collection_name
 
             collection_name = kb_id_to_collection_name(kb_id)
 
