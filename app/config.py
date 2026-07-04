@@ -184,6 +184,9 @@ class Settings(BaseSettings):
             "set_kb_retrieval_settings",
             "clear_kb_retrieval_settings",
             "get_kb_effective_settings",
+            "create_knowledge_base",
+            "ingest_url",
+            "ingest_text",
         ],
         description="Enabled MCP tool names",
     )
