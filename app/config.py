@@ -185,8 +185,11 @@ class Settings(BaseSettings):
             "clear_kb_retrieval_settings",
             "get_kb_effective_settings",
             "create_knowledge_base",
+            "update_knowledge_base",
+            "delete_knowledge_base",
             "ingest_url",
             "ingest_text",
+            "delete_document",
         ],
         description="Enabled MCP tool names",
     )

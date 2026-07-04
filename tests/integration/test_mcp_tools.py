@@ -231,6 +231,106 @@ class TestCreateKnowledgeBase:
 
 
 # ============================================================================
+# update_knowledge_base / delete_knowledge_base
+# ============================================================================
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+class TestUpdateKnowledgeBase:
+    async def test_missing_kb(self, mcp_app):
+        text = await _call(
+            mcp_app, "update_knowledge_base", knowledge_base_id=str(uuid4()), name="New Name"
+        )
+        assert text.startswith("Error:")
+        assert "not found" in text
+
+    async def test_no_fields_provided(self, mcp_app, sample_kb: KnowledgeBase):
+        text = await _call(mcp_app, "update_knowledge_base", knowledge_base_id=str(sample_kb.id))
+        assert text == "Error: at least one field to update must be provided."
+
+    async def test_updates_name_and_description(self, mcp_app, sample_kb: KnowledgeBase, mcp_db):
+        text = await _call(
+            mcp_app,
+            "update_knowledge_base",
+            knowledge_base_id=str(sample_kb.id),
+            name="Renamed KB",
+            description="New description",
+        )
+        assert text.startswith("Updated knowledge base 'Renamed KB'")
+
+        async with mcp_db() as db:
+            result = await db.execute(select(KnowledgeBase).where(KnowledgeBase.id == sample_kb.id))
+            kb = result.scalar_one()
+            assert kb.name == "Renamed KB"
+            assert kb.description == "New description"
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+class TestDeleteKnowledgeBase:
+    async def test_missing_kb(self, mcp_app):
+        text = await _call(mcp_app, "delete_knowledge_base", knowledge_base_id=str(uuid4()))
+        assert text.startswith("Error:")
+        assert "not found" in text
+
+    async def test_soft_deletes_kb_and_documents(
+        self, mcp_app, sample_kb: KnowledgeBase, sample_document: Document, mcp_db
+    ):
+        text = await _call(mcp_app, "delete_knowledge_base", knowledge_base_id=str(sample_kb.id))
+        assert text == f"Deleted knowledge base {sample_kb.id}."
+
+        async with mcp_db() as db:
+            kb_result = await db.execute(
+                select(KnowledgeBase).where(KnowledgeBase.id == sample_kb.id)
+            )
+            kb = kb_result.scalar_one()
+            assert kb.is_deleted is True
+
+            doc_result = await db.execute(select(Document).where(Document.id == sample_document.id))
+            doc = doc_result.scalar_one()
+            assert doc.is_deleted is True
+
+        # Now invisible to the read-only tools too.
+        listing = await _call(mcp_app, "list_knowledge_bases")
+        assert str(sample_kb.id) not in listing
+
+
+# ============================================================================
+# delete_document
+# ============================================================================
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+class TestDeleteDocument:
+    async def test_missing_document(self, mcp_app):
+        text = await _call(mcp_app, "delete_document", document_id=str(uuid4()))
+        assert text.startswith("Error:")
+        assert "not found" in text
+
+    async def test_soft_deletes_document_and_updates_kb_count(
+        self, mcp_app, sample_kb: KnowledgeBase, sample_document: Document, mcp_db
+    ):
+        text = await _call(mcp_app, "delete_document", document_id=str(sample_document.id))
+        assert text == f"Deleted document {sample_document.id}."
+
+        async with mcp_db() as db:
+            doc_result = await db.execute(select(Document).where(Document.id == sample_document.id))
+            doc = doc_result.scalar_one()
+            assert doc.is_deleted is True
+
+            kb_result = await db.execute(
+                select(KnowledgeBase).where(KnowledgeBase.id == sample_kb.id)
+            )
+            kb = kb_result.scalar_one()
+            assert kb.document_count == 0
+
+        listing = await _call(mcp_app, "list_documents", knowledge_base_id=str(sample_kb.id))
+        assert listing == "No documents found for this knowledge base."
+
+
+# ============================================================================
 # ingest_text / ingest_url
 # ============================================================================
 

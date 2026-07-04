@@ -8,6 +8,7 @@ import uuid as _uuid
 from typing import Any, Dict, List, Optional, cast
 from uuid import UUID
 
+from fastapi import HTTPException
 from fastmcp import FastMCP
 from sqlalchemy import func, select
 
@@ -41,8 +42,11 @@ MCP_TOOL_NAMES = [
     "clear_kb_retrieval_settings",
     "get_kb_effective_settings",
     "create_knowledge_base",
+    "update_knowledge_base",
+    "delete_knowledge_base",
     "ingest_url",
     "ingest_text",
+    "delete_document",
 ]
 
 
@@ -588,6 +592,75 @@ def build_mcp_app() -> FastMCP:
         return f"Created knowledge base '{name}' (id={kb_id}, model={model})"
 
     @mcp.tool()
+    async def update_knowledge_base(
+        knowledge_base_id: str,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        chunk_size: Optional[int] = None,
+        chunk_overlap: Optional[int] = None,
+    ) -> str:
+        """Update a knowledge base's name, description, or chunking config."""
+        disabled = await _ensure_tool_enabled("update_knowledge_base")
+        if disabled:
+            return disabled
+
+        try:
+            kb_uuid = UUID(str(knowledge_base_id))
+        except Exception:
+            return "Error: invalid knowledge_base_id."
+
+        update_fields: Dict[str, Any] = {
+            k: v
+            for k, v in {
+                "name": name,
+                "description": description,
+                "chunk_size": chunk_size,
+                "chunk_overlap": chunk_overlap,
+            }.items()
+            if v is not None
+        }
+        if not update_fields:
+            return "Error: at least one field to update must be provided."
+
+        from app.api.v1.knowledge_bases import update_knowledge_base as _api_update_kb
+        from app.models.schemas import KnowledgeBaseUpdate
+
+        async with get_db_session() as db:
+            try:
+                kb = await _api_update_kb(
+                    kb_id=kb_uuid,
+                    kb_update=KnowledgeBaseUpdate(**update_fields),
+                    db=db,
+                    user_id=None,
+                )
+            except HTTPException as exc:
+                return f"Error: {exc.detail}"
+
+        return f"Updated knowledge base '{kb.name}' (id={kb.id})"
+
+    @mcp.tool()
+    async def delete_knowledge_base(knowledge_base_id: str) -> str:
+        """Soft-delete a knowledge base, its documents, and their vectors."""
+        disabled = await _ensure_tool_enabled("delete_knowledge_base")
+        if disabled:
+            return disabled
+
+        try:
+            kb_uuid = UUID(str(knowledge_base_id))
+        except Exception:
+            return "Error: invalid knowledge_base_id."
+
+        from app.api.v1.knowledge_bases import delete_knowledge_base as _api_delete_kb
+
+        async with get_db_session() as db:
+            try:
+                await _api_delete_kb(kb_id=kb_uuid, db=db, user_id=None)
+            except HTTPException as exc:
+                return f"Error: {exc.detail}"
+
+        return f"Deleted knowledge base {knowledge_base_id}."
+
+    @mcp.tool()
     async def ingest_url(url: str, knowledge_base_id: str) -> str:
         """Fetch a URL, extract its text, and add it as a document to a knowledge base."""
         disabled = await _ensure_tool_enabled("ingest_url")
@@ -776,6 +849,28 @@ def build_mcp_app() -> FastMCP:
 
         asyncio.create_task(_background_process(doc_id))
         return f"Ingested '{fname}' (id={doc_id}, {len(content_bytes)} bytes). Processing started."
+
+    @mcp.tool()
+    async def delete_document(document_id: str) -> str:
+        """Soft-delete a document and remove its vectors."""
+        disabled = await _ensure_tool_enabled("delete_document")
+        if disabled:
+            return disabled
+
+        try:
+            doc_uuid = UUID(str(document_id))
+        except Exception:
+            return "Error: invalid document_id."
+
+        from app.api.v1.documents import delete_document as _api_delete_document
+
+        async with get_db_session() as db:
+            try:
+                await _api_delete_document(doc_id=doc_uuid, db=db, user_id=None)
+            except HTTPException as exc:
+                return f"Error: {exc.detail}"
+
+        return f"Deleted document {document_id}."
 
     return mcp
 
