@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { toast } from 'sonner'
 import { apiClient } from '../../services/api'
 import type { Document } from '../../types/index'
+import { DocumentPreviewModal } from './DocumentPreviewModal'
 
 interface DocumentItemProps {
   document: Document
@@ -18,6 +19,26 @@ export function DocumentItem({ document, onReprocess, onDelete, onRecomputeDupli
   const [headingMap, setHeadingMap] = useState<Array<{ pos: number; level: number; text: string }> | null>(null)
   const [headingMapLoading, setHeadingMapLoading] = useState(false)
   const [headingMapLoaded, setHeadingMapLoaded] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewContent, setPreviewContent] = useState<string | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewLoaded, setPreviewLoaded] = useState(false)
+
+  const handlePreview = async () => {
+    setPreviewOpen(true)
+    if (previewLoaded) return
+    setPreviewLoading(true)
+    try {
+      const full = await apiClient.getDocument(document.id)
+      setPreviewContent(full.content ?? null)
+    } catch {
+      setPreviewContent(null)
+      toast.error('Failed to load document preview')
+    } finally {
+      setPreviewLoading(false)
+      setPreviewLoaded(true)
+    }
+  }
 
   const handleDownload = async () => {
     setIsDownloading(true)
@@ -288,6 +309,17 @@ export function DocumentItem({ document, onReprocess, onDelete, onRecomputeDupli
         </div>
 
         <div className="flex items-center space-x-2 ml-4">
+          {document.status === 'completed' && (
+            <button
+              onClick={handlePreview}
+              className="text-gray-400 hover:text-blue-400 p-2 rounded transition-colors"
+              aria-label="Preview document content"
+              title="Preview document content"
+            >
+              👁️
+            </button>
+          )}
+
           {!document.source_url && (
             <button
               onClick={handleDownload}
@@ -347,6 +379,13 @@ export function DocumentItem({ document, onReprocess, onDelete, onRecomputeDupli
         </div>
       </div>
 
+      <DocumentPreviewModal
+        isOpen={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        filename={document.filename}
+        content={previewContent}
+        loading={previewLoading}
+      />
     </div>
   )
 }
