@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import uuid as _uuid
+from pathlib import Path
 from typing import Any, Dict, List, Optional, cast
 from uuid import UUID
 
@@ -31,6 +32,11 @@ from app.services.retrieval_settings import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Directory upload_document reads from when called with `path` instead of
+# content_base64 — files are expected to already be placed here (e.g. via
+# scp to the RAG host), since it's bind-mounted from ./uploads on the host.
+UPLOAD_INBOX_DIR = Path("/app/uploads/inbox")
 
 MCP_TOOL_NAMES = [
     "rag_query",
@@ -854,15 +860,25 @@ def build_mcp_app() -> FastMCP:
     @mcp.tool()
     async def upload_document(
         knowledge_base_id: str,
-        filename: str,
-        content_base64: str,
+        filename: Optional[str] = None,
+        content_base64: Optional[str] = None,
+        path: Optional[str] = None,
     ) -> str:
-        """Upload a binary document (pdf, docx, fb2, txt, or md) as base64-encoded content.
+        """Upload a binary document (pdf, docx, fb2, txt, or md).
+
+        Provide exactly ONE of:
+        - content_base64: base64-encoded file bytes, passed inline. Fine for
+          small files, but the calling agent's own tool-call context usually
+          truncates well under 1MB — impractical for most PDFs.
+        - path: filename (or relative path) of a file already placed under
+          the uploads/inbox/ directory on the RAG host (e.g. via scp), read
+          directly from disk with no base64 round-trip. Recommended for PDFs
+          and anything over a few tens of KB.
 
         Use this instead of ingest_text/ingest_url when the original file format
         matters — PDF page numbers, DOCX/FB2 structural headings, or when the
         original file needs to stay downloadable. For plain text/markdown that
-        the agent authored itself, prefer ingest_text (no base64 overhead).
+        the agent authored itself, prefer ingest_text (no upload overhead).
         """
         disabled = await _ensure_tool_enabled("upload_document")
         if disabled:
@@ -873,14 +889,34 @@ def build_mcp_app() -> FastMCP:
         except Exception:
             return "Error: invalid knowledge_base_id."
 
-        import base64
-        import binascii
-        from io import BytesIO
+        if bool(content_base64) == bool(path):
+            return "Error: provide exactly one of content_base64 or path."
 
-        try:
-            content_bytes = base64.b64decode(content_base64, validate=True)
-        except (binascii.Error, ValueError):
-            return "Error: content_base64 is not valid base64."
+        if path:
+            inbox_dir = UPLOAD_INBOX_DIR.resolve()
+            inbox_dir.mkdir(parents=True, exist_ok=True)
+            candidate = (inbox_dir / path).resolve()
+            try:
+                candidate.relative_to(inbox_dir)
+            except ValueError:
+                return "Error: path must stay within the uploads/inbox directory."
+            if not candidate.is_file():
+                return f"Error: file not found in uploads/inbox: {path}"
+            content_bytes = candidate.read_bytes()
+            filename = filename or candidate.name
+        else:
+            import base64
+            import binascii
+
+            if not filename:
+                return "Error: filename is required when using content_base64."
+            assert content_base64 is not None
+            try:
+                content_bytes = base64.b64decode(content_base64, validate=True)
+            except (binascii.Error, ValueError):
+                return "Error: content_base64 is not valid base64."
+
+        from io import BytesIO
 
         from fastapi import BackgroundTasks, UploadFile
 

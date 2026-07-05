@@ -553,6 +553,96 @@ class TestUploadDocument:
         assert second.startswith("Error:")
         assert "already exists" in second
 
+    async def test_neither_content_nor_path_provided(self, mcp_app, sample_kb: KnowledgeBase):
+        text = await _call(
+            mcp_app,
+            "upload_document",
+            knowledge_base_id=str(sample_kb.id),
+            filename="report.pdf",
+        )
+        assert text == "Error: provide exactly one of content_base64 or path."
+
+    async def test_both_content_and_path_provided(self, mcp_app, sample_kb: KnowledgeBase):
+        text = await _call(
+            mcp_app,
+            "upload_document",
+            knowledge_base_id=str(sample_kb.id),
+            filename="report.pdf",
+            content_base64=_make_test_pdf_base64(),
+            path="report.pdf",
+        )
+        assert text == "Error: provide exactly one of content_base64 or path."
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+class TestUploadDocumentViaPath:
+    @pytest.fixture
+    def inbox_dir(self, tmp_path, monkeypatch):
+        inbox = tmp_path / "inbox"
+        inbox.mkdir()
+        monkeypatch.setattr("app.mcp.server.UPLOAD_INBOX_DIR", inbox)
+        return inbox
+
+    async def test_file_not_found(self, mcp_app, sample_kb: KnowledgeBase, inbox_dir):
+        text = await _call(
+            mcp_app,
+            "upload_document",
+            knowledge_base_id=str(sample_kb.id),
+            path="missing.pdf",
+        )
+        assert text.startswith("Error:")
+        assert "not found" in text
+
+    async def test_path_traversal_rejected(self, mcp_app, sample_kb: KnowledgeBase, inbox_dir):
+        outside_file = inbox_dir.parent / "secret.txt"
+        outside_file.write_text("should not be readable")
+
+        text = await _call(
+            mcp_app,
+            "upload_document",
+            knowledge_base_id=str(sample_kb.id),
+            path="../secret.txt",
+        )
+        assert text == "Error: path must stay within the uploads/inbox directory."
+
+    async def test_uploads_from_inbox(self, mcp_app, sample_kb: KnowledgeBase, mcp_db, inbox_dir):
+        pdf_bytes = base64.b64decode(_make_test_pdf_base64("From inbox"))
+        (inbox_dir / "report.pdf").write_bytes(pdf_bytes)
+
+        text = await _call(
+            mcp_app,
+            "upload_document",
+            knowledge_base_id=str(sample_kb.id),
+            path="report.pdf",
+        )
+        assert text.startswith("Uploaded 'report.pdf'")
+        await _drain_background_tasks(mcp_app)
+
+        async with mcp_db() as db:
+            result = await db.execute(
+                select(Document).where(Document.knowledge_base_id == sample_kb.id)
+            )
+            doc = result.scalar_one()
+            assert doc.file_type == "pdf"
+            assert "From inbox" in doc.content
+
+    async def test_filename_defaults_to_path_basename(
+        self, mcp_app, sample_kb: KnowledgeBase, mcp_db, inbox_dir
+    ):
+        pdf_bytes = base64.b64decode(_make_test_pdf_base64("Nested file"))
+        subdir = inbox_dir / "sub"
+        subdir.mkdir()
+        (subdir / "nested.pdf").write_bytes(pdf_bytes)
+
+        text = await _call(
+            mcp_app,
+            "upload_document",
+            knowledge_base_id=str(sample_kb.id),
+            path="sub/nested.pdf",
+        )
+        assert text.startswith("Uploaded 'nested.pdf'")
+
 
 # ============================================================================
 # Disabled-tool guard
