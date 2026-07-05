@@ -36,6 +36,7 @@ const MCP_TOOL_OPTIONS = [
   { id: 'ingest_url', label: 'ingest_url', description: 'Fetch a URL and add it as a document to a knowledge base.' },
   { id: 'ingest_text', label: 'ingest_text', description: 'Add a plain-text or markdown document to a knowledge base.' },
   { id: 'upload_document', label: 'upload_document', description: 'Upload a binary document (pdf, docx, fb2, txt, md) via base64 content or a file already placed in uploads/inbox/.' },
+  { id: 'create_upload_url', label: 'create_upload_url', description: 'Generate a short-lived signed URL for uploading a large document via plain HTTP PUT, bypassing tool-call payloads entirely.' },
   { id: 'delete_document', label: 'delete_document', description: 'Soft-delete a document and remove its vectors.' },
 ]
 

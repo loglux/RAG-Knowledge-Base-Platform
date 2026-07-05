@@ -190,6 +190,7 @@ class Settings(BaseSettings):
             "ingest_url",
             "ingest_text",
             "upload_document",
+            "create_upload_url",
             "delete_document",
         ],
         description="Enabled MCP tool names",

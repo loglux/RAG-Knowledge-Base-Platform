@@ -9,6 +9,9 @@ at the test engine (see the mcp_db fixture below).
 import asyncio
 import base64
 import json
+import re
+import time
+from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
 import pytest
@@ -20,6 +23,7 @@ import app.db.session as db_session_module
 from app.config import Settings, settings
 from app.mcp.server import MCP_TOOL_NAMES, build_mcp_app
 from app.models.database import Document, KnowledgeBase
+from app.services.upload_signing import sign_upload
 
 
 def _text(result) -> str:
@@ -642,6 +646,116 @@ class TestUploadDocumentViaPath:
             path="sub/nested.pdf",
         )
         assert text.startswith("Uploaded 'nested.pdf'")
+
+
+# ============================================================================
+# create_upload_url + presigned upload consumption
+# ============================================================================
+
+
+def _extract_upload_path(text: str) -> str:
+    match = re.search(r"(/api/v1/uploads/\S+)", text)
+    assert match, f"no upload URL found in: {text}"
+    return match.group(1)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+class TestCreateUploadUrl:
+    async def test_missing_kb(self, mcp_app):
+        text = await _call(
+            mcp_app,
+            "create_upload_url",
+            knowledge_base_id=str(uuid4()),
+            filename="report.pdf",
+        )
+        assert text.startswith("Error:")
+        assert "not found" in text
+
+    async def test_unsupported_extension(self, mcp_app, sample_kb: KnowledgeBase):
+        text = await _call(
+            mcp_app,
+            "create_upload_url",
+            knowledge_base_id=str(sample_kb.id),
+            filename="archive.zip",
+        )
+        assert text.startswith("Error:")
+        assert "Unsupported file type" in text
+
+    async def test_generates_valid_signed_url(self, mcp_app, sample_kb: KnowledgeBase):
+        text = await _call(
+            mcp_app,
+            "create_upload_url",
+            knowledge_base_id=str(sample_kb.id),
+            filename="report.pdf",
+        )
+        assert text.startswith("Upload URL (valid 5 min, single use, max")
+        assert "curl -X PUT -T 'report.pdf'" in text
+
+        path = _extract_upload_path(text)
+        qs = parse_qs(urlparse(path).query)
+        assert qs["kb_id"][0] == str(sample_kb.id)
+        assert qs["filename"][0] == "report.pdf"
+        assert "expires" in qs
+        assert "sig" in qs
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+class TestConsumeUploadUrl:
+    async def test_wrong_signature_rejected(self, mcp_app, sample_kb: KnowledgeBase, test_client):
+        text = await _call(
+            mcp_app,
+            "create_upload_url",
+            knowledge_base_id=str(sample_kb.id),
+            filename="report.pdf",
+        )
+        path = _extract_upload_path(text)
+        tampered = re.sub(r"sig=[0-9a-f]+", "sig=deadbeef", path)
+
+        response = await test_client.put(tampered, content=b"whatever")
+        assert response.status_code == 403
+
+    async def test_expired_url_rejected(self, mcp_app, sample_kb: KnowledgeBase, test_client):
+        upload_id = "expired-test-id"
+        expires = int(time.time()) - 10
+        sig = sign_upload(upload_id, str(sample_kb.id), "report.pdf", expires)
+
+        response = await test_client.put(
+            f"/api/v1/uploads/{upload_id}"
+            f"?kb_id={sample_kb.id}&filename=report.pdf&expires={expires}&sig={sig}",
+            content=b"whatever",
+        )
+        assert response.status_code == 410
+
+    async def test_successful_upload_and_replay_rejected(
+        self, mcp_app, sample_kb: KnowledgeBase, test_client, mcp_db
+    ):
+        text = await _call(
+            mcp_app,
+            "create_upload_url",
+            knowledge_base_id=str(sample_kb.id),
+            filename="report.pdf",
+        )
+        path = _extract_upload_path(text)
+        pdf_bytes = base64.b64decode(_make_test_pdf_base64("Presigned upload works"))
+
+        response = await test_client.put(path, content=pdf_bytes)
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["filename"] == "report.pdf"
+
+        async with mcp_db() as db:
+            result = await db.execute(
+                select(Document).where(Document.knowledge_base_id == sample_kb.id)
+            )
+            doc = result.scalar_one()
+            assert doc.file_type == "pdf"
+            assert str(doc.id) == payload["document_id"]
+
+        # Replay: the same (still-unexpired) URL must not work twice.
+        replay = await test_client.put(path, content=pdf_bytes)
+        assert replay.status_code == 409
 
 
 # ============================================================================

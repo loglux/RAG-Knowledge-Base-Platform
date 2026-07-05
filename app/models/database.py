@@ -663,6 +663,20 @@ class MCPAuthEvent(Base):
     admin_user: Mapped[Optional["AdminUser"]] = relationship("AdminUser")
 
 
+class ConsumedUploadToken(Base):
+    """Tracks single-use consumption of presigned document-upload URLs.
+
+    The URL itself is stateless (HMAC-signed, self-describing) — this table
+    exists only to reject replay of an otherwise still-valid, unexpired URL.
+    See app.services.upload_signing and app.api.v1.uploads.
+    """
+
+    __tablename__ = "consumed_upload_tokens"
+
+    upload_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    consumed_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
 class SystemSettings(Base):
     """System configuration settings - stores API keys, database URLs, etc."""
 

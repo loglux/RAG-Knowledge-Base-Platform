@@ -21,6 +21,7 @@ from app.api.v1 import (
     settings,
     setup,
     system_settings,
+    uploads,
 )
 from app.dependencies import get_current_user_id
 
@@ -32,6 +33,9 @@ protected_router = APIRouter(dependencies=[Depends(get_current_user_id)])
 api_router.include_router(health.router, tags=["health"])
 api_router.include_router(setup.router, tags=["setup"])  # Setup wizard (no auth required)
 api_router.include_router(auth.router)
+api_router.include_router(
+    uploads.router, prefix="/uploads", tags=["uploads"]
+)  # HMAC-signed presigned upload URLs (no JWT — own signature-based auth)
 
 # Protected routers
 protected_router.include_router(

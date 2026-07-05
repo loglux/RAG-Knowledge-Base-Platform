@@ -4,9 +4,11 @@ import asyncio
 import hashlib
 import json
 import logging
+import time
 import uuid as _uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, cast
+from urllib.parse import urlencode
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -53,6 +55,7 @@ MCP_TOOL_NAMES = [
     "ingest_url",
     "ingest_text",
     "upload_document",
+    "create_upload_url",
     "delete_document",
 ]
 
@@ -943,6 +946,58 @@ def build_mcp_app() -> FastMCP:
         return (
             f"Uploaded '{filename}' (id={doc.id}, {len(content_bytes)} bytes). "
             "Processing started."
+        )
+
+    @mcp.tool()
+    async def create_upload_url(knowledge_base_id: str, filename: str) -> str:
+        """Generate a short-lived, single-use signed URL for uploading a large
+        binary document via a plain HTTP PUT.
+
+        Use this when content_base64 is impractical (large files typically
+        truncate in the calling agent's own tool-output limits well before
+        reaching our server) and the file isn't already reachable via the
+        uploads/inbox/ `path` option on upload_document. File bytes never
+        pass through this tool call or the calling agent's context — the
+        returned URL is consumed with a plain HTTP PUT (e.g.
+        `curl -X PUT -T file.pdf '<url>'`), expires in 5 minutes, and works
+        exactly once.
+        """
+        disabled = await _ensure_tool_enabled("create_upload_url")
+        if disabled:
+            return disabled
+
+        try:
+            kb_uuid = UUID(str(knowledge_base_id))
+        except Exception:
+            return "Error: invalid knowledge_base_id."
+
+        extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+        if extension not in {"txt", "md", "fb2", "docx", "pdf"}:
+            return (
+                f"Error: Unsupported file type: {extension}. " "Supported: txt, md, fb2, docx, pdf"
+            )
+
+        async with get_db_session() as db:
+            kb = await db.get(KnowledgeBaseModel, kb_uuid)
+            if not kb or kb.is_deleted:
+                return f"Error: knowledge base {knowledge_base_id} not found."
+
+        from app.services.upload_signing import UPLOAD_URL_TTL_SECONDS, sign_upload
+
+        upload_id = _uuid.uuid4().hex
+        expires = int(time.time()) + UPLOAD_URL_TTL_SECONDS
+        signature = sign_upload(upload_id, str(kb_uuid), filename, expires)
+
+        base_url = (settings.MCP_PUBLIC_BASE_URL or "").rstrip("/")
+        query = urlencode(
+            {"kb_id": str(kb_uuid), "filename": filename, "expires": expires, "sig": signature}
+        )
+        url = f"{base_url}/api/v1/uploads/{upload_id}?{query}"
+
+        return (
+            f"Upload URL (valid {UPLOAD_URL_TTL_SECONDS // 60} min, single use, "
+            f"max {settings.MAX_FILE_SIZE_MB}MB):\n{url}\n\n"
+            f"curl -X PUT -T '{filename}' '{url}'"
         )
 
     @mcp.tool()
