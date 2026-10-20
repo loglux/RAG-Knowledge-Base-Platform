@@ -15,28 +15,41 @@ class TestDocumentsAPI:
         self, test_client: AsyncClient, sample_kb: KnowledgeBase, mock_document_data: dict
     ):
         """Test creating a new document."""
-        request_data = {**mock_document_data, "knowledge_base_id": str(sample_kb.id)}
+        # POST /documents/ is multipart/form-data (actual file upload), not JSON -
+        # see app/api/v1/documents.py::create_document.
+        files = {
+            "file": (
+                mock_document_data["filename"],
+                mock_document_data["content"].encode(),
+                "text/markdown",
+            )
+        }
+        data = {"knowledge_base_id": str(sample_kb.id)}
 
-        response = await test_client.post("/api/v1/documents/", json=request_data)
+        response = await test_client.post("/api/v1/documents/", files=files, data=data)
 
         assert response.status_code == 201
-        data = response.json()
+        body = response.json()
 
-        assert data["filename"] == mock_document_data["filename"]
-        assert data["knowledge_base_id"] == str(sample_kb.id)
-        assert data["status"] == "pending"
-        assert "id" in data
+        assert body["filename"] == mock_document_data["filename"]
+        assert body["knowledge_base_id"] == str(sample_kb.id)
+        assert body["status"] == "pending"
+        assert "id" in body
 
     async def test_create_duplicate_document(
         self, test_client: AsyncClient, sample_document: Document, mock_document_data: dict
     ):
         """Test creating duplicate document returns 409."""
-        request_data = {
-            **mock_document_data,
-            "knowledge_base_id": str(sample_document.knowledge_base_id),
+        files = {
+            "file": (
+                mock_document_data["filename"],
+                mock_document_data["content"].encode(),
+                "text/markdown",
+            )
         }
+        data = {"knowledge_base_id": str(sample_document.knowledge_base_id)}
 
-        response = await test_client.post("/api/v1/documents/", json=request_data)
+        response = await test_client.post("/api/v1/documents/", files=files, data=data)
 
         assert response.status_code == 409
 

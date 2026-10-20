@@ -14,6 +14,25 @@ jobs:
   backend:
     name: Backend (ruff + black + mypy + pytest)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: kb_user
+          POSTGRES_PASSWORD: kb_pass
+          POSTGRES_DB: knowledge_base_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # tests/conftest.py derives TEST_DATABASE_URL from this by swapping the
+      # db name - the "knowledge_base" db itself is never connected to in
+      # tests (app lifespan never runs), only "knowledge_base_test" is.
+      DATABASE_URL: postgresql+asyncpg://kb_user:kb_pass@localhost:5432/knowledge_base
     steps:
       - uses: actions/checkout@v4
 
@@ -41,6 +60,9 @@ jobs:
 
       - name: Unit tests
         run: make test-unit
+
+      - name: Integration tests
+        run: make test-integration
 
   frontend:
     name: Frontend (eslint + build)

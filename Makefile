@@ -46,11 +46,11 @@ dev:  ## Run FastAPI dev server with --reload
 test:  ## Run all tests with coverage
 	$(PYTEST)
 
-test-unit:  ## Run unit tests only
-	$(PYTEST) tests/unit
+test-unit:  ## Run unit tests only (fails if coverage drops below current baseline)
+	$(PYTEST) tests/unit --cov-fail-under=36
 
-test-integration:  ## Run integration tests only
-	$(PYTEST) tests/integration
+test-integration:  ## Run integration tests only (needs a reachable Postgres - see DATABASE_URL)
+	$(PYTEST) tests/integration --no-cov
 
 coverage:  ## Generate HTML coverage report
 	$(PYTEST) --cov-report=html
