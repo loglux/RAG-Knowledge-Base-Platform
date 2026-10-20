@@ -3,7 +3,7 @@
 import logging
 
 import bcrypt
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +16,7 @@ from app.core.auth import (
     get_admin_id,
     is_token_type,
 )
+from app.core.rate_limit import limiter
 from app.db.session import get_db
 from app.dependencies import get_current_admin_id
 from app.models.database import AdminRefreshToken, AdminUser
@@ -47,7 +48,9 @@ def _clear_refresh_cookie(response: Response) -> None:
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("10/minute")
 async def login(
+    request: Request,
     payload: LoginRequest,
     response: Response,
     db: AsyncSession = Depends(get_db),

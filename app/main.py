@@ -7,13 +7,17 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator, Callable
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.api import oauth
 from app.api.v1 import api_router
 from app.config import settings
+from app.core.rate_limit import limiter
 from app.db.session import close_db
 from app.mcp.manager import reload_mcp_routes
 from app.mcp.server import get_mcp_app
@@ -174,6 +178,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Rate limiting - blanket per-IP cap on every endpoint (app.core.rate_limit),
+# plus tighter per-route limits where decorated (e.g. /auth/login).
+async def _rate_limit_handler(request: Request, exc: Exception) -> Response:
+    # slowapi's handler is typed for RateLimitExceeded specifically; this
+    # wrapper just satisfies Starlette's generic Exception handler signature.
+    assert isinstance(exc, RateLimitExceeded)
+    return _rate_limit_exceeded_handler(request, exc)
+
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # Include OAuth routers (no API prefix)
 app.include_router(oauth.router)
