@@ -6,7 +6,14 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.models.enums import ChunkingStrategy, DocumentStatus, FileType, RetrievalMode
+from app.models.enums import (
+    ChunkingStrategy,
+    CrawlJobStatus,
+    CrawlScope,
+    DocumentStatus,
+    FileType,
+    RetrievalMode,
+)
 
 # ============================================================================
 # Knowledge Base Schemas
@@ -248,6 +255,57 @@ class UrlPreviewResponse(BaseModel):
     canonical_url: Optional[str] = None
     content_md: str = Field(..., description="Full extracted markdown content")
     word_count: int
+
+
+class UrlCrawlRequest(BaseModel):
+    """Schema for starting a multi-page URL crawl."""
+
+    knowledge_base_id: UUID = Field(..., description="Knowledge base ID")
+    seed_url: str = Field(..., description="URL to start crawling from")
+    scope: CrawlScope = Field(
+        CrawlScope.DOMAIN, description="How far the crawl may wander from the seed URL"
+    )
+    max_depth: int = Field(2, ge=0, le=5, description="Maximum link-following depth from seed")
+    max_pages: int = Field(
+        30, ge=1, le=200, description="Maximum pages to import (hard-capped at 200)"
+    )
+    detect_duplicates: bool = Field(False, description="Enable duplicate chunk detection")
+    contextual_description_enabled: Optional[bool] = Field(
+        None, description="Override contextual description generation for this import"
+    )
+
+
+class UrlCrawlPageResult(BaseModel):
+    """Outcome for a single page discovered/fetched during a crawl."""
+
+    url: str
+    depth: int
+    status: str = Field(..., description="imported | duplicate | failed")
+    document_id: Optional[UUID] = None
+    error: Optional[str] = None
+
+
+class UrlCrawlJobResponse(BaseModel):
+    """Schema for a URL crawl job (create response and poll response)."""
+
+    id: UUID
+    knowledge_base_id: UUID
+    seed_url: str
+    scope: CrawlScope
+    max_depth: int
+    max_pages: int
+    status: CrawlJobStatus
+    pages_discovered: int
+    pages_processed: int
+    pages_duplicate: int
+    pages_failed: int
+    pages: List[UrlCrawlPageResult] = Field(default_factory=list)
+    error_message: Optional[str] = None
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
 
 
 class DocumentUpload(BaseModel):

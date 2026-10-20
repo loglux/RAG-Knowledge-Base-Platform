@@ -844,3 +844,57 @@ class QAEvalResult(Base):
 
     def __repr__(self) -> str:
         return f"<QAEvalResult(id={self.id}, run_id={self.run_id})>"
+
+
+class UrlCrawlJob(Base):
+    """Background job that discovers and imports multiple pages from a seed URL."""
+
+    __tablename__ = "url_crawl_jobs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False
+    )
+
+    knowledge_base_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("knowledge_bases.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True, comment="Owner user ID - nullable for MVP"
+    )
+
+    seed_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    scope: Mapped[str] = mapped_column(
+        String(20), default="domain", nullable=False, comment="domain | path_prefix | unrestricted"
+    )
+    max_depth: Mapped[int] = mapped_column(Integer, default=2, nullable=False)
+    max_pages: Mapped[int] = mapped_column(Integer, default=30, nullable=False)
+    detect_duplicates: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    contextual_description_enabled: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default="pending",
+        nullable=False,
+        index=True,
+        comment="pending | running | completed | failed",
+    )
+    pages_discovered: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    pages_processed: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    pages_duplicate: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    pages_failed: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    pages_json: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True, comment="JSON array of {url, depth, status, document_id, error}"
+    )
+    error_message: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True, comment="Fatal error if the job failed before processing any page"
+    )
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    def __repr__(self) -> str:
+        return f"<UrlCrawlJob(id={self.id}, seed_url={self.seed_url}, status={self.status})>"

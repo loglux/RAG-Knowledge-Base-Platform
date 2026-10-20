@@ -22,6 +22,7 @@ from app.api.v1 import (
     setup,
     system_settings,
     uploads,
+    url_crawl,
 )
 from app.dependencies import get_current_user_id
 
@@ -57,6 +58,7 @@ protected_router.include_router(auto_tune.router, tags=["auto-tune"])
 protected_router.include_router(mcp_tokens.router)
 protected_router.include_router(mcp_refresh_tokens.router)
 protected_router.include_router(mcp_oauth_events.router)
+protected_router.include_router(url_crawl.router, prefix="/crawl", tags=["crawl"])
 
 api_router.include_router(protected_router)
 

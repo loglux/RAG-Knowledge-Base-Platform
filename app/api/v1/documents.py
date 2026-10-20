@@ -38,40 +38,16 @@ from app.models.schemas import (
 )
 from app.services.document_processor import get_document_processor
 from app.services.duplicate_chunks import compute_duplicate_chunks_for_document, json_dumps
+from app.services.url_ingest import (
+    DuplicateContentError,
+    DuplicateUrlError,
+    create_document_from_extracted_page,
+)
+from app.services.url_ingest import clean_url as _clean_url
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-_TRACKING_PREFIXES = ("utm_", "cx_", "mc_", "yclid")
-_TRACKING_PARAMS = frozenset({"fbclid", "gclid", "gclsrc", "msclkid", "igshid", "_ga", "twclid"})
-
-
-def _clean_url(raw: str, canonical: str | None = None) -> str:
-    """Prefer canonical URL from page; otherwise strip known tracking params and fragment."""
-    from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
-
-    if canonical:
-        try:
-            raw_p = urlparse(raw)
-            can_p = urlparse(canonical)
-            if can_p.scheme in ("http", "https") and can_p.netloc == raw_p.netloc:
-                return canonical
-        except Exception:
-            pass
-
-    try:
-        parsed = urlparse(raw)
-        params = parse_qs(parsed.query, keep_blank_values=True)
-        clean = {
-            k: v
-            for k, v in params.items()
-            if not any(k.lower().startswith(p) for p in _TRACKING_PREFIXES)
-            and k.lower() not in _TRACKING_PARAMS
-        }
-        return urlunparse(parsed._replace(query=urlencode(clean, doseq=True), fragment=""))
-    except Exception:
-        return raw
 
 
 async def _process_document_background(
@@ -406,100 +382,14 @@ async def create_document_from_url(
     except Url2mdEmptyResult as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
 
-    clean_url = _clean_url(request.url, page.canonical_url)
-
-    # Check for duplicate source URL in this KB (using cleaned URL)
-    url_dup_query = select(DocumentModel).where(
-        DocumentModel.knowledge_base_id == request.knowledge_base_id,
-        DocumentModel.source_url == clean_url,
-        DocumentModel.is_deleted == False,
-    )
-    url_dup_result = await db.execute(url_dup_query)
-    if url_dup_result.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="A document from this URL already exists in this knowledge base",
+    try:
+        doc_model = await create_document_from_extracted_page(
+            db=db, kb=kb, url=request.url, page=page, user_id=user_id
         )
-
-    content = page.content_md
-    content_bytes = content.encode("utf-8")
-    content_hash = hashlib.sha256(content_bytes).hexdigest()
-
-    # Check for duplicate content in this KB
-    dup_query = select(DocumentModel).where(
-        DocumentModel.knowledge_base_id == request.knowledge_base_id,
-        DocumentModel.content_hash == content_hash,
-        DocumentModel.is_deleted == False,
-    )
-    dup_result = await db.execute(dup_query)
-    if dup_result.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Document with identical content already exists in this knowledge base",
-        )
-
-    # Derive a filename from title or hostname
-    from urllib.parse import urlparse as _urlparse
-
-    if page.title:
-        safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in page.title)[:80]
-        filename = f"{safe_title.strip()}.md"
-    else:
-        hostname = _urlparse(request.url).hostname or "web"
-        filename = f"{hostname}.md"
-
-    # Build web_metadata JSON
-    web_metadata_dict = {
-        k: v
-        for k, v in {
-            "author": page.author,
-            "publish_date": page.publish_date,
-            "sitename": page.sitename,
-            "description": page.description,
-            "canonical_url": page.canonical_url,
-        }.items()
-        if v is not None
-    }
-
-    doc_model = DocumentModel(
-        knowledge_base_id=request.knowledge_base_id,
-        filename=filename,
-        file_type=FileType.MD,
-        file_size=len(content_bytes),
-        content=content,
-        content_hash=content_hash,
-        status=DocumentStatus.PENDING,
-        user_id=user_id,
-        language=page.language,
-        source_url=clean_url,
-        web_metadata=(
-            json.dumps(web_metadata_dict, ensure_ascii=False) if web_metadata_dict else None
-        ),
-    )
-
-    db.add(doc_model)
-    await db.flush()
-
-    # Save raw HTML to disk so reprocess works offline
-    if page.raw_html:
-        html_path = Path("/app/uploads") / str(request.knowledge_base_id) / f"{doc_model.id}.html"
-        try:
-            html_path.parent.mkdir(parents=True, exist_ok=True)
-            html_path.write_text(page.raw_html, encoding="utf-8")
-            doc_model.file_path = str(html_path)
-        except Exception as exc:
-            logger.warning(f"Failed to save raw HTML to disk: {exc}")
-
-    # Recalculate KB document count
-    doc_count = await db.scalar(
-        select(func.count(DocumentModel.id)).where(
-            DocumentModel.knowledge_base_id == kb.id, DocumentModel.is_deleted == False
-        )
-    )
-    kb.document_count = doc_count or 0
-
-    await db.commit()
-    await db.refresh(doc_model)
+    except DuplicateUrlError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    except DuplicateContentError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
 
     background_tasks.add_task(
         _process_document_background,
@@ -508,7 +398,9 @@ async def create_document_from_url(
         contextual_description_enabled_override=request.contextual_description_enabled,
     )
 
-    logger.info(f"Document {doc_model.id} imported from {clean_url} and queued for processing")
+    logger.info(
+        f"Document {doc_model.id} imported from {doc_model.source_url} and queued for processing"
+    )
 
     return doc_model
 
