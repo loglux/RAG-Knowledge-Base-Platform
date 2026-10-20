@@ -3,12 +3,12 @@
 import logging
 import time
 from typing import Optional
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.ownership import check_ownership
 from app.core.retrieval import get_retrieval_engine
 from app.db.session import get_db
 from app.dependencies import get_current_user_id
@@ -31,7 +31,7 @@ router = APIRouter()
 async def retrieve_only(
     request: RetrieveRequest,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
     rag_service: RAGService = Depends(get_rag_service),
 ):
     """
@@ -50,6 +50,8 @@ async def retrieve_only(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Knowledge base {request.knowledge_base_id} not found",
         )
+
+    check_ownership(kb.user_id, user_id, resource="knowledge base")
 
     if kb.document_count == 0:
         raise HTTPException(

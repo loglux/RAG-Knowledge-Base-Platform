@@ -15,7 +15,7 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.dependencies import get_current_user, get_current_user_id
 from app.main import app
-from app.models.database import Document, KnowledgeBase
+from app.models.database import AdminUser, Document, KnowledgeBase
 from app.models.enums import ChunkingStrategy, DocumentStatus, FileType
 
 # ============================================================================
@@ -81,17 +81,38 @@ async def test_db(test_engine) -> AsyncGenerator[AsyncSession, None]:
 
 
 @pytest_asyncio.fixture(scope="function")
-async def test_client(test_db: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+async def test_admin(test_db: AsyncSession) -> AdminUser:
+    """
+    Real AdminUser row in the test DB - knowledge_bases/documents/
+    conversations.user_id is now a real FK to admin_users.id (data isolation,
+    app/core/ownership.py), so the "current user" tests act as must actually
+    exist, not just be a plausible-looking int.
+    """
+    admin = AdminUser(
+        username="test_admin",
+        password_hash="not-a-real-hash",
+        role="admin",
+        is_active=True,
+    )
+    test_db.add(admin)
+    await test_db.flush()
+    return admin
+
+
+@pytest_asyncio.fixture(scope="function")
+async def test_client(
+    test_db: AsyncSession, test_admin: AdminUser
+) -> AsyncGenerator[AsyncClient, None]:
     """Create test client with database override."""
 
     async def override_get_db():
         yield test_db
 
     async def override_get_current_user():
-        return 1
+        return test_admin.id
 
     async def override_get_current_user_id():
-        return uuid4()
+        return test_admin.id
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = override_get_current_user

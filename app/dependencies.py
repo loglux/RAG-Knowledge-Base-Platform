@@ -1,7 +1,6 @@
 """FastAPI dependencies for dependency injection."""
 
 from typing import AsyncGenerator, Optional
-from uuid import UUID
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -35,17 +34,10 @@ async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(_bearer),
 ) -> int:
     """
-    Get current authenticated user.
+    Get the current authenticated admin's ID from the JWT bearer token.
 
-    MVP: Returns None (no authentication)
-    Future: Parse JWT token and return user_id
-
-    Usage:
-        @app.get("/protected")
-        async def protected_route(user_id: UUID = Depends(get_current_user)):
-            if user_id is None:
-                # Handle unauthenticated access
-                pass
+    Raises 401 if the token is missing, invalid, the wrong type, or has no
+    subject. Never returns None - callers can rely on getting a real int.
     """
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
@@ -69,13 +61,16 @@ async def get_current_user(
 
 async def get_current_user_id(
     credentials: HTTPAuthorizationCredentials = Depends(_bearer),
-) -> Optional[UUID]:
+) -> Optional[int]:
     """
-    Validate current user and return None (user_id is not stored yet).
-    Keeps auth enforcement without writing admin int IDs into UUID columns.
+    Return the current admin's ID (app.models.database.AdminUser.id).
+
+    Used as the owner id for per-user data isolation (knowledge bases,
+    documents, conversations - see app/core/ownership.py). Never actually
+    None in practice since get_current_user() raises 401 first; kept
+    Optional for drop-in compatibility with routes written before this.
     """
-    await get_current_user(credentials)
-    return None
+    return await get_current_user(credentials)
 
 
 async def get_current_admin_id(

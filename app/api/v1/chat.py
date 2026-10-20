@@ -11,6 +11,7 @@ from sqlalchemy import delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings as app_settings
+from app.core.ownership import check_ownership, ownership_filter
 from app.db.session import get_db
 from app.dependencies import get_current_user_id
 from app.models.database import AppSettings as AppSettingsModel
@@ -70,7 +71,7 @@ def _format_chat_error(exc: Exception) -> tuple[int, str]:
 async def chat_query(
     request: ChatRequest,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
     rag_service: RAGService = Depends(get_rag_service),
 ):
     """
@@ -109,6 +110,8 @@ async def chat_query(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Knowledge base {request.knowledge_base_id} not found",
             )
+
+        check_ownership(kb.user_id, user_id, resource="knowledge base")
 
         # 2. Check if KB has any documents
         if kb.document_count == 0:
@@ -526,7 +529,7 @@ async def chat_query(
 async def get_knowledge_base_stats(
     kb_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
     Get statistics about a knowledge base.
@@ -549,6 +552,8 @@ async def get_knowledge_base_stats(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base {kb_id} not found"
         )
 
+    check_ownership(kb.user_id, user_id, resource="knowledge base")
+
     return {
         "id": str(kb.id),
         "name": kb.name,
@@ -570,7 +575,7 @@ async def get_knowledge_base_stats(
 async def list_conversations(
     knowledge_base_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """List conversations for a knowledge base."""
     convo_query = (
@@ -578,6 +583,7 @@ async def list_conversations(
         .where(
             ConversationModel.knowledge_base_id == knowledge_base_id,
             ConversationModel.is_deleted == False,
+            ownership_filter(ConversationModel.user_id, user_id),
         )
         .order_by(desc(ConversationModel.updated_at))
     )
@@ -600,7 +606,7 @@ async def list_conversations(
 async def get_conversation(
     conversation_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """Get conversation details including settings."""
     convo_query = select(ConversationModel).where(
@@ -614,6 +620,8 @@ async def get_conversation(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Conversation {conversation_id} not found",
         )
+
+    check_ownership(conversation.user_id, user_id, resource="conversation")
 
     settings = None
     if conversation.settings_json:
@@ -642,7 +650,7 @@ async def update_conversation_settings(
     conversation_id: UUID,
     payload: ConversationSettings,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """Update conversation settings."""
     convo_query = select(ConversationModel).where(
@@ -656,6 +664,8 @@ async def update_conversation_settings(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Conversation {conversation_id} not found",
         )
+
+    check_ownership(conversation.user_id, user_id, resource="conversation")
 
     conversation.settings_json = payload.model_dump_json(exclude_none=True)
     conversation.updated_at = utcnow()
@@ -675,7 +685,7 @@ async def update_conversation(
     conversation_id: UUID,
     payload: ConversationTitleUpdate,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """Update conversation metadata (title)."""
     convo_query = select(ConversationModel).where(
@@ -689,6 +699,8 @@ async def update_conversation(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Conversation {conversation_id} not found",
         )
+
+    check_ownership(conversation.user_id, user_id, resource="conversation")
 
     title = payload.title.strip() if payload.title else None
     conversation.title = title if title else None
@@ -720,7 +732,7 @@ async def update_conversation(
 async def get_conversation_messages(
     conversation_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """Get messages for a conversation."""
     convo_query = select(ConversationModel).where(
@@ -734,6 +746,8 @@ async def get_conversation_messages(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Conversation {conversation_id} not found",
         )
+
+    check_ownership(conversation.user_id, user_id, resource="conversation")
 
     msg_query = (
         select(ChatMessageModel)
@@ -785,7 +799,7 @@ async def set_message_rating(
     message_id: UUID,
     payload: MessageRatingUpdate,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
     Set or clear a 👍/👎 rating on a stored chat message.
@@ -806,6 +820,8 @@ async def set_message_rating(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Conversation {conversation_id} not found",
         )
+
+    check_ownership(conversation.user_id, user_id, resource="conversation")
 
     msg_query = select(ChatMessageModel).where(
         ChatMessageModel.id == message_id,
@@ -870,7 +886,7 @@ async def list_kb_feedback(
     rating: Optional[int] = None,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
     List rated chat messages across all conversations of a KB.
@@ -891,6 +907,15 @@ async def list_kb_feedback(
             detail="rating must be -1, 0, or 1",
         )
     limit = max(1, min(limit, 500))
+
+    kb = (
+        await db.execute(select(KnowledgeBaseModel).where(KnowledgeBaseModel.id == kb_id))
+    ).scalar_one_or_none()
+    if not kb:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base {kb_id} not found"
+        )
+    check_ownership(kb.user_id, user_id, resource="knowledge base")
 
     # Pull rated assistant messages for this KB. We restrict to role=assistant
     # because the UX only surfaces rated answers.
@@ -962,7 +987,7 @@ async def delete_conversation_message(
     message_id: UUID,
     pair: bool = True,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """Delete a message (optionally with its paired question/answer)."""
     convo_query = select(ConversationModel).where(
@@ -976,6 +1001,8 @@ async def delete_conversation_message(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Conversation {conversation_id} not found",
         )
+
+    check_ownership(conversation.user_id, user_id, resource="conversation")
 
     msg_query = select(ChatMessageModel).where(
         ChatMessageModel.id == message_id,
@@ -1018,7 +1045,7 @@ async def delete_conversation_message(
 async def delete_conversation(
     conversation_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """Soft-delete a conversation."""
     convo_query = select(ConversationModel).where(
@@ -1032,6 +1059,8 @@ async def delete_conversation(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Conversation {conversation_id} not found",
         )
+
+    check_ownership(conversation.user_id, user_id, resource="conversation")
 
     conversation.is_deleted = True
     return {"status": "deleted", "id": str(conversation_id)}

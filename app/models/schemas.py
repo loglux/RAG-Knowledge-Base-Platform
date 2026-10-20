@@ -169,7 +169,7 @@ class KnowledgeBaseResponse(KnowledgeBaseBase):
     embedding_dimension: int
     document_count: int
     total_chunks: int
-    user_id: Optional[UUID] = None
+    user_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
     is_deleted: bool
@@ -331,7 +331,7 @@ class DocumentResponse(DocumentBase):
     progress_percentage: int = 0
     chunk_count: int
     language: Optional[str] = None
-    user_id: Optional[UUID] = None
+    user_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
     processed_at: Optional[datetime] = None

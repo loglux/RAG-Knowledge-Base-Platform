@@ -121,12 +121,12 @@ class KnowledgeBase(Base):
     document_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_chunks: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    # Future: User ownership (nullable for MVP)
-    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True),
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("admin_users.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
-        comment="Owner user ID - nullable for MVP, will be required later",
+        comment="Owner admin user ID - None means accessible to everyone (legacy/pre-isolation data)",
     )
 
     # Timestamps
@@ -253,9 +253,12 @@ class Document(Base):
         comment="JSON: author, publish_date, sitename, description, canonical_url",
     )
 
-    # Future: User ownership (nullable for MVP)
-    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True, index=True, comment="Owner user ID - nullable for MVP"
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("admin_users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Owner admin user ID - None means accessible to everyone (legacy/pre-isolation data)",
     )
 
     # Timestamps
@@ -325,8 +328,12 @@ class Conversation(Base):
         Text, nullable=True, comment="JSON-encoded chat settings overrides"
     )
 
-    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True, index=True, comment="Owner user ID - nullable for MVP"
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("admin_users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Owner admin user ID - None means accessible to everyone (legacy/pre-isolation data)",
     )
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
@@ -354,8 +361,12 @@ class PromptVersion(Base):
     )
     name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     system_content: Mapped[str] = mapped_column(Text, nullable=False)
-    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True, index=True, comment="Creator user ID (nullable for MVP)"
+    created_by: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("admin_users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Creator admin user ID (audit only - prompts are global, not per-user scoped)",
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
@@ -373,8 +384,12 @@ class SelfCheckPromptVersion(Base):
     )
     name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     system_content: Mapped[str] = mapped_column(Text, nullable=False)
-    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True, index=True, comment="Creator user ID (nullable for MVP)"
+    created_by: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("admin_users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Creator admin user ID (audit only - prompts are global, not per-user scoped)",
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
@@ -861,8 +876,12 @@ class UrlCrawlJob(Base):
         nullable=False,
         index=True,
     )
-    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True, index=True, comment="Owner user ID - nullable for MVP"
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("admin_users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Owner admin user ID - None means accessible to everyone (legacy/pre-isolation data)",
     )
 
     seed_url: Mapped[str] = mapped_column(String(2048), nullable=False)

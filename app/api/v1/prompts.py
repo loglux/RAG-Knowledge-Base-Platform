@@ -81,7 +81,7 @@ async def get_active_prompt(
 async def create_prompt_version(
     payload: PromptVersionCreate,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """Create a new prompt version (optionally activate it)."""
     errors = validate_system_prompt(payload.system_content)
@@ -183,7 +183,7 @@ async def get_self_check_prompt_version(
 async def create_self_check_prompt_version(
     payload: SelfCheckPromptVersionCreate,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """Create a new self-check prompt version (optionally activate it)."""
     errors = validate_system_prompt(payload.system_content)

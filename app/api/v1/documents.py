@@ -23,6 +23,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.ownership import check_ownership, ownership_filter
 from app.db.session import get_db
 from app.dependencies import get_current_user_id
 from app.models.database import Document as DocumentModel
@@ -122,7 +123,7 @@ async def create_document(
     ),
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
     Upload and process a document file.
@@ -149,6 +150,8 @@ async def create_document(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Knowledge base {knowledge_base_id} not found",
         )
+
+    check_ownership(kb.user_id, user_id, resource="knowledge base")
 
     # Detect file type
     filename = file.filename or "unnamed"
@@ -339,7 +342,7 @@ async def create_document_from_url(
     request: DocumentFromUrlRequest,
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
     Import a document from a URL.
@@ -371,6 +374,8 @@ async def create_document_from_url(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Knowledge base {request.knowledge_base_id} not found",
         )
+
+    check_ownership(kb.user_id, user_id, resource="knowledge base")
 
     # Fetch and extract via url2md
     try:
@@ -414,7 +419,7 @@ async def list_documents(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(10, ge=1, le=500, description="Items per page"),
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
     List documents with optional filtering.
@@ -431,7 +436,7 @@ async def list_documents(
     if status_filter:
         query = query.where(DocumentModel.status == status_filter)
 
-    # Future: Add user filter when auth is implemented
+    query = query.where(ownership_filter(DocumentModel.user_id, user_id))
 
     # Count total
     count_query = select(func.count()).select_from(query.subquery())
@@ -461,7 +466,7 @@ async def list_documents(
 async def get_document(
     doc_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
     Get document by ID including full content.
@@ -481,7 +486,7 @@ async def get_document(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Document {doc_id} not found"
         )
 
-    # Future: Check user ownership
+    check_ownership(doc.user_id, user_id, resource="document")
 
     return doc
 
@@ -490,7 +495,7 @@ async def get_document(
 async def download_document(
     doc_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """Download original uploaded file."""
     result = await db.execute(
@@ -502,6 +507,8 @@ async def download_document(
     doc = result.scalar_one_or_none()
     if not doc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+
+    check_ownership(doc.user_id, user_id, resource="document")
 
     if not doc.file_path or not Path(doc.file_path).exists():
         raise HTTPException(
@@ -521,7 +528,7 @@ async def download_document(
 async def delete_document(
     doc_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
     Delete document (soft delete).
@@ -542,7 +549,7 @@ async def delete_document(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Document {doc_id} not found"
         )
 
-    # Future: Check user ownership
+    check_ownership(doc.user_id, user_id, resource="document")
 
     # Get KB to update stats
     kb_query = select(KnowledgeBaseModel).where(KnowledgeBaseModel.id == doc.knowledge_base_id)
@@ -605,7 +612,7 @@ async def reprocess_document(
         ),
     ),
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
     Reprocess an existing document.
@@ -629,6 +636,8 @@ async def reprocess_document(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Document {doc_id} not found"
         )
+
+    check_ownership(doc.user_id, user_id, resource="document")
 
     # Check if document is currently processing
     if doc.status == DocumentStatus.PROCESSING:
@@ -714,7 +723,7 @@ async def _reprocess_document_background(
 async def get_document_status(
     doc_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
     Get processing status of a document.
@@ -734,6 +743,8 @@ async def get_document_status(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail=f"Document {doc_id} not found"
             )
+
+        check_ownership(doc.user_id, user_id, resource="document")
 
         # Safe status extraction
         doc_status = "unknown"
@@ -790,7 +801,7 @@ async def get_document_status(
 async def recompute_document_duplicates(
     doc_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
     Recompute duplicate chunk analysis for a document (Qdrant payload scan only).
@@ -815,6 +826,7 @@ async def recompute_document_duplicates(
         )
 
     doc, kb = row
+    check_ownership(doc.user_id, user_id, resource="document")
     summary = await compute_duplicate_chunks_for_document(doc.id, kb.collection_name)
     doc.duplicate_chunks_json = json_dumps(summary)
     await db.commit()

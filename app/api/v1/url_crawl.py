@@ -9,6 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, s
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.ownership import check_ownership, ownership_filter
 from app.db.session import get_db
 from app.dependencies import get_current_user_id
 from app.models.database import KnowledgeBase as KnowledgeBaseModel
@@ -48,7 +49,7 @@ async def start_crawl(
     request: UrlCrawlRequest,
     background_tasks: BackgroundTasks = BackgroundTasks(),
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
     Start a multi-page crawl from a seed URL.
@@ -70,6 +71,8 @@ async def start_crawl(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Knowledge base {request.knowledge_base_id} not found",
         )
+
+    check_ownership(kb.user_id, user_id, resource="knowledge base")
 
     job = UrlCrawlJob(
         knowledge_base_id=request.knowledge_base_id,
@@ -99,7 +102,7 @@ async def start_crawl(
 async def get_crawl_job(
     job_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """Poll a crawl job's status and per-page results."""
     job = await db.get(UrlCrawlJob, job_id)
@@ -107,6 +110,7 @@ async def get_crawl_job(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Crawl job {job_id} not found"
         )
+    check_ownership(job.user_id, user_id, resource="crawl job")
     return _job_to_response(job)
 
 
@@ -114,10 +118,14 @@ async def get_crawl_job(
 async def list_crawl_jobs(
     knowledge_base_id: Optional[UUID] = Query(None, description="Filter by knowledge base"),
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """List crawl jobs, most recent first."""
-    query = select(UrlCrawlJob).order_by(UrlCrawlJob.created_at.desc())
+    query = (
+        select(UrlCrawlJob)
+        .where(ownership_filter(UrlCrawlJob.user_id, user_id))
+        .order_by(UrlCrawlJob.created_at.desc())
+    )
     if knowledge_base_id:
         query = query.where(UrlCrawlJob.knowledge_base_id == knowledge_base_id)
     jobs = (await db.execute(query)).scalars().all()

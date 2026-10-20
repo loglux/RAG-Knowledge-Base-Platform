@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.ollama import fetch_ollama_model_dimension
 from app.core.embeddings_base import EMBEDDING_MODELS, EmbeddingProvider
 from app.core.lexical_store import get_lexical_store
+from app.core.ownership import check_ownership, ownership_filter
 from app.core.vector_store import get_vector_store
 from app.db.session import get_db
 from app.dependencies import get_current_user_id
@@ -63,7 +64,7 @@ def kb_id_to_collection_name(kb_id: UUID) -> str:
 async def create_knowledge_base(
     kb: KnowledgeBaseCreate,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
     Create a new knowledge base.
@@ -184,21 +185,17 @@ async def list_knowledge_bases(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(10, ge=1, le=100, description="Items per page"),
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
-    List all knowledge bases.
-
-    Returns paginated list of knowledge bases.
-    In MVP: returns all KBs (no user filtering).
-    Future: filter by user_id when auth is implemented.
+    List all knowledge bases owned by the current admin (plus any
+    unowned/legacy ones - see app/core/ownership.py).
     """
     # Build query
-    query = select(KnowledgeBaseModel).where(KnowledgeBaseModel.is_deleted == False)
-
-    # Future: Add user filter when auth is implemented
-    # if user_id:
-    #     query = query.where(KnowledgeBaseModel.user_id == user_id)
+    query = select(KnowledgeBaseModel).where(
+        KnowledgeBaseModel.is_deleted == False,
+        ownership_filter(KnowledgeBaseModel.user_id, user_id),
+    )
 
     # Count total
     count_query = select(func.count()).select_from(query.subquery())
@@ -225,12 +222,15 @@ async def list_deleted_knowledge_bases(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(10, ge=1, le=100, description="Items per page"),
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
-    List deleted knowledge bases (trash).
+    List deleted knowledge bases (trash) owned by the current admin.
     """
-    query = select(KnowledgeBaseModel).where(KnowledgeBaseModel.is_deleted == True)
+    query = select(KnowledgeBaseModel).where(
+        KnowledgeBaseModel.is_deleted == True,
+        ownership_filter(KnowledgeBaseModel.user_id, user_id),
+    )
 
     count_query = select(func.count()).select_from(query.subquery())
     total = await db.scalar(count_query)
@@ -252,7 +252,7 @@ async def list_deleted_knowledge_bases(
 async def get_knowledge_base(
     kb_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
     Get knowledge base by ID.
@@ -272,7 +272,7 @@ async def get_knowledge_base(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base {kb_id} not found"
         )
 
-    # Future: Check user ownership when auth is implemented
+    check_ownership(kb.user_id, user_id, resource="knowledge base")
 
     return kb
 
@@ -307,7 +307,7 @@ async def update_knowledge_base(
     kb_id: UUID,
     kb_update: KnowledgeBaseUpdate,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
     Update knowledge base.
@@ -328,7 +328,7 @@ async def update_knowledge_base(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base {kb_id} not found"
         )
 
-    # Future: Check user ownership
+    check_ownership(kb.user_id, user_id, resource="knowledge base")
 
     # Update fields
     update_data = kb_update.model_dump(exclude_unset=True)
@@ -345,7 +345,7 @@ async def update_knowledge_base(
 async def get_retrieval_settings(
     kb_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """Get stored and effective retrieval settings for a knowledge base."""
     query = select(KnowledgeBaseModel).where(
@@ -360,6 +360,8 @@ async def get_retrieval_settings(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base {kb_id} not found"
         )
 
+    check_ownership(kb.user_id, user_id, resource="knowledge base")
+
     return await _build_retrieval_settings_envelope(kb, db)
 
 
@@ -368,7 +370,7 @@ async def update_retrieval_settings(
     kb_id: UUID,
     payload: RetrievalSettingsUpdate,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """Update retrieval settings for a knowledge base (stored as JSON overrides)."""
     query = select(KnowledgeBaseModel).where(
@@ -383,6 +385,8 @@ async def update_retrieval_settings(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base {kb_id} not found"
         )
 
+    check_ownership(kb.user_id, user_id, resource="knowledge base")
+
     data = payload.model_dump(exclude_none=True)
     kb.retrieval_settings_json = json.dumps(data) if data else None
     await db.commit()
@@ -395,7 +399,7 @@ async def update_retrieval_settings(
 async def clear_retrieval_settings(
     kb_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """Clear stored retrieval settings for a knowledge base."""
     query = select(KnowledgeBaseModel).where(
@@ -410,6 +414,8 @@ async def clear_retrieval_settings(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base {kb_id} not found"
         )
 
+    check_ownership(kb.user_id, user_id, resource="knowledge base")
+
     kb.retrieval_settings_json = None
     await db.commit()
     await db.refresh(kb)
@@ -422,7 +428,7 @@ async def regenerate_chat_titles(
     kb_id: UUID,
     payload: RegenerateChatTitlesRequest,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """Regenerate chat titles for conversations in a knowledge base."""
     kb_query = select(KnowledgeBaseModel).where(
@@ -435,6 +441,7 @@ async def regenerate_chat_titles(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base {kb_id} not found"
         )
+    check_ownership(kb.user_id, user_id, resource="knowledge base")
 
     convo_query = select(ConversationModel).where(
         ConversationModel.knowledge_base_id == kb_id,
@@ -509,7 +516,7 @@ async def regenerate_chat_titles(
 async def delete_knowledge_base(
     kb_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
     Delete knowledge base (soft delete).
@@ -534,7 +541,7 @@ async def delete_knowledge_base(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Knowledge base {kb_id} not found"
         )
 
-    # Future: Check user ownership
+    check_ownership(kb.user_id, user_id, resource="knowledge base")
 
     logger.info(f"Deleting KB '{kb.name}' (id={kb_id}, collection={kb.collection_name})")
 
@@ -589,7 +596,7 @@ async def restore_knowledge_base(
     kb_id: UUID,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
     Restore a soft-deleted knowledge base and reindex its documents.
@@ -606,6 +613,8 @@ async def restore_knowledge_base(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Deleted knowledge base {kb_id} not found",
         )
+
+    check_ownership(kb.user_id, user_id, resource="knowledge base")
 
     # Restore KB and documents
     kb.is_deleted = False
@@ -653,7 +662,7 @@ async def restore_knowledge_base(
 async def purge_knowledge_base(
     kb_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
     Permanently delete a knowledge base and its documents from the database.
@@ -667,6 +676,8 @@ async def purge_knowledge_base(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Knowledge base {kb_id} not found",
         )
+
+    check_ownership(kb.user_id, user_id, resource="knowledge base")
 
     # Delete documents (hard delete)
     docs_query = select(DocumentModel).where(
@@ -710,7 +721,7 @@ async def reprocess_knowledge_base(
         ),
     ),
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
     Reprocess all documents in a knowledge base.
@@ -730,6 +741,8 @@ async def reprocess_knowledge_base(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Knowledge base {kb_id} not found",
         )
+
+    check_ownership(kb.user_id, user_id, resource="knowledge base")
 
     # Get documents
     doc_query = select(DocumentModel).where(
@@ -768,7 +781,7 @@ async def reprocess_knowledge_base(
 async def cleanup_orphaned_chunks(
     kb_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user_id: Optional[UUID] = Depends(get_current_user_id),
+    user_id: Optional[int] = Depends(get_current_user_id),
 ):
     """
     Clean up orphaned chunks in Qdrant for deleted documents.
@@ -791,6 +804,8 @@ async def cleanup_orphaned_chunks(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Knowledge base {kb_id} not found",
         )
+
+    check_ownership(kb.user_id, user_id, resource="knowledge base")
 
     # Get deleted document IDs
     deleted_query = select(DocumentModel.id).where(
