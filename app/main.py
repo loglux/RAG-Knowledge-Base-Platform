@@ -164,7 +164,7 @@ except Exception as exc:
 app = FastAPI(
     title="Knowledge Base Platform",
     description="Universal platform for creating and managing knowledge bases using RAG",
-    version="0.1.0",
+    version="0.2.0",
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url=f"{settings.API_PREFIX}/openapi.json",
@@ -218,7 +218,7 @@ async def root():
     """Root endpoint - API information."""
     return {
         "name": "Knowledge Base Platform API",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "status": "operational",
         "environment": settings.ENVIRONMENT,
         "docs": "/docs",
