@@ -18,7 +18,9 @@ import type {
   MCPToken,
   MCPRefreshToken,
   MCPOAuthEvent,
-  OAuthTokenResponse
+  OAuthTokenResponse,
+  AdminInvite,
+  AdminInviteCreateResponse
 } from '../types/index'
 
 const MCP_TOOL_OPTIONS = [
@@ -40,7 +42,7 @@ const MCP_TOOL_OPTIONS = [
   { id: 'delete_document', label: 'delete_document', description: 'Soft-delete a document and remove its vectors.' },
 ]
 
-type TabType = 'query' | 'kb-defaults' | 'ai-providers' | 'databases' | 'prompts' | 'kb-transfer' | 'mcp'
+type TabType = 'query' | 'kb-defaults' | 'ai-providers' | 'databases' | 'prompts' | 'kb-transfer' | 'mcp' | 'admins'
 
 export function SettingsPage() {
   const navigate = useNavigate()
@@ -211,7 +213,7 @@ export function SettingsPage() {
     const params = new URLSearchParams(location.search)
     const tab = params.get('tab') as TabType | null
     if (!tab) return
-    const allowed: TabType[] = ['query', 'kb-defaults', 'ai-providers', 'databases', 'prompts', 'kb-transfer', 'mcp']
+    const allowed: TabType[] = ['query', 'kb-defaults', 'ai-providers', 'databases', 'prompts', 'kb-transfer', 'mcp', 'admins']
     if (allowed.includes(tab) && tab !== activeTab) {
       setActiveTab(tab)
     }
@@ -1125,6 +1127,16 @@ export function SettingsPage() {
         >
           MCP
         </button>
+        <button
+          onClick={() => handleTabSelect('admins')}
+          className={`px-6 py-3 font-medium whitespace-nowrap border-b-2 transition-colors ${
+            activeTab === 'admins'
+              ? 'border-primary-500 text-primary-500'
+              : 'border-transparent text-gray-400 hover:text-gray-300'
+          }`}
+        >
+          Admins
+        </button>
       </div>
 
       {/* Alerts */}
@@ -1390,6 +1402,8 @@ export function SettingsPage() {
             onRefreshOAuthEvents={loadMcpOAuthEvents}
           />
         )}
+
+        {activeTab === 'admins' && <AdminInvitesTab />}
       </div>
     </div>
   )
@@ -3648,6 +3662,181 @@ function DatabasesTab(props: any) {
           >
             {saving ? 'Changing...' : 'Change PostgreSQL Password'}
           </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AdminInvitesTab() {
+  const [invites, setInvites] = useState<AdminInvite[]>([])
+  const [loading, setLoading] = useState(true)
+  const [label, setLabel] = useState('')
+  const [expiresInHours, setExpiresInHours] = useState<number | ''>(72)
+  const [creating, setCreating] = useState(false)
+  const [createdInvite, setCreatedInvite] = useState<AdminInviteCreateResponse | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [copySuccess, setCopySuccess] = useState<string | null>(null)
+
+  const loadInvites = async () => {
+    setLoading(true)
+    try {
+      const data = await apiClient.listAdminInvites()
+      setInvites(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load invites')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadInvites()
+  }, [])
+
+  const inviteUrl = (token: string) => `${window.location.origin}/invite/${token}`
+
+  const handleCreate = async () => {
+    setCreating(true)
+    setError(null)
+    try {
+      const result = await apiClient.createAdminInvite({
+        label: label.trim() || undefined,
+        expires_in_hours: expiresInHours === '' ? undefined : expiresInHours,
+      })
+      setCreatedInvite(result)
+      setLabel('')
+      await loadInvites()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create invite')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleRevoke = async (id: string) => {
+    try {
+      await apiClient.revokeAdminInvite(id)
+      await loadInvites()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to revoke invite')
+    }
+  }
+
+  const handleCopy = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopySuccess('Copied!')
+      setTimeout(() => setCopySuccess(null), 2000)
+    } catch {
+      setCopySuccess('Copy failed')
+    }
+  }
+
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return '—'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+    return date.toLocaleString()
+  }
+
+  const statusColor: Record<AdminInvite['status'], string> = {
+    pending: 'text-primary-400',
+    used: 'text-green-400',
+    revoked: 'text-red-300',
+    expired: 'text-gray-500',
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 space-y-4">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-100">Invite a new admin</h3>
+          <p className="text-sm text-gray-400">
+            Creates a one-time link. Share it however you'd normally reach them (WhatsApp,
+            Telegram, ...) - they open it and pick their own username and password. Any admin
+            can invite; new admins start with nothing until they create their own knowledge bases.
+          </p>
+        </div>
+
+        {error && (
+          <div className="p-3 bg-red-500/10 border border-red-500 rounded-lg text-red-200 text-sm">
+            {error}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <Input
+            type="text"
+            fullWidth={false}
+            placeholder="Label (optional, e.g. 'for Sveta')"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+          <Field label="Expires in (hours)">
+            <Input
+              type="number"
+              min={1}
+              value={expiresInHours}
+              onChange={(e) => setExpiresInHours(e.target.value === '' ? '' : Number(e.target.value))}
+            />
+          </Field>
+          <div className="flex items-end">
+            <Button variant="primary" onClick={handleCreate} disabled={creating}>
+              {creating ? 'Creating...' : 'Create invite'}
+            </Button>
+          </div>
+        </div>
+
+        {createdInvite && (
+          <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
+            <div className="text-sm text-gray-300 mb-2">
+              Invite link (shown once - copy it now, it won't be shown again)
+            </div>
+            <div className="font-mono text-sm text-gray-100 break-all">
+              {inviteUrl(createdInvite.invite_token)}
+            </div>
+            <div className="mt-3 flex gap-2">
+              <Button variant="secondary" onClick={() => handleCopy(inviteUrl(createdInvite.invite_token))}>
+                Copy link
+              </Button>
+              {copySuccess && <span className="text-xs text-gray-400 self-center">{copySuccess}</span>}
+              <Button variant="secondary" onClick={() => setCreatedInvite(null)}>
+                Dismiss
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 space-y-3">
+        <h3 className="text-lg font-semibold text-gray-100">Invites</h3>
+        {loading && <div className="text-sm text-gray-400">Loading...</div>}
+        {!loading && invites.length === 0 && (
+          <div className="text-sm text-gray-400">No invites yet</div>
+        )}
+        <div className="space-y-2">
+          {invites.map((invite) => (
+            <div
+              key={invite.id}
+              className="flex items-center justify-between bg-gray-900 rounded-lg p-3 border border-gray-700"
+            >
+              <div className="text-sm text-gray-200">
+                <div>{invite.label || 'Unlabeled invite'}</div>
+                <div className={`text-xs ${statusColor[invite.status]}`}>{invite.status}</div>
+                <div className="text-gray-400 text-xs">created: {formatDateTime(invite.created_at)}</div>
+                <div className="text-gray-400 text-xs">expires: {formatDateTime(invite.expires_at)}</div>
+                {invite.used_at && (
+                  <div className="text-gray-400 text-xs">used: {formatDateTime(invite.used_at)}</div>
+                )}
+              </div>
+              {invite.status === 'pending' && (
+                <Button variant="secondary" onClick={() => handleRevoke(invite.id)}>
+                  Revoke
+                </Button>
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </div>

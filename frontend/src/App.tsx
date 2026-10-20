@@ -11,6 +11,9 @@ const ChatPage = lazy(() => import('./pages/ChatPage').then((module) => ({ defau
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })))
 const Setup = lazy(() => import('./pages/Setup'))
 const LoginPage = lazy(() => import('./pages/LoginPage').then((module) => ({ default: module.LoginPage })))
+const InviteAcceptPage = lazy(() =>
+  import('./pages/InviteAcceptPage').then((module) => ({ default: module.InviteAcceptPage }))
+)
 
 function FullScreenLoading() {
   return (
@@ -68,6 +71,7 @@ function App() {
               <Routes>
                 <Route path="/setup" element={<Setup />} />
                 <Route path="/login" element={<LoginPage />} />
+                <Route path="/invite/:token" element={<InviteAcceptPage />} />
                 <Route element={<ProtectedRoute />}>
                   <Route path="/" element={<DashboardPage />} />
                   <Route path="/settings" element={<SettingsPage />} />

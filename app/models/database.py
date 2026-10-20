@@ -917,3 +917,40 @@ class UrlCrawlJob(Base):
 
     def __repr__(self) -> str:
         return f"<UrlCrawlJob(id={self.id}, seed_url={self.seed_url}, status={self.status})>"
+
+
+class AdminInvite(Base):
+    """
+    Single-use invite link for creating a new admin account.
+
+    The raw token is only ever shown once (in the create-invite API
+    response) - only its SHA256 hash is stored, same pattern as MCPToken.
+    """
+
+    __tablename__ = "admin_invites"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, nullable=False
+    )
+    token_hash: Mapped[str] = mapped_column(
+        String(64), unique=True, nullable=False, index=True, comment="SHA256 hash of the token"
+    )
+    label: Mapped[Optional[str]] = mapped_column(
+        String(120), nullable=True, comment="Optional note, e.g. who this invite is for"
+    )
+    created_by: Mapped[int] = mapped_column(
+        Integer, ForeignKey("admin_users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    used_by_admin_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("admin_users.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="Admin account created when this invite was accepted",
+    )
+
+    def __repr__(self) -> str:
+        return f"<AdminInvite(id={self.id}, label={self.label}, used={self.used_at is not None})>"

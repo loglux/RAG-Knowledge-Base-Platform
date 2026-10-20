@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends
 
 from app.api.v1 import (
+    admin_invites,
     auth,
     auto_tune,
     chat,
@@ -37,6 +38,9 @@ api_router.include_router(auth.router)
 api_router.include_router(
     uploads.router, prefix="/uploads", tags=["uploads"]
 )  # HMAC-signed presigned upload URLs (no JWT — own signature-based auth)
+api_router.include_router(
+    admin_invites.router
+)  # mixes public (check/accept) and self-guarded (create/list/revoke) endpoints
 
 # Protected routers
 protected_router.include_router(

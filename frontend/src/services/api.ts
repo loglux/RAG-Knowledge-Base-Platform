@@ -45,6 +45,9 @@ import type {
   OAuthTokenResponse,
   KBRetrievalSettingsStored,
   KBRetrievalSettingsEnvelope,
+  AdminInvite,
+  AdminInviteCreateResponse,
+  AdminInviteCheckResponse,
 } from '../types/index'
 
 const ACCESS_TOKEN_KEY = 'kb_access_token'
@@ -112,7 +115,12 @@ class APIClient {
         const originalRequest = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined
         const status = error.response?.status
 
-        if (status === 401 && !originalRequest?._retry && !originalRequest?.url?.includes('/auth/')) {
+        if (
+          status === 401 &&
+          !originalRequest?._retry &&
+          !originalRequest?.url?.includes('/auth/') &&
+          !originalRequest?.url?.includes('/admin-invites/')
+        ) {
           if (this.authFailureInProgress) {
             throw new Error(AUTH_FAILURE_MESSAGE)
           }
@@ -143,7 +151,7 @@ class APIClient {
   }
 
   private isAuthRequest(config?: Pick<InternalAxiosRequestConfig, 'url'> | null): boolean {
-    return Boolean(config?.url?.includes('/auth/'))
+    return Boolean(config?.url?.includes('/auth/') || config?.url?.includes('/admin-invites/'))
   }
 
   private shouldShortCircuitRequest(config: InternalAxiosRequestConfig): boolean {
@@ -839,6 +847,35 @@ class APIClient {
 
   async getApiInfo(): Promise<ApiInfo> {
     const response = await this.client.get<ApiInfo>('/info')
+    return response.data
+  }
+
+  async listAdminInvites(): Promise<AdminInvite[]> {
+    const response = await this.client.get<AdminInvite[]>('/admin-invites/')
+    return response.data
+  }
+
+  async createAdminInvite(payload: { label?: string; expires_in_hours?: number }): Promise<AdminInviteCreateResponse> {
+    const response = await this.client.post<AdminInviteCreateResponse>('/admin-invites/', payload)
+    return response.data
+  }
+
+  async revokeAdminInvite(inviteId: string): Promise<void> {
+    await this.client.delete(`/admin-invites/${inviteId}`)
+  }
+
+  // Public - no auth token exists yet for these two, the invitee isn't an
+  // admin until accept() succeeds.
+  async checkAdminInvite(token: string): Promise<AdminInviteCheckResponse> {
+    const response = await this.client.get<AdminInviteCheckResponse>(`/admin-invites/${token}/check`)
+    return response.data
+  }
+
+  async acceptAdminInvite(
+    token: string,
+    payload: { username: string; password: string; email?: string }
+  ): Promise<{ success: boolean; username: string; message: string }> {
+    const response = await this.client.post(`/admin-invites/${token}/accept`, payload)
     return response.data
   }
 }

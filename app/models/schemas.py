@@ -973,6 +973,50 @@ class MeResponse(BaseModel):
 
 
 # ============================================================================
+# Admin Invite Schemas
+# ============================================================================
+
+
+class AdminInviteCreateRequest(BaseModel):
+    label: Optional[str] = Field(
+        None, max_length=120, description="Optional note, e.g. who this invite is for"
+    )
+    expires_in_hours: int = Field(72, ge=1, le=24 * 30, description="Invite link TTL in hours")
+
+
+class AdminInviteCreateResponse(BaseModel):
+    id: UUID
+    invite_token: str = Field(
+        ..., description="Raw invite token - shown only once, never retrievable again"
+    )
+    label: Optional[str] = None
+    expires_at: datetime
+
+
+class AdminInviteSummary(BaseModel):
+    id: UUID
+    label: Optional[str] = None
+    created_by: int
+    created_at: datetime
+    expires_at: datetime
+    revoked_at: Optional[datetime] = None
+    used_at: Optional[datetime] = None
+    status: str = Field(..., description="pending | used | revoked | expired")
+
+
+class AdminInviteStatusResponse(BaseModel):
+    valid: bool
+    label: Optional[str] = None
+    detail: Optional[str] = Field(None, description="Reason the invite isn't valid, if it isn't")
+
+
+class AdminInviteAcceptRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50)
+    password: str = Field(..., min_length=8, description="Admin password (min 8 characters)")
+    email: Optional[str] = None
+
+
+# ============================================================================
 # KB Export/Import Schemas
 # ============================================================================
 

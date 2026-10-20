@@ -613,6 +613,30 @@ export interface MCPRefreshToken {
   revoked_at?: string | null
 }
 
+export interface AdminInvite {
+  id: string
+  label?: string | null
+  created_by: number
+  created_at: string
+  expires_at: string
+  revoked_at?: string | null
+  used_at?: string | null
+  status: 'pending' | 'used' | 'revoked' | 'expired'
+}
+
+export interface AdminInviteCreateResponse {
+  id: string
+  invite_token: string
+  label?: string | null
+  expires_at: string
+}
+
+export interface AdminInviteCheckResponse {
+  valid: boolean
+  label?: string | null
+  detail?: string | null
+}
+
 export interface MCPOAuthEvent {
   id: string
   event_type: string
