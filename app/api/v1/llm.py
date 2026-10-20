@@ -1,11 +1,14 @@
 """LLM models endpoints."""
 
 import logging
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, HTTPException
 
 from app.api.v1.ollama import fetch_ollama_models, is_embedding_model
 from app.core.llm_base import LLM_MODELS, LLMProvider
+from app.core.model_discovery import fetch_anthropic_model_ids, fetch_openai_model_ids
+from app.core.model_pricing import get_live_pricing
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -20,7 +23,7 @@ async def list_llm_models():
     """
     try:
         # Get static models (OpenAI, Anthropic)
-        static_models = []
+        static_models: List[Dict[str, Any]] = []
         for model_name, model_config in LLM_MODELS.items():
             static_models.append(
                 {
@@ -34,7 +37,7 @@ async def list_llm_models():
             )
 
         # Get Ollama models (dynamic)
-        ollama_models = []
+        ollama_models: List[Dict[str, Any]] = []
         try:
             all_ollama = await fetch_ollama_models()
             for model in all_ollama:
@@ -55,14 +58,57 @@ async def list_llm_models():
         except Exception as e:
             logger.warning(f"Failed to fetch Ollama models: {e}")
 
+        # Augment with live models the provider reports but we haven't
+        # catalogued yet - surfaced with metadata missing rather than guessed.
+        catalogued_ids = {m["model"] for m in static_models}
+        live_models: List[Dict[str, Any]] = []
+        for provider_name, fetch in (
+            ("openai", fetch_openai_model_ids),
+            ("anthropic", fetch_anthropic_model_ids),
+        ):
+            try:
+                for model_id in await fetch():
+                    if model_id in catalogued_ids:
+                        continue
+                    catalogued_ids.add(model_id)
+                    live_models.append(
+                        {
+                            "model": model_id,
+                            "provider": provider_name,
+                            "context_window": None,
+                            "cost_input": None,
+                            "cost_output": None,
+                            "description": "Reported by provider API - pricing/context not yet catalogued",
+                        }
+                    )
+            except Exception as e:
+                logger.warning(f"Failed to fetch live {provider_name} models: {e}")
+
+        # Overlay live pricing/context-window from the LiteLLM community cost
+        # map onto catalogued entries (corrects drift without hand-editing
+        # LLM_MODELS) and onto newly-discovered entries (fills in what we
+        # couldn't catalogue). Fields the map doesn't have are left as-is.
+        for model_entry in static_models + live_models:
+            live = await get_live_pricing(model_entry["model"])
+            if not live:
+                continue
+            if live["cost_per_million_input_tokens"] is not None:
+                model_entry["cost_input"] = live["cost_per_million_input_tokens"]
+            if live["cost_per_million_output_tokens"] is not None:
+                model_entry["cost_output"] = live["cost_per_million_output_tokens"]
+            if live["context_window"] is not None:
+                model_entry["context_window"] = live["context_window"]
+
+        all_models = static_models + live_models + ollama_models
+
         return {
-            "models": static_models + ollama_models,
+            "models": all_models,
             "providers": {
-                "openai": len([m for m in static_models if m["provider"] == "openai"]),
-                "anthropic": len([m for m in static_models if m["provider"] == "anthropic"]),
+                "openai": len([m for m in all_models if m["provider"] == "openai"]),
+                "anthropic": len([m for m in all_models if m["provider"] == "anthropic"]),
                 "ollama": len(ollama_models),
             },
-            "total": len(static_models) + len(ollama_models),
+            "total": len(all_models),
         }
 
     except Exception as e:
@@ -87,6 +133,13 @@ async def list_llm_providers():
                 "display_name": "Anthropic",
                 "models_count": len(
                     [m for m in LLM_MODELS.values() if m.provider == LLMProvider.ANTHROPIC]
+                ),
+            },
+            {
+                "name": "deepseek",
+                "display_name": "DeepSeek",
+                "models_count": len(
+                    [m for m in LLM_MODELS.values() if m.provider == LLMProvider.DEEPSEEK]
                 ),
             },
             {

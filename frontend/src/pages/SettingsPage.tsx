@@ -55,7 +55,7 @@ export function SettingsPage() {
   const [success, setSuccess] = useState<string | null>(null)
 
   // Query Defaults (AppSettings)
-  const [llmModel, setLlmModel] = useState('gpt-4o')
+  const [llmModel, setLlmModel] = useState('gpt-5.1')
   const [llmProvider, setLlmProvider] = useState('openai')
   const [temperature, setTemperature] = useState(0.7)
   const [topK, setTopK] = useState(5)

@@ -189,22 +189,22 @@ LLM_MODELS = {
         cost_per_million_input_tokens=0.15,
         cost_per_million_output_tokens=0.60,
     ),
-    # Anthropic Claude 4.5 models (latest as of Jan 2026)
-    "claude-opus-4-5-20251101": LLMModel(
+    # Anthropic Claude 5 family (latest as of Oct 2026)
+    "claude-opus-5": LLMModel(
         provider=LLMProvider.ANTHROPIC,
-        model_name="claude-opus-4-5-20251101",
-        context_window=200000,
-        description="Claude Opus 4.5 - premium model with maximum intelligence",
+        model_name="claude-opus-5",
+        context_window=1000000,
+        description="Claude Opus 5 - premium model with maximum intelligence",
         cost_per_million_input_tokens=5.0,
         cost_per_million_output_tokens=25.0,
     ),
-    "claude-sonnet-4-5-20250929": LLMModel(
+    "claude-sonnet-5": LLMModel(
         provider=LLMProvider.ANTHROPIC,
-        model_name="claude-sonnet-4-5-20250929",
-        context_window=200000,  # 1M beta with context-1m-2025-08-07 header
-        description="Claude Sonnet 4.5 - smart model for complex agents and coding",
-        cost_per_million_input_tokens=3.0,
-        cost_per_million_output_tokens=15.0,
+        model_name="claude-sonnet-5",
+        context_window=1000000,
+        description="Claude Sonnet 5 - smart model for complex agents and coding",
+        cost_per_million_input_tokens=2.0,
+        cost_per_million_output_tokens=10.0,
     ),
     "claude-haiku-4-5-20251001": LLMModel(
         provider=LLMProvider.ANTHROPIC,
@@ -213,6 +213,23 @@ LLM_MODELS = {
         description="Claude Haiku 4.5 - fastest model with near-frontier intelligence",
         cost_per_million_input_tokens=1.0,
         cost_per_million_output_tokens=5.0,
+    ),
+    # Legacy Claude 4.5 models (keeping for compatibility)
+    "claude-opus-4-5-20251101": LLMModel(
+        provider=LLMProvider.ANTHROPIC,
+        model_name="claude-opus-4-5-20251101",
+        context_window=200000,
+        description="Claude Opus 4.5 (legacy) - superseded by Opus 5",
+        cost_per_million_input_tokens=5.0,
+        cost_per_million_output_tokens=25.0,
+    ),
+    "claude-sonnet-4-5-20250929": LLMModel(
+        provider=LLMProvider.ANTHROPIC,
+        model_name="claude-sonnet-4-5-20250929",
+        context_window=200000,  # 1M beta with context-1m-2025-08-07 header
+        description="Claude Sonnet 4.5 (legacy) - superseded by Sonnet 5",
+        cost_per_million_input_tokens=3.0,
+        cost_per_million_output_tokens=15.0,
     ),
     # Legacy Claude 4 models (keeping for compatibility)
     "claude-opus-4-1-20250805": LLMModel(

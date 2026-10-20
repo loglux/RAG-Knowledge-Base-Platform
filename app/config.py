@@ -91,7 +91,7 @@ class Settings(BaseSettings):
     OPENAI_EMBEDDING_MODEL: str = Field(
         default="text-embedding-3-large", description="OpenAI embedding model"
     )
-    OPENAI_CHAT_MODEL: str = Field(default="gpt-4o", description="OpenAI chat model")
+    OPENAI_CHAT_MODEL: str = Field(default="gpt-5.1", description="OpenAI chat model")
     OPENAI_MAX_TOKENS: int = Field(default=16000, description="Max tokens for OpenAI responses")
     OPENAI_TEMPERATURE: float = Field(default=0.7, description="Temperature for OpenAI responses")
 
@@ -106,9 +106,7 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: Optional[str] = Field(
         default=None, description="Anthropic API key (optional)"
     )
-    ANTHROPIC_CHAT_MODEL: str = Field(
-        default="claude-3-5-sonnet-20241022", description="Anthropic chat model"
-    )
+    ANTHROPIC_CHAT_MODEL: str = Field(default="claude-sonnet-5", description="Anthropic chat model")
     ANTHROPIC_MAX_TOKENS: int = Field(
         default=4000, description="Max tokens for Anthropic responses"
     )
@@ -377,15 +375,9 @@ async def load_settings_from_db() -> None:
                         "Failed to close cached RAG service after settings reload: %s", exc
                     )
 
-                import logging
-
-                logger = logging.getLogger(__name__)
                 logger.info("Settings loaded from database and applied")
 
     except Exception as e:
-        import logging
-
-        logger = logging.getLogger(__name__)
         logger.warning(f"Could not load settings from database: {e}")
         logger.info("Using settings from environment variables")
 
@@ -405,9 +397,6 @@ async def is_setup_complete() -> bool:
             return await SystemSettingsManager.is_setup_complete(db)
 
     except Exception as e:
-        import logging
-
-        logger = logging.getLogger(__name__)
         logger.warning(f"Could not check setup completion: {e}")
         # If can't check, assume setup needed
         return False
