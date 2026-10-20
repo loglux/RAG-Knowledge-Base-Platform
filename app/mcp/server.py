@@ -13,11 +13,13 @@ from uuid import UUID
 
 from fastapi import HTTPException
 from fastmcp import FastMCP
+from fastmcp.server.dependencies import get_http_request
 from sqlalchemy import func, select
 
 from app.api.v1.ollama import fetch_ollama_model_dimension
 from app.config import settings
 from app.core.embeddings_base import EMBEDDING_MODELS, EmbeddingProvider
+from app.core.ownership import ownership_filter
 from app.core.retrieval import get_retrieval_engine
 from app.core.system_settings import SystemSettingsManager
 from app.core.vector_store import get_vector_store
@@ -82,7 +84,34 @@ async def _ensure_tool_enabled(name: str) -> Optional[str]:
     return None
 
 
-async def _get_kb(db, kb_id: Optional[str]) -> Optional[KnowledgeBaseModel]:
+def _get_calling_admin_id() -> Optional[int]:
+    """
+    The admin id behind the MCP bearer token used for this call.
+
+    app/mcp/middleware.py's MCPAuthMiddleware validates the token and sets
+    request.state.mcp_admin_id before any tool body runs - that middleware
+    rejects the request with 401 on its own if the token is missing/invalid,
+    so in normal operation this always resolves to a real admin id. The
+    fallback (None) only matters if get_http_request() can't find the
+    request at all (e.g. a code path FastMCP's context plumbing doesn't
+    cover) - logged because it means isolation isn't actually being
+    enforced for that call, not because it's an expected branch.
+    """
+    try:
+        request = get_http_request()
+        admin_id = getattr(request.state, "mcp_admin_id", None)
+        if admin_id is not None:
+            return int(admin_id)
+    except Exception as exc:
+        logger.warning("Could not resolve calling admin id for MCP tool call: %s", exc)
+        return None
+    logger.warning("MCP tool call has no mcp_admin_id in request.state - auth middleware bug?")
+    return None
+
+
+async def _get_kb(
+    db, kb_id: Optional[str], admin_id: Optional[int]
+) -> Optional[KnowledgeBaseModel]:
     if not kb_id:
         kb_id = settings.MCP_DEFAULT_KB_ID
     if not kb_id:
@@ -91,7 +120,14 @@ async def _get_kb(db, kb_id: Optional[str]) -> Optional[KnowledgeBaseModel]:
         kb_uuid = UUID(str(kb_id))
     except Exception:
         return None
-    return cast(Optional[KnowledgeBaseModel], await db.get(KnowledgeBaseModel, kb_uuid))
+    kb = cast(Optional[KnowledgeBaseModel], await db.get(KnowledgeBaseModel, kb_uuid))
+    if kb is None:
+        return None
+    if kb.user_id is not None and kb.user_id != admin_id:
+        # Same as "not found" - don't confirm existence of a KB this token
+        # can't access.
+        return None
+    return kb
 
 
 def _format_sources(sources: List[Dict[str, Any]]) -> str:
@@ -137,8 +173,9 @@ def build_mcp_app() -> FastMCP:
         if disabled:
             return disabled
 
+        admin_id = _get_calling_admin_id()
         async with get_db_session() as db:
-            kb = await _get_kb(db, knowledge_base_id)
+            kb = await _get_kb(db, knowledge_base_id, admin_id)
             if not kb:
                 return "Error: knowledge_base_id is required (no default configured)."
             if kb.is_deleted:
@@ -209,10 +246,14 @@ def build_mcp_app() -> FastMCP:
         if disabled:
             return disabled
 
+        admin_id = _get_calling_admin_id()
         async with get_db_session() as db:
             result = await db.execute(
                 select(KnowledgeBaseModel)
-                .where(KnowledgeBaseModel.is_deleted == False)
+                .where(
+                    KnowledgeBaseModel.is_deleted == False,
+                    ownership_filter(KnowledgeBaseModel.user_id, admin_id),
+                )
                 .order_by(KnowledgeBaseModel.created_at.desc())
                 .offset((page - 1) * page_size)
                 .limit(page_size)
@@ -234,8 +275,9 @@ def build_mcp_app() -> FastMCP:
         if disabled:
             return disabled
 
+        admin_id = _get_calling_admin_id()
         async with get_db_session() as db:
-            kb = await _get_kb(db, knowledge_base_id)
+            kb = await _get_kb(db, knowledge_base_id, admin_id)
             if not kb:
                 return "Error: knowledge_base_id is required."
             result = await db.execute(
@@ -266,8 +308,9 @@ def build_mcp_app() -> FastMCP:
         if disabled:
             return disabled
 
+        admin_id = _get_calling_admin_id()
         async with get_db_session() as db:
-            kb = await _get_kb(db, knowledge_base_id)
+            kb = await _get_kb(db, knowledge_base_id, admin_id)
             if not kb:
                 return "Error: knowledge_base_id is required."
             if kb.document_count == 0:
@@ -365,8 +408,9 @@ def build_mcp_app() -> FastMCP:
         if disabled:
             return disabled
 
+        admin_id = _get_calling_admin_id()
         async with get_db_session() as db:
-            kb = await _get_kb(db, knowledge_base_id)
+            kb = await _get_kb(db, knowledge_base_id, admin_id)
             if not kb:
                 return "Error: knowledge_base_id is required."
             settings_result = await db.execute(
@@ -396,8 +440,9 @@ def build_mcp_app() -> FastMCP:
         if disabled:
             return disabled
 
+        admin_id = _get_calling_admin_id()
         async with get_db_session() as db:
-            kb = await _get_kb(db, knowledge_base_id)
+            kb = await _get_kb(db, knowledge_base_id, admin_id)
             if not kb:
                 return "Error: knowledge_base_id is required."
             kb.retrieval_settings_json = json.dumps(settings_payload) if settings_payload else None
@@ -411,8 +456,9 @@ def build_mcp_app() -> FastMCP:
         if disabled:
             return disabled
 
+        admin_id = _get_calling_admin_id()
         async with get_db_session() as db:
-            kb = await _get_kb(db, knowledge_base_id)
+            kb = await _get_kb(db, knowledge_base_id, admin_id)
             if not kb:
                 return "Error: knowledge_base_id is required."
             kb.retrieval_settings_json = None
@@ -426,8 +472,9 @@ def build_mcp_app() -> FastMCP:
         if disabled:
             return disabled
 
+        admin_id = _get_calling_admin_id()
         async with get_db_session() as db:
-            kb = await _get_kb(db, knowledge_base_id)
+            kb = await _get_kb(db, knowledge_base_id, admin_id)
             if not kb:
                 return "Error: knowledge_base_id is required."
 
@@ -543,6 +590,7 @@ def build_mcp_app() -> FastMCP:
         if disabled:
             return disabled
 
+        admin_id = _get_calling_admin_id()
         model = embedding_model or "text-embedding-3-large"
         # A model not in the static catalog is assumed to be a locally-pulled
         # Ollama embedding model - resolve its dimension live instead of
@@ -598,6 +646,7 @@ def build_mcp_app() -> FastMCP:
                 chunk_size=chunk_size or default_chunk_size,
                 chunk_overlap=chunk_overlap or default_chunk_overlap,
                 upsert_batch_size=default_batch,
+                user_id=admin_id,
             )
             db.add(kb_model)
             await db.commit()
@@ -628,6 +677,7 @@ def build_mcp_app() -> FastMCP:
         if disabled:
             return disabled
 
+        admin_id = _get_calling_admin_id()
         try:
             kb_uuid = UUID(str(knowledge_base_id))
         except Exception:
@@ -655,7 +705,7 @@ def build_mcp_app() -> FastMCP:
                     kb_id=kb_uuid,
                     kb_update=KnowledgeBaseUpdate(**update_fields),
                     db=db,
-                    user_id=None,
+                    user_id=admin_id,
                 )
             except HTTPException as exc:
                 return f"Error: {exc.detail}"
@@ -669,6 +719,7 @@ def build_mcp_app() -> FastMCP:
         if disabled:
             return disabled
 
+        admin_id = _get_calling_admin_id()
         try:
             kb_uuid = UUID(str(knowledge_base_id))
         except Exception:
@@ -678,7 +729,7 @@ def build_mcp_app() -> FastMCP:
 
         async with get_db_session() as db:
             try:
-                await _api_delete_kb(kb_id=kb_uuid, db=db, user_id=None)
+                await _api_delete_kb(kb_id=kb_uuid, db=db, user_id=admin_id)
             except HTTPException as exc:
                 return f"Error: {exc.detail}"
 
@@ -691,8 +742,9 @@ def build_mcp_app() -> FastMCP:
         if disabled:
             return disabled
 
+        admin_id = _get_calling_admin_id()
         async with get_db_session() as db:
-            kb = await _get_kb(db, knowledge_base_id)
+            kb = await _get_kb(db, knowledge_base_id, admin_id)
             if not kb:
                 return "Error: knowledge_base_id not found."
 
@@ -795,6 +847,7 @@ def build_mcp_app() -> FastMCP:
                 language=page.language,
                 source_url=clean_url,
                 web_metadata=json.dumps(web_meta, ensure_ascii=False) if web_meta else None,
+                user_id=admin_id,
             )
             db.add(doc)
             count = await db.scalar(
@@ -836,8 +889,9 @@ def build_mcp_app() -> FastMCP:
         content_bytes = content.encode("utf-8")
         content_hash = hashlib.sha256(content_bytes).hexdigest()
 
+        admin_id = _get_calling_admin_id()
         async with get_db_session() as db:
-            kb = await _get_kb(db, knowledge_base_id)
+            kb = await _get_kb(db, knowledge_base_id, admin_id)
             if not kb:
                 return "Error: knowledge_base_id not found."
 
@@ -859,6 +913,7 @@ def build_mcp_app() -> FastMCP:
                 content=content,
                 content_hash=content_hash,
                 status=DocumentStatus.PENDING,
+                user_id=admin_id,
             )
             db.add(doc)
             count = await db.scalar(
@@ -901,6 +956,7 @@ def build_mcp_app() -> FastMCP:
         if disabled:
             return disabled
 
+        admin_id = _get_calling_admin_id()
         try:
             kb_uuid = UUID(str(knowledge_base_id))
         except Exception:
@@ -951,7 +1007,7 @@ def build_mcp_app() -> FastMCP:
                     contextual_description_enabled=None,
                     background_tasks=background_tasks,
                     db=db,
-                    user_id=None,
+                    user_id=admin_id,
                 )
             except HTTPException as exc:
                 return f"Error: {exc.detail}"
@@ -980,6 +1036,7 @@ def build_mcp_app() -> FastMCP:
         if disabled:
             return disabled
 
+        admin_id = _get_calling_admin_id()
         try:
             kb_uuid = UUID(str(knowledge_base_id))
         except Exception:
@@ -994,6 +1051,8 @@ def build_mcp_app() -> FastMCP:
         async with get_db_session() as db:
             kb = await db.get(KnowledgeBaseModel, kb_uuid)
             if not kb or kb.is_deleted:
+                return f"Error: knowledge base {knowledge_base_id} not found."
+            if kb.user_id is not None and kb.user_id != admin_id:
                 return f"Error: knowledge base {knowledge_base_id} not found."
 
         from app.services.upload_signing import UPLOAD_URL_TTL_SECONDS, sign_upload
@@ -1021,6 +1080,7 @@ def build_mcp_app() -> FastMCP:
         if disabled:
             return disabled
 
+        admin_id = _get_calling_admin_id()
         try:
             doc_uuid = UUID(str(document_id))
         except Exception:
@@ -1030,7 +1090,7 @@ def build_mcp_app() -> FastMCP:
 
         async with get_db_session() as db:
             try:
-                await _api_delete_document(doc_id=doc_uuid, db=db, user_id=None)
+                await _api_delete_document(doc_id=doc_uuid, db=db, user_id=admin_id)
             except HTTPException as exc:
                 return f"Error: {exc.detail}"
 
