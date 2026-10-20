@@ -15,8 +15,9 @@ from fastapi import HTTPException
 from fastmcp import FastMCP
 from sqlalchemy import func, select
 
+from app.api.v1.ollama import fetch_ollama_model_dimension
 from app.config import settings
-from app.core.embeddings_base import EMBEDDING_MODELS
+from app.core.embeddings_base import EMBEDDING_MODELS, EmbeddingProvider
 from app.core.retrieval import get_retrieval_engine
 from app.core.system_settings import SystemSettingsManager
 from app.core.vector_store import get_vector_store
@@ -543,10 +544,23 @@ def build_mcp_app() -> FastMCP:
             return disabled
 
         model = embedding_model or "text-embedding-3-large"
-        if model not in EMBEDDING_MODELS:
-            return f"Error: unknown embedding_model '{model}'. Available: {', '.join(EMBEDDING_MODELS)}"
-
-        model_config = EMBEDDING_MODELS[model]
+        # A model not in the static catalog is assumed to be a locally-pulled
+        # Ollama embedding model - resolve its dimension live instead of
+        # rejecting it (mirrors app.api.v1.knowledge_bases.create_knowledge_base).
+        embedding_dimension: Optional[int]
+        if model in EMBEDDING_MODELS:
+            model_config = EMBEDDING_MODELS[model]
+            embedding_provider = model_config.provider.value
+            embedding_dimension = model_config.dimension
+        else:
+            embedding_dimension = await fetch_ollama_model_dimension(model)
+            if embedding_dimension is None:
+                return (
+                    f"Error: unknown embedding_model '{model}'. "
+                    f"Available catalogued models: {', '.join(EMBEDDING_MODELS)}. "
+                    "If this is a local Ollama model, pull it on the Ollama server first."
+                )
+            embedding_provider = EmbeddingProvider.OLLAMA.value
 
         async with get_db_session() as db:
             settings_result = await db.execute(
@@ -579,8 +593,8 @@ def build_mcp_app() -> FastMCP:
                 description=description,
                 collection_name=collection_name,
                 embedding_model=model,
-                embedding_provider=model_config.provider.value,
-                embedding_dimension=model_config.dimension,
+                embedding_provider=embedding_provider,
+                embedding_dimension=embedding_dimension,
                 chunk_size=chunk_size or default_chunk_size,
                 chunk_overlap=chunk_overlap or default_chunk_overlap,
                 upsert_batch_size=default_batch,
@@ -592,7 +606,7 @@ def build_mcp_app() -> FastMCP:
                 vector_store = get_vector_store()
                 await vector_store.create_collection(
                     collection_name=collection_name,
-                    vector_size=model_config.dimension,
+                    vector_size=embedding_dimension,
                 )
             except Exception as exc:
                 await db.delete(kb_model)
