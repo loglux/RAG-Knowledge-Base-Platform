@@ -54,15 +54,13 @@ def get_embedding_service(
     # Use default model from settings if not provided
     model = model or settings.OPENAI_EMBEDDING_MODEL
 
-    # Get model configuration
-    if model not in EMBEDDING_MODELS:
-        raise ValueError(
-            f"Unknown embedding model: {model}. "
-            f"Available models: {', '.join(EMBEDDING_MODELS.keys())}"
-        )
-
-    model_config = EMBEDDING_MODELS[model]
-    provider = model_config.provider
+    # Get model configuration (unknown models are assumed to be dynamic
+    # Ollama models, mirroring app.core.llm_factory.create_llm_service)
+    if model in EMBEDDING_MODELS:
+        provider = EMBEDDING_MODELS[model].provider
+    else:
+        logger.info(f"Unknown embedding model '{model}', assuming Ollama dynamic model")
+        provider = EmbeddingProvider.OLLAMA
 
     logger.info(f"Creating {provider.value} embedding service for model: {model}")
 
@@ -127,15 +125,13 @@ def create_embedding_service(
     # Use default model from settings if not provided
     model = model or settings.OPENAI_EMBEDDING_MODEL
 
-    # Get model configuration
-    if model not in EMBEDDING_MODELS:
-        raise ValueError(
-            f"Unknown embedding model: {model}. "
-            f"Available models: {', '.join(EMBEDDING_MODELS.keys())}"
-        )
-
-    model_config = EMBEDDING_MODELS[model]
-    provider = model_config.provider
+    # Get model configuration (unknown models are assumed to be dynamic
+    # Ollama models, mirroring app.core.llm_factory.create_llm_service)
+    if model in EMBEDDING_MODELS:
+        provider = EMBEDDING_MODELS[model].provider
+    else:
+        logger.info(f"Unknown embedding model '{model}', assuming Ollama dynamic model")
+        provider = EmbeddingProvider.OLLAMA
 
     if provider == EmbeddingProvider.OPENAI:
         return OpenAIEmbeddingService(

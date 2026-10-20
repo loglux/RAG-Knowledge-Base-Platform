@@ -6,7 +6,7 @@ Provides abstract interface for different embedding services (OpenAI, Voyage AI,
 
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -148,6 +148,7 @@ class BaseEmbeddingService(ABC):
         api_key: str,
         model: str,
         max_retries: int = 3,
+        skip_validation: bool = False,
     ):
         """
         Initialize embedding service.
@@ -156,26 +157,35 @@ class BaseEmbeddingService(ABC):
             api_key: API key for the provider
             model: Model name to use
             max_retries: Maximum number of retries for failed requests
+            skip_validation: Skip catalog lookup (for dynamic Ollama models)
         """
         self.api_key = api_key
         self.model = model
         self.max_retries = max_retries
 
-        # Get model configuration
+        # Get model configuration (skip for dynamic models)
+        if skip_validation:
+            self.model_config = None
+            return
+
         if model not in EMBEDDING_MODELS:
             raise ValueError(f"Unknown embedding model: {model}")
 
         self.model_config = EMBEDDING_MODELS[model]
 
     @property
-    def provider(self) -> EmbeddingProvider:
-        """Get the provider type."""
-        return self.model_config.provider
+    def provider(self) -> Optional[EmbeddingProvider]:
+        """Get the provider type (None for dynamic/uncatalogued models)."""
+        if self.model_config:
+            return self.model_config.provider
+        return None
 
     @property
-    def dimension(self) -> int:
-        """Get the embedding dimension."""
-        return self.model_config.dimension
+    def dimension(self) -> Optional[int]:
+        """Get the embedding dimension (None for dynamic/uncatalogued models)."""
+        if self.model_config:
+            return self.model_config.dimension
+        return None
 
     @abstractmethod
     async def generate_embedding(self, text: str) -> List[float]:

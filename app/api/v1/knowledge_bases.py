@@ -9,7 +9,8 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, s
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.embeddings_base import EMBEDDING_MODELS
+from app.api.v1.ollama import fetch_ollama_model_dimension
+from app.core.embeddings_base import EMBEDDING_MODELS, EmbeddingProvider
 from app.core.lexical_store import get_lexical_store
 from app.core.vector_store import get_vector_store
 from app.db.session import get_db
@@ -70,16 +71,24 @@ async def create_knowledge_base(
     Creates a new knowledge base with specified configuration.
     Collection name is derived from KB ID for deterministic mapping.
     """
-    # Validate embedding model
-    if kb.embedding_model not in EMBEDDING_MODELS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unknown embedding model: {kb.embedding_model}. "
-            f"Available models: {', '.join(EMBEDDING_MODELS.keys())}",
-        )
-
-    # Get embedding model configuration
-    model_config = EMBEDDING_MODELS[kb.embedding_model]
+    # Resolve embedding provider + dimension. A model not in the static
+    # catalog is assumed to be a locally-pulled Ollama embedding model -
+    # resolve its dimension live via /api/show instead of rejecting it
+    # (mirrors app.core.embeddings_factory's dynamic-Ollama fallback).
+    if kb.embedding_model in EMBEDDING_MODELS:
+        model_config = EMBEDDING_MODELS[kb.embedding_model]
+        embedding_provider = model_config.provider.value
+        embedding_dimension = model_config.dimension
+    else:
+        embedding_dimension = await fetch_ollama_model_dimension(kb.embedding_model)
+        if embedding_dimension is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unknown embedding model: {kb.embedding_model}. "
+                f"Available catalogued models: {', '.join(EMBEDDING_MODELS.keys())}. "
+                "If this is a local Ollama model, pull it on the Ollama server first.",
+            )
+        embedding_provider = EmbeddingProvider.OLLAMA.value
 
     # Generate KB ID and collection name (deterministic)
     import uuid
@@ -114,8 +123,8 @@ async def create_knowledge_base(
         description=kb.description,
         collection_name=collection_name,
         embedding_model=kb.embedding_model,
-        embedding_provider=model_config.provider.value,
-        embedding_dimension=model_config.dimension,
+        embedding_provider=embedding_provider,
+        embedding_dimension=embedding_dimension,
         chunk_size=kb.chunk_size if kb.chunk_size is not None else default_chunk_size,
         chunk_overlap=kb.chunk_overlap if kb.chunk_overlap is not None else default_chunk_overlap,
         chunking_strategy=kb.chunking_strategy,
@@ -143,12 +152,12 @@ async def create_knowledge_base(
         vector_store = get_vector_store()
         logger.info(
             f"Creating Qdrant collection '{collection_name}' "
-            f"for KB '{kb.name}' (dimension={model_config.dimension})"
+            f"for KB '{kb.name}' (dimension={embedding_dimension})"
         )
 
         await vector_store.create_collection(
             collection_name=collection_name,
-            vector_size=model_config.dimension,
+            vector_size=embedding_dimension,
         )
 
         logger.info(f"Successfully created Qdrant collection '{collection_name}'")

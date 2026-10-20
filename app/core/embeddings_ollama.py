@@ -42,6 +42,7 @@ class OllamaEmbeddingService(BaseEmbeddingService):
         base_url: Optional[str] = None,
         model: Optional[str] = None,
         max_retries: int = 3,
+        dimension: Optional[int] = None,
     ):
         """
         Initialize Ollama embeddings service.
@@ -50,6 +51,10 @@ class OllamaEmbeddingService(BaseEmbeddingService):
             base_url: Ollama API base URL (uses settings.OLLAMA_BASE_URL if not provided)
             model: Embedding model name (uses settings.OLLAMA_EMBEDDING_MODEL if not provided)
             max_retries: Maximum number of retries for failed requests
+            dimension: Known embedding dimension for models not in the static
+                catalog (e.g. resolved via Ollama's /api/show). If omitted and
+                the model isn't catalogued, the dimension is probed on first
+                use via a real embedding call.
 
         Raises:
             ValueError: If base URL is missing
@@ -58,12 +63,20 @@ class OllamaEmbeddingService(BaseEmbeddingService):
         api_key = "local"
         model = model or settings.OLLAMA_EMBEDDING_MODEL
 
-        # Initialize base class
-        super().__init__(api_key=api_key, model=model, max_retries=max_retries)
+        # Initialize base class with skip_validation for dynamic models
+        super().__init__(
+            api_key=api_key, model=model, max_retries=max_retries, skip_validation=True
+        )
 
-        # Validate provider
-        if self.provider != EmbeddingProvider.OLLAMA:
+        # Validate provider (only meaningful when the model is catalogued)
+        if self.model_config and self.provider != EmbeddingProvider.OLLAMA:
             raise ValueError(f"Model {model} is not an Ollama model")
+
+        self._dimension = (
+            dimension
+            if dimension is not None
+            else (self.model_config.dimension if self.model_config else None)
+        )
 
         self.base_url = base_url or settings.OLLAMA_BASE_URL
         if not self.base_url:
@@ -197,15 +210,29 @@ class OllamaEmbeddingService(BaseEmbeddingService):
         logger.info(f"Successfully generated {len(results)} embeddings")
         return results
 
+    @property
+    def dimension(self) -> Optional[int]:
+        """Get the embedding dimension (known or resolved via /api/show)."""
+        return self._dimension
+
     async def get_embedding_dimension(self) -> int:
         """
         Get the dimension size of embeddings for the current model.
 
+        For catalogued/pre-resolved models this is free (no API call). For an
+        unrecognized model whose dimension couldn't be resolved up front, it
+        falls back to a single real embedding call and caches the result.
+
         Returns:
             Integer representing embedding dimension size
         """
-        # Return from model config (more efficient than test embedding)
-        return self.dimension
+        if self._dimension is None:
+            embedding = await self.generate_embedding("dimension probe")
+            self._dimension = len(embedding)
+            logger.info(
+                f"Probed embedding dimension for Ollama model '{self.model}': {self._dimension}"
+            )
+        return self._dimension
 
     async def close(self):
         """Close the HTTP client and cleanup resources."""

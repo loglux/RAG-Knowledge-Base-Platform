@@ -1,7 +1,7 @@
 """Ollama models endpoints."""
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import httpx
 from fastapi import APIRouter, HTTPException, status
@@ -38,6 +38,41 @@ async def fetch_ollama_models() -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Failed to fetch Ollama models: {e}")
         raise
+
+
+async def fetch_ollama_model_dimension(model_name: str) -> Optional[int]:
+    """
+    Resolve the embedding dimension for an Ollama model via /api/show.
+
+    Ollama reports embedding size as "<arch>.embedding_length" inside
+    model_info, where the arch prefix varies by model family (bert,
+    nomic-bert, qwen3, gemma, ...). We scan for any key with that suffix
+    instead of hardcoding the prefix.
+
+    Args:
+        model_name: Name/tag of the model as known to the local Ollama server
+
+    Returns:
+        Embedding dimension, or None if it couldn't be determined
+    """
+    if not settings.OLLAMA_BASE_URL:
+        return None
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                f"{settings.OLLAMA_BASE_URL}/api/show",
+                json={"model": model_name},
+            )
+            response.raise_for_status()
+            model_info = response.json().get("model_info", {}) or {}
+            for key, value in model_info.items():
+                if key.endswith(".embedding_length") and isinstance(value, int):
+                    return value
+    except Exception as e:
+        logger.warning(f"Failed to resolve dimension for Ollama model '{model_name}': {e}")
+
+    return None
 
 
 def is_embedding_model(model: Dict[str, Any]) -> bool:
